@@ -55,6 +55,7 @@ The developer tried moving shared code into a Saturn composable (`useLoanIntake`
 
 Section components keep a local `draft` (a deep copy of `modelValue`), edit it, and emit a fresh copy with `update:modelValue`. A deep watcher re-copies when the parent changes. Consequences:
 
+- **A section's new rows must have the same shape as the main form's `createEmpty…` factory.** If a field the main form checks is missing from the screen, the applicant sees a warning they can't fix.
 - **Never store `File` objects inside section data.** The JSON copy turns them into `{}`. Staged files live only in the parent's `documentState`.
 - **The parent's objects can be replaced mid-operation** when the applicant types. After async saves, `syncSavedIds(scopeKey, saved)` copies server IDs onto the current object.
 - Document events (`stage-file`, `remove-file`, `request-file-upload`, `file-rejected`) are passed straight up from sections to the parent.
@@ -151,6 +152,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 - Multiple IDs (PartyIdentification), the split address, the NIS number, and calculated NIS and income tax.
 - Collateral: removed the category dropdown, added insurance details, and added third-party collateral.
 - Tried moving shared code into a `useLoanIntake` composable, then reverted. Everything lives in the main form again.
+- Rebuilt `AdaptiveLoanCollateralSection.vue` to match the main form: the owner choice (applicant or third party), the third-party asset and owner fields, and the insurance fields. The old Category dropdown is gone. The repo copy had been an old version, so the form warned about insurance fields that weren't on screen.
 
 ### Decisions still waiting on the developer
 
