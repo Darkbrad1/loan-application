@@ -99,6 +99,7 @@
                             :primary="formData.primary"
                             :parties="formData.parties"
                             :lookups="lookups"
+                            :resource-props="resourceProps"
                             :active-tab="activePartyTab"
                             :minimum-identifications="minimumIdentifications"
                             :deductions="deductionsByApplicant"
@@ -137,6 +138,7 @@
                             :third-party-owner-ids="thirdPartyOwnerPartyIds"
                             :requires-collateral="requiresCollateral"
                             :lookups="lookups"
+                            :resource-props="resourceProps"
                             @update:model-value="formData.assets = $event"
                             :document-scopes="documentScopes"
                             :uploading-key="uploadingDocumentKey"
@@ -159,6 +161,7 @@
                             :liability-types="liabilityTypes"
                             :default-revolving-rate="defaultRevolvingRate"
                             :lookups="lookups"
+                            :resource-props="resourceProps"
                             @update:model-value="formData.liabilities = $event"
                             :document-scopes="documentScopes"
                             :uploading-key="uploadingDocumentKey"
@@ -181,6 +184,7 @@
                             :expense-types="expenseTypes"
                             :loan-category-label="loanCategoryLabel"
                             :lookups="lookups"
+                            :resource-props="resourceProps"
                             @update:model-value="formData.expenses = $event"
                             :document-scopes="documentScopes"
                             :uploading-key="uploadingDocumentKey"
@@ -547,9 +551,11 @@ export default {
             // was removed by the applicant and is deleted on the next save.
             persistedIds: {},
 
-            // Saturn's own field definitions for Application, so the request
-            // step can render them with Saturn's FormField.
+            // Saturn's own field definitions, so the steps can render them
+            // with Saturn's FormField. applicationProps is the Application
+            // list; resourceProps holds every resource's list by name.
             applicationProps: [],
+            resourceProps: {},
 
             // Dropdown option lists keyed by field name
             lookups: {
@@ -2312,6 +2318,16 @@ export default {
 
             this.products = this.toList(products);
             this.applicationProps = this.toList(applicationProps);
+            this.resourceProps = {
+                Application: this.toList(applicationProps),
+                Party: this.toList(partyProps),
+                ApplicationParty: this.toList(applicationPartyProps),
+                PartyIdentification: this.toList(identificationProps),
+                Asset: this.toList(assetProps),
+                Liability: this.toList(liabilityProps),
+                Expense: this.toList(expenseProps),
+                Collateral: this.toList(collateralProps),
+            };
 
             this.liabilityTypes = this.activeSortedTypes(liabilityTypeRows).map(
                 (type) => ({

@@ -29,6 +29,7 @@
         <AdaptiveLoanApplicantEditor
           :model-value="person"
           :lookups="lookups"
+          :resource-props="resourceProps"
           :role-options="additionalRoleOptions"
           :show-role="index > 0"
           :minimum-identifications="minimumIdentifications"
@@ -92,6 +93,11 @@ export default {
       default: () => [],
     },
     lookups: {
+      type: Object,
+      default: () => ({}),
+    },
+    /** Saturn's property definitions, keyed by resource name. */
+    resourceProps: {
       type: Object,
       default: () => ({}),
     },

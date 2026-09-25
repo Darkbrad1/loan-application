@@ -27,26 +27,22 @@
 
       <div class="field-grid">
         <el-form-item label="Creditor" required>
-          <el-input
+          <FormField
             :model-value="item.creditor_name"
-            @input="set(index, 'creditor_name', $event)"
+            :property="field('Liability', 'creditor_name', 'Creditor', 'input')"
+            :form="item"
+            @update:model-value="set(index, 'creditor_name', $event)"
           />
         </el-form-item>
 
         <!-- Options come from LiabilityType records; value is the record ID -->
         <el-form-item label="Liability type" required>
-          <el-select
+          <FormField
             :model-value="item.liability_type"
-            placeholder="Select liability type"
+            :property="field('Liability', 'liability_type', 'Liability type', 'select', { options: liabilityTypeOptions, force: true })"
+            :form="item"
             @update:model-value="set(index, 'liability_type', $event)"
-          >
-            <el-option
-              v-for="type in liabilityTypes"
-              :key="typeId(type)"
-              :label="type.name"
-              :value="typeId(type)"
-            />
-          </el-select>
+          />
           <small
             v-if="item.liability_type && !typeOf(item)"
             class="helper invalid"
@@ -56,9 +52,10 @@
         </el-form-item>
 
         <el-form-item label="Outstanding balance (EC$)" required>
-          <el-input-number
+          <FormField
             :model-value="item.outstanding_balance"
-            :min="0"
+            :property="field('Liability', 'outstanding_balance', 'Outstanding balance (EC$)', 'number')"
+            :form="item"
             @update:model-value="set(index, 'outstanding_balance', $event)"
           />
         </el-form-item>
@@ -69,34 +66,30 @@
           label="Credit limit (EC$)"
           required
         >
-          <el-input-number
+          <FormField
             :model-value="item.credit_limit"
-            :min="0"
+            :property="field('Liability', 'credit_limit', 'Credit limit (EC$)', 'number')"
+            :form="item"
             @update:model-value="set(index, 'credit_limit', $event)"
           />
         </el-form-item>
 
         <el-form-item label="Payment amount (EC$)" required>
-          <el-input-number
+          <FormField
             :model-value="item.payment_amount"
-            :min="0"
+            :property="field('Liability', 'payment_amount', 'Payment amount (EC$)', 'number')"
+            :form="item"
             @update:model-value="set(index, 'payment_amount', $event)"
           />
         </el-form-item>
 
         <el-form-item label="Payment frequency">
-          <el-select
+          <FormField
             :model-value="item.payment_frequency"
-            placeholder="Select frequency"
+            :property="field('Liability', 'payment_frequency', 'Payment frequency', 'select', { options: lookup('payment_frequency') })"
+            :form="item"
             @update:model-value="set(index, 'payment_frequency', $event)"
-          >
-            <el-option
-              v-for="option in lookup('payment_frequency')"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
+          />
         </el-form-item>
 
         <!--
@@ -150,6 +143,10 @@
  *
  * Uses the local draft pattern: edits happen on a deep-cloned copy and are
  * committed upward via update:modelValue.
+ *
+ * Every input is Saturn's built-in FormField, using Saturn's own
+ * definitions of the Liability properties when they exist. Liability type
+ * always uses the LiabilityType records passed in by the parent.
  */
 export default {
   props: {
@@ -195,6 +192,11 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    /** Saturn's property definitions, keyed by resource name. */
+    resourceProps: {
+      type: Object,
+      default: () => ({}),
+    },
   },
 
   emits: [
@@ -211,6 +213,21 @@ export default {
       // Local working copy; synced back to the parent on every change.
       draft: this.copy(this.modelValue),
     };
+  },
+
+  created() {
+    // FormField configs, reused while unchanged (see field()).
+    this.fieldCache = {};
+  },
+
+  computed: {
+    /** LiabilityType records as dropdown options (value is the record ID). */
+    liabilityTypeOptions() {
+      return this.liabilityTypes.map((type) => ({
+        label: type.name,
+        value: this.typeId(type),
+      }));
+    },
   },
 
   watch: {
@@ -280,6 +297,70 @@ export default {
       })}`;
     },
 
+    // ---- Saturn FormField helpers (the same in every section) ----
+
+    /**
+     * FormField's update event may send the value itself or
+     * { property, data } (the Saturn guide isn't clear), so accept both.
+     * Dates are kept as YYYY-MM-DD strings.
+     */
+    valueOf(event, kind) {
+      let value = event;
+      if (value && typeof value === 'object' && 'property' in value && 'data' in value) {
+        value = value.data;
+      }
+      return kind === 'date' ? this.toDateString(value) : value;
+    },
+
+    /** A date as YYYY-MM-DD (the local date for Date objects), or ''. */
+    toDateString(value) {
+      if (!value) return '';
+      if (value instanceof Date) {
+        const pad = (number) => String(number).padStart(2, '0');
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+      }
+      return String(value).slice(0, 10);
+    },
+
+    /** Saturn's definition of one property of a resource, or null. */
+    savedProperty(resourceName, name) {
+      const rows = this.resourceProps[resourceName] || [];
+      return rows.find((row) => String(row.property || row.key || row.name || '') === name) || null;
+    },
+
+    /**
+     * FormField property config for one field. Uses Saturn's own definition
+     * of the property (with our label) when there is one, unless
+     * extra.force is set (for dropdowns whose options the form decides).
+     * Otherwise builds a basic one from the Saturn guide; a dropdown with
+     * no options becomes a text box. Configs are reused while unchanged, so
+     * FormField isn't handed a new object on every keystroke.
+     */
+    field(resourceName, name, label, kind, extra) {
+      const options = (extra && extra.options) || [];
+      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+      let config;
+      if (saved) {
+        config = Object.assign({}, saved, { property: name, label });
+      } else if (kind === 'number' || kind === 'date') {
+        config = { property: name, label, type: kind };
+      } else if (kind === 'checkbox') {
+        config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
+      } else if (kind === 'select' && options.length) {
+        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
+      } else {
+        config = {
+          property: name,
+          label,
+          type: 'string',
+          input_properties: { type: kind === 'textarea' ? 'textarea' : 'input' },
+        };
+      }
+      const cacheKey = JSON.stringify(config);
+      if (!this.fieldCache[cacheKey]) this.fieldCache[cacheKey] = config;
+      return this.fieldCache[cacheKey];
+    },
+
     /** Pushes the current draft up to the parent. */
     notify() {
       this.$emit('update:modelValue', this.copy(this.draft));
@@ -289,9 +370,9 @@ export default {
      * Updates one field on one liability and notifies the parent. Switching
      * to a non-revolving type clears the limit so stale values aren't saved.
      */
-    set(index, fieldName, value) {
+    set(index, fieldName, event) {
       const item = this.draft[index];
-      item[fieldName] = value;
+      item[fieldName] = this.valueOf(event);
 
       if (fieldName === 'liability_type' && !this.isRevolving(item)) {
         item.credit_limit = null;

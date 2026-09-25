@@ -27,62 +27,25 @@
 
       <div class="field-grid">
         <el-form-item label="Responsible applicant" required>
-          <el-select
+          <FormField
             :model-value="item.application_party_id"
-            placeholder="Select applicant"
+            :property="field('Expense', 'applicationpartiesid', 'Responsible applicant', 'select', { options: applicationPartyOptions, force: true })"
+            :form="item"
             @update:model-value="set(index, 'application_party_id', $event)"
-          >
-            <el-option
-              v-for="option in applicationPartyOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
+          />
         </el-form-item>
 
         <!--
           Options are ExpenseType records filtered by the parent to the
-          selected loan category. Grouped when the types define a group.
+          selected loan category, sorted by group.
         -->
         <el-form-item label="Expense type" required>
-          <el-select
+          <FormField
             :model-value="item.expense_type"
-            placeholder="Select expense type"
+            :property="field('Expense', 'expense_type', 'Expense type', 'select', { options: typeOptionsFor(item), force: true })"
+            :form="item"
             @update:model-value="set(index, 'expense_type', $event)"
-          >
-            <!-- Keeps a no-longer-applicable value readable instead of showing its ID -->
-            <el-option
-              v-if="isInapplicable(item)"
-              :key="`current-${item.expense_type}`"
-              :label="typeName(item.expense_type) || 'Unavailable type'"
-              :value="item.expense_type"
-              disabled
-            />
-
-            <template v-if="hasGroups">
-              <el-option-group
-                v-for="group in groupedOptions"
-                :key="group.label"
-                :label="group.label"
-              >
-                <el-option
-                  v-for="option in group.options"
-                  :key="option.value"
-                  :label="option.label"
-                  :value="option.value"
-                />
-              </el-option-group>
-            </template>
-            <template v-else>
-              <el-option
-                v-for="option in expenseTypeOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </template>
-          </el-select>
+          />
           <small v-if="isInapplicable(item)" class="helper invalid">
             This expense doesn't apply to a {{ loanCategoryLabel }}. Choose
             another type or remove it.
@@ -90,34 +53,30 @@
         </el-form-item>
 
         <el-form-item label="Expense name">
-          <el-input
+          <FormField
             :model-value="item.expense_name"
-            :placeholder="typeName(item.expense_type) || 'Optional description'"
-            @input="set(index, 'expense_name', $event)"
+            :property="field('Expense', 'expense_name', 'Expense name', 'input')"
+            :form="item"
+            @update:model-value="set(index, 'expense_name', $event)"
           />
         </el-form-item>
 
         <el-form-item label="Amount (EC$)" required>
-          <el-input-number
+          <FormField
             :model-value="item.amount"
-            :min="0"
+            :property="field('Expense', 'amount', 'Amount (EC$)', 'number')"
+            :form="item"
             @update:model-value="set(index, 'amount', $event)"
           />
         </el-form-item>
 
         <el-form-item label="Frequency">
-          <el-select
+          <FormField
             :model-value="item.frequency"
-            placeholder="Select frequency"
+            :property="field('Expense', 'frequency', 'Frequency', 'select', { options: lookup('expense_frequency') })"
+            :form="item"
             @update:model-value="set(index, 'frequency', $event)"
-          >
-            <el-option
-              v-for="option in lookup('expense_frequency')"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
+          />
         </el-form-item>
       </div>
 
@@ -144,6 +103,10 @@
  *
  * Uses the local draft pattern: edits happen on a deep-cloned copy and are
  * committed upward via update:modelValue.
+ *
+ * Every input is Saturn's built-in FormField, using Saturn's own
+ * definitions of the Expense properties when they exist. The responsible
+ * applicant and expense type always use the options from the parent.
  */
 export default {
   props: {
@@ -191,6 +154,11 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    /** Saturn's property definitions, keyed by resource name. */
+    resourceProps: {
+      type: Object,
+      default: () => ({}),
+    },
   },
 
   emits: [
@@ -215,24 +183,28 @@ export default {
       return new Set(this.expenseTypeOptions.map((option) => option.value));
     },
 
-    hasGroups() {
-      return this.expenseTypeOptions.some((option) => option.group);
-    },
-
-    /** Options grouped by ExpenseType.group, in first-seen order. */
-    groupedOptions() {
+    /**
+     * Selectable types as dropdown options, with types in the same
+     * ExpenseType.group kept together (in first-seen order).
+     */
+    sortedTypeOptions() {
       const groups = [];
       this.expenseTypeOptions.forEach((option) => {
-        const label = option.group || 'Other';
-        let group = groups.find((entry) => entry.label === label);
-        if (!group) {
-          group = { label, options: [] };
-          groups.push(group);
-        }
-        group.options.push(option);
+        if (!groups.includes(option.group || '')) groups.push(option.group || '');
       });
-      return groups;
+      const rows = [];
+      groups.forEach((group) => {
+        this.expenseTypeOptions
+          .filter((option) => (option.group || '') === group)
+          .forEach((option) => rows.push({ label: option.label, value: option.value }));
+      });
+      return rows;
     },
+  },
+
+  created() {
+    // FormField configs, reused while unchanged (see field()).
+    this.fieldCache = {};
   },
 
   watch: {
@@ -292,8 +264,86 @@ export default {
       return true;
     },
 
+    /**
+     * Type options for one expense. A type that no longer applies stays in
+     * the list (marked unavailable) so it shows its name, not its ID.
+     */
+    typeOptionsFor(item) {
+      if (!this.isInapplicable(item)) return this.sortedTypeOptions;
+      return [
+        {
+          label: `${this.typeName(item.expense_type) || 'Unavailable type'} (not available)`,
+          value: item.expense_type,
+        },
+      ].concat(this.sortedTypeOptions);
+    },
+
     title(item, index) {
       return item.expense_name || this.typeName(item.expense_type) || `Expense ${index + 1}`;
+    },
+
+    // ---- Saturn FormField helpers (the same in every section) ----
+
+    /**
+     * FormField's update event may send the value itself or
+     * { property, data } (the Saturn guide isn't clear), so accept both.
+     * Dates are kept as YYYY-MM-DD strings.
+     */
+    valueOf(event, kind) {
+      let value = event;
+      if (value && typeof value === 'object' && 'property' in value && 'data' in value) {
+        value = value.data;
+      }
+      return kind === 'date' ? this.toDateString(value) : value;
+    },
+
+    /** A date as YYYY-MM-DD (the local date for Date objects), or ''. */
+    toDateString(value) {
+      if (!value) return '';
+      if (value instanceof Date) {
+        const pad = (number) => String(number).padStart(2, '0');
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+      }
+      return String(value).slice(0, 10);
+    },
+
+    /** Saturn's definition of one property of a resource, or null. */
+    savedProperty(resourceName, name) {
+      const rows = this.resourceProps[resourceName] || [];
+      return rows.find((row) => String(row.property || row.key || row.name || '') === name) || null;
+    },
+
+    /**
+     * FormField property config for one field. Uses Saturn's own definition
+     * of the property (with our label) when there is one, unless
+     * extra.force is set (for dropdowns whose options the form decides).
+     * Otherwise builds a basic one from the Saturn guide; a dropdown with
+     * no options becomes a text box. Configs are reused while unchanged, so
+     * FormField isn't handed a new object on every keystroke.
+     */
+    field(resourceName, name, label, kind, extra) {
+      const options = (extra && extra.options) || [];
+      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+      let config;
+      if (saved) {
+        config = Object.assign({}, saved, { property: name, label });
+      } else if (kind === 'number' || kind === 'date') {
+        config = { property: name, label, type: kind };
+      } else if (kind === 'checkbox') {
+        config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
+      } else if (kind === 'select' && options.length) {
+        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
+      } else {
+        config = {
+          property: name,
+          label,
+          type: 'string',
+          input_properties: { type: kind === 'textarea' ? 'textarea' : 'input' },
+        };
+      }
+      const cacheKey = JSON.stringify(config);
+      if (!this.fieldCache[cacheKey]) this.fieldCache[cacheKey] = config;
+      return this.fieldCache[cacheKey];
     },
 
     /** Pushes the current draft up to the parent. */
@@ -302,8 +352,8 @@ export default {
     },
 
     /** Updates one field on one expense and notifies the parent. */
-    set(index, fieldName, value) {
-      this.draft[index][fieldName] = value;
+    set(index, fieldName, event) {
+      this.draft[index][fieldName] = this.valueOf(event);
       this.notify();
     },
 

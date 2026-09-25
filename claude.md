@@ -33,11 +33,13 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 |`AdaptiveLoanProductSection`|Step 1: loan category and product.|
 |`AdaptiveLoanApplicantsSection.vue`|Applicants step: one tab per applicant, plus that applicant's documents. Shows a note that only people listed here can own assets, so owners who aren't borrowing are added as Third Party Owners.|
 |`AdaptiveLoanApplicantEditor.vue`|One applicant: personal details, split address, NIS number, IDs (with scans), employment and income, estimated deductions, and consents. A Third Party Owner gets a short form instead (see Business rules).|
-|`AdaptiveLoanRequestSection`|Amount, term, purpose, and auto, home, or business details. **On `dev`:** every input is Saturn's `FormField` (see below).|
+|`AdaptiveLoanRequestSection`|Amount, term, purpose, and auto, home, or business details.|
 |`AdaptiveLoanAssetsSection.vue`|Assets with ownership splits and per-asset documents. On loans that need collateral, each asset has a "Use this asset as collateral" checkbox that reveals the insurance questions, collateral notes, and collateral documents.|
 |`AdaptiveLoanLiabilitiesSection.vue`|Liabilities with responsibility splits, credit limits for revolving credit, and documents.|
 |`AdaptiveLoanExpensesSection.vue`|Expenses, filtered by loan category, with documents.|
 |`AdaptiveLoanAllocationEditor`|Percentage split editor (ownership and responsibility) that must total 100%.|
+
+**On `dev`, every input in every section is Saturn's `FormField`** (see below). The Product step (clickable cards) and the Review step (read-only) have no inputs to convert.
 |`AdaptiveLoanDocumentRequirements.vue`|Reusable document upload cards for one owner (the application, an applicant, an ID, or an item).|
 |`AdaptiveLoanReviewSection.vue`|Final review step. Currently thin: totals and counts only.|
 
@@ -59,16 +61,19 @@ Section components keep a local `draft` (a deep copy of `modelValue`), edit it, 
 - **The parent's objects can be replaced mid-operation** when the applicant types. After async saves, `syncSavedIds(scopeKey, saved)` copies server IDs onto the current object.
 - Document events (`stage-file`, `remove-file`, `request-file-upload`, `file-rejected`) are passed straight up from sections to the parent.
 
-### Saturn `FormField` (trial on `dev`)
+### Saturn `FormField` (on `dev`)
 
-The request section renders every input with Saturn's built-in `FormField` instead of `el-input`, `el-select`, and so on.
+Every section renders its inputs with Saturn's built-in `FormField` instead of `el-input`, `el-select`, `el-checkbox`, and so on. The request section was tested in Saturn first and worked; the other sections followed the same pattern.
 
-- The main form loads Saturn's field definitions for Application (`loadResourceProps("Application")`) into `applicationProps` and passes them to the section.
-- **Each field uses Saturn's own definition** of that property when it exists, with our label, so the input type and dropdown options follow the resource settings in Saturn. Without one, the section builds a basic definition from the Saturn guide (`type: "number"`, `type: "date"`, `lookup_type: "values"` with `map.values`, or `input_properties.type` of `input`/`textarea`).
-- The property configs are built once in a computed `fields` map, not in the template, so `FormField` isn't handed a new object on every keystroke.
-- **The update event payload is unclear** in the guide (the value, or `{ property, data }`), so `valueOf()` accepts both.
-- Each `FormField` sits inside an `el-form-item`, which shows the label and required star. If Saturn also shows its own label, remove one of them.
-- `FormField` has no min/max, so the amount and term limits are only checked when the applicant presses Continue (they're still shown under the inputs).
+- **The main form passes Saturn's field definitions** to the sections: `applicationProps` (Application) to the request section, and `resourceProps` (every resource by name: Application, Party, ApplicationParty, PartyIdentification, Asset, Liability, Expense, Collateral) to the others.
+- **Each field uses Saturn's own definition** of that property when it exists, with our label, so the input type and dropdown options follow the resource settings in Saturn.
+- **Some dropdowns always use the form's own options (`force`),** because the form decides what's allowed: role (no "Primary Applicant"), identification type (types already used on that applicant's other IDs are left out), liability type (LiabilityType records), expense type (filtered by loan category), the responsible applicant, and the owner in ownership splits.
+- **Without a Saturn definition,** a basic one is built from the Saturn guide: `type: "number"`, `type: "date"`, `type: "boolean"` with `input_properties.type: "check-box"`, `lookup_type: "values"` with `map.values`, or `input_properties.type` of `input`/`textarea`. A dropdown with no options becomes a text box.
+- **Configs are reused while unchanged** (`fieldCache`, set in `created()`), so `FormField` isn't handed a new object on every keystroke. The request section does the same with a computed `fields` map.
+- **The same helpers are copied into each section** (`valueOf`, `toDateString`, `savedProperty`, `field`), since Saturn components can't share code. Keep the copies the same.
+- **The update event payload is unclear** in the guide (the value, or `{ property, data }`), so `valueOf()` accepts both. Dates are stored as `YYYY-MM-DD` strings (the local date for `Date` objects).
+- Each `FormField` sits inside an `el-form-item`, which shows the label and required star.
+- **What was lost:** `FormField` has no min/max, so amounts, terms, and percentages aren't limited as they're typed (the main form still checks them on Continue). The expense type dropdown no longer shows group headings; types are kept together by group instead. Placeholders are gone.
 
 ## Wizard steps
 
@@ -178,14 +183,14 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 2. **Minimum IDs:** 1 or 2.
 3. **Credit bureau consent:** signed in the form, or a form downloaded, signed, and uploaded. Skipped for now.
 4. **Review screen:** Saturn's `ResourceViewInline` or expanding our own.
-5. **Input boxes:** Saturn `FormField` or our hand-built ones. **Being tried on the `dev` branch** in `AdaptiveLoanRequestSection` first; decide after testing it in Saturn.
+5. **Input boxes:** Saturn `FormField` or our hand-built ones. **Leaning to `FormField`:** the request section worked in Saturn, and every section now uses it on `dev`. Merge to `main` once the other sections are tested.
 6. **Upload boxes:** Saturn `typed_file_upload` or ours.
 7. **Submit failure:** have the workflow set the status and the number together (recommended), or keep the current order and let officers spot stuck applications.
 
 ### Next up
 
 - **Projected insurance expense:** turn each collateral insurance premium into a read-only monthly expense marked `is_projected`.
-- **Remove spread syntax (`...`):** the reverted code still uses it (about 14 places left in the main form, plus one in `AdaptiveLoanAllocationEditor.vue`; the code touched so far has been cleaned), and Saturn fails on it at runtime.
+- **Remove spread syntax (`...`):** the reverted code still uses it (about 14 places left in the main form; the sections are clean), and Saturn fails on it at runtime.
 - **Add missing files to the repo:** `AdaptiveLoanDocumentRequirements.vue` is used by the main form but isn't in the repo yet.
 - **Cleanup:** remove the dead CSS from the old Documents screen (e.g. `.legacy-queue`), and reorganize the main form into labelled sections.
 
