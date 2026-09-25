@@ -259,10 +259,6 @@ export default {
             this.$emit("update:modelValue", this.copy(this.draft));
         },
 
-        lookup(key) {
-            return this.lookups[key] || [];
-        },
-
         /** Saturn's definition of an Application property, or null. */
         savedProperty(name) {
             return (
@@ -290,15 +286,8 @@ export default {
             if (kind === "date") {
                 return { property: name, label, type: "date" };
             }
-            if (kind === "select") {
-                return {
-                    property: name,
-                    label,
-                    type: "string",
-                    lookup_type: "values",
-                    map: { values: this.lookup(name) },
-                };
-            }
+            // FormField's own option lists (lookup_type "values") don't work
+            // in Saturn, so a dropdown with no Saturn definition is a text box.
             return {
                 property: name,
                 label,

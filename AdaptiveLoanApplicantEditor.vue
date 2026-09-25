@@ -9,21 +9,32 @@
       </p>
       <div class="field-grid">
         <el-form-item v-if="showRole" label="Role" required>
-          <FormField
+          <el-select
             :model-value="draft.role"
-            :property="roleField"
-            :form="draft"
+            placeholder="Select role"
             @update:model-value="set('role', $event)"
-          />
+          >
+            <el-option
+              v-for="option in roleOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="Owner is a" required>
-          <FormField
+          <el-select
             :model-value="draft.kind || 'PERSON'"
-            :property="field('Party', 'kind', 'Owner is a', 'select', { options: ownerKindOptions, force: true })"
-            :form="draft"
             @update:model-value="set('kind', $event)"
-          />
+          >
+            <el-option
+              v-for="option in ownerKindOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item v-if="draft.kind === 'ORGANIZATION'" label="Business name" required>
@@ -58,7 +69,7 @@
         <el-form-item label="Relationship to the primary applicant" required>
           <FormField
             :model-value="draft.relationship_to_applicant"
-            :property="field('ApplicationParty', 'relationship_to_applicant', 'Relationship to the primary applicant', 'select', { options: lookup('relationship_to_applicant') })"
+            :property="field('ApplicationParty', 'relationship_to_applicant', 'Relationship to the primary applicant', 'select')"
             :form="draft"
             @update:model-value="set('relationship_to_applicant', $event)"
           />
@@ -88,12 +99,18 @@
       <!-- Personal details -->
       <div class="field-grid">
         <el-form-item v-if="showRole" label="Role" required>
-          <FormField
+          <el-select
             :model-value="draft.role"
-            :property="roleField"
-            :form="draft"
+            placeholder="Select role"
             @update:model-value="set('role', $event)"
-          />
+          >
+            <el-option
+              v-for="option in roleOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="First name" required>
@@ -144,7 +161,7 @@
         <el-form-item label="Marital status">
           <FormField
             :model-value="draft.marital_status"
-            :property="field('Party', 'marital_status', 'Marital status', 'select', { options: lookup('marital_status') })"
+            :property="field('Party', 'marital_status', 'Marital status', 'select')"
             :form="draft"
             @update:model-value="set('marital_status', $event)"
           />
@@ -175,7 +192,7 @@
           <el-form-item label="Country" required>
             <FormField
               :model-value="draft.country"
-              :property="field('Party', 'country', 'Country', 'select', { options: lookup('country') })"
+              :property="field('Party', 'country', 'Country', 'select')"
               :form="draft"
               @update:model-value="set('country', $event)"
             />
@@ -185,7 +202,7 @@
           <el-form-item v-if="inGrenada" label="Parish" required>
             <FormField
               :model-value="draft.parish"
-              :property="field('Party', 'parish', 'Parish', 'select', { options: lookup('parish') })"
+              :property="field('Party', 'parish', 'Parish', 'select')"
               :form="draft"
               @update:model-value="set('parish', $event)"
             />
@@ -235,7 +252,7 @@
             <el-form-item label="Identification type" required>
               <FormField
                 :model-value="row.identification_type"
-                :property="field('PartyIdentification', 'identification_type', 'Identification type', 'select', { options: lookup('identification_type') })"
+                :property="field('PartyIdentification', 'identification_type', 'Identification type', 'select')"
                 :form="row"
                 @update:model-value="setIdentification(index, 'identification_type', $event)"
               />
@@ -253,7 +270,7 @@
             <el-form-item label="Issuing country">
               <FormField
                 :model-value="row.issuing_country"
-                :property="field('PartyIdentification', 'issuing_country', 'Issuing country', 'select', { options: lookup('country') })"
+                :property="field('PartyIdentification', 'issuing_country', 'Issuing country', 'select')"
                 :form="row"
                 @update:model-value="setIdentification(index, 'issuing_country', $event)"
               />
@@ -302,7 +319,7 @@
           <el-form-item label="Employment status">
             <FormField
               :model-value="draft.employment_status"
-              :property="field('ApplicationParty', 'employment_status', 'Employment status', 'select', { options: lookup('employment_status') })"
+              :property="field('ApplicationParty', 'employment_status', 'Employment status', 'select')"
               :form="draft"
               @update:model-value="set('employment_status', $event)"
             />
@@ -414,8 +431,9 @@
  *
  * Every input is Saturn's built-in FormField. Each field uses Saturn's own
  * definition of the property (Party, ApplicationParty, or
- * PartyIdentification) when there is one. Role always uses the form's own
- * options, since "Primary Applicant" is left out.
+ * PartyIdentification) when there is one. Role and "Owner is a" are
+ * el-selects, since the form decides their choices ("Primary Applicant" is
+ * left out of Role).
  */
 export default {
   props: {
@@ -493,14 +511,6 @@ export default {
     /** Matches THIRD_PARTY_OWNER_ROLE in the main form. */
     isThirdPartyOwner() {
       return String(this.draft.role || '').trim().toLowerCase() === 'third party owner';
-    },
-
-    /** Role always uses the parent's options ("Primary Applicant" is left out). */
-    roleField() {
-      return this.field('ApplicationParty', 'role', 'Role', 'select', {
-        options: this.roleOptions,
-        force: true,
-      });
     },
 
     showEmploymentDetails() {
@@ -598,15 +608,15 @@ export default {
 
     /**
      * FormField property config for one field. Uses Saturn's own definition
-     * of the property (with our label) when there is one, unless
-     * extra.force is set (for dropdowns whose options the form decides).
-     * Otherwise builds a basic one from the Saturn guide; a dropdown with
-     * no options becomes a text box. Configs are reused while unchanged, so
-     * FormField isn't handed a new object on every keystroke.
+     * of the property (with our label) when there is one. Otherwise builds a
+     * basic one from the Saturn guide; a dropdown becomes a text box, since
+     * FormField's own option lists (lookup_type "values") don't work in
+     * Saturn. Dropdowns whose choices the form decides use el-select
+     * instead. Configs are reused while unchanged, so FormField isn't handed
+     * a new object on every keystroke.
      */
-    field(resourceName, name, label, kind, extra) {
-      const options = (extra && extra.options) || [];
-      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+    field(resourceName, name, label, kind) {
+      const saved = this.savedProperty(resourceName, name);
       let config;
       if (saved) {
         config = Object.assign({}, saved, { property: name, label });
@@ -614,8 +624,6 @@ export default {
         config = { property: name, label, type: kind };
       } else if (kind === 'checkbox') {
         config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
-      } else if (kind === 'select' && options.length) {
-        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
       } else {
         config = {
           property: name,

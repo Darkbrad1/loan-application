@@ -11,18 +11,24 @@
       class="allocation-row"
     >
       <el-form-item :label="selectLabel" required>
-        <FormField
+        <el-select
           :model-value="row[referenceKey]"
-          :property="field(referenceKey, selectLabel, 'select', options)"
-          :form="row"
+          placeholder="Select"
           @update:model-value="setValue(index, referenceKey, $event)"
-        />
+        >
+          <el-option
+            v-for="option in options"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="Percentage" required>
         <FormField
           :model-value="row.percentage"
-          :property="field('percentage', 'Percentage', 'number')"
+          :property="field('percentage', 'Percentage')"
           :form="row"
           @update:model-value="setValue(index, 'percentage', $event)"
         />
@@ -50,9 +56,9 @@
  * liability responsibility (by ApplicationParty). The rows must total
  * 100%; the main form checks that before the applicant can continue.
  *
- * Every input is Saturn's built-in FormField. The owner dropdown always
- * uses the options passed in, since they're the people on this
- * application. FormField has no min/max, so the percentage isn't limited
+ * The percentage is Saturn's built-in FormField. The owner dropdown is an
+ * el-select of the options passed in, since they're the people on this
+ * application (FormField's own option lists don't work in Saturn). FormField has no min/max, so the percentage isn't limited
  * to 0 to 100 as it's typed; the total shown below turns red until it's 100.
  */
 export default {
@@ -116,21 +122,11 @@ export default {
     },
 
     /**
-     * FormField property config: a dropdown of the given options, or a
-     * number. Reused while unchanged, so FormField isn't handed a new
-     * object on every keystroke.
+     * FormField property config for the percentage (a number). Reused while
+     * unchanged, so FormField isn't handed a new object on every keystroke.
      */
-    field(name, label, kind, options) {
-      const config =
-        kind === 'select'
-          ? {
-              property: name,
-              label,
-              type: 'string',
-              lookup_type: 'values',
-              map: { values: options || [] },
-            }
-          : { property: name, label, type: 'number' };
+    field(name, label) {
+      const config = { property: name, label, type: 'number' };
       const cacheKey = JSON.stringify(config);
       if (!this.fieldCache[cacheKey]) this.fieldCache[cacheKey] = config;
       return this.fieldCache[cacheKey];

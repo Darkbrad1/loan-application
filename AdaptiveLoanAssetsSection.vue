@@ -49,7 +49,7 @@
         <el-form-item label="Asset type" required>
           <FormField
             :model-value="asset.asset_type"
-            :property="field('Asset', 'asset_type', 'Asset type', 'select', { options: lookup('asset_type') })"
+            :property="field('Asset', 'asset_type', 'Asset type', 'select')"
             :form="asset"
             @update:model-value="set(index, 'asset_type', $event)"
           />
@@ -117,7 +117,7 @@
             <el-form-item label="Insurance type" required>
               <FormField
                 :model-value="asset.collateral.insurance.type"
-                :property="field('Collateral', 'insurance_type', 'Insurance type', 'select', { options: lookup('insurance_type') })"
+                :property="field('Collateral', 'insurance_type', 'Insurance type', 'select')"
                 :form="asset.collateral.insurance"
                 @update:model-value="setInsurance(index, 'type', $event)"
               />
@@ -126,7 +126,7 @@
             <el-form-item label="Policy or quote?" required>
               <FormField
                 :model-value="asset.collateral.insurance.status"
-                :property="field('Collateral', 'insurance_status', 'Policy or quote?', 'select', { options: insuranceStatusOptions })"
+                :property="field('Collateral', 'insurance_status', 'Policy or quote?', 'select')"
                 :form="asset.collateral.insurance"
                 @update:model-value="setInsurance(index, 'status', $event)"
               />
@@ -174,7 +174,7 @@
             <el-form-item label="Premium paid" required>
               <FormField
                 :model-value="asset.collateral.insurance.premium_frequency"
-                :property="field('Collateral', 'insurance_premium_frequency', 'Premium paid', 'select', { options: lookup('insurance_premium_frequency') })"
+                :property="field('Collateral', 'insurance_premium_frequency', 'Premium paid', 'select')"
                 :form="asset.collateral.insurance"
                 @update:model-value="setInsurance(index, 'premium_frequency', $event)"
               />
@@ -420,15 +420,15 @@ export default {
 
     /**
      * FormField property config for one field. Uses Saturn's own definition
-     * of the property (with our label) when there is one, unless
-     * extra.force is set (for dropdowns whose options the form decides).
-     * Otherwise builds a basic one from the Saturn guide; a dropdown with
-     * no options becomes a text box. Configs are reused while unchanged, so
-     * FormField isn't handed a new object on every keystroke.
+     * of the property (with our label) when there is one. Otherwise builds a
+     * basic one from the Saturn guide; a dropdown becomes a text box, since
+     * FormField's own option lists (lookup_type "values") don't work in
+     * Saturn. Dropdowns whose choices the form decides use el-select
+     * instead. Configs are reused while unchanged, so FormField isn't handed
+     * a new object on every keystroke.
      */
-    field(resourceName, name, label, kind, extra) {
-      const options = (extra && extra.options) || [];
-      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+    field(resourceName, name, label, kind) {
+      const saved = this.savedProperty(resourceName, name);
       let config;
       if (saved) {
         config = Object.assign({}, saved, { property: name, label });
@@ -436,8 +436,6 @@ export default {
         config = { property: name, label, type: kind };
       } else if (kind === 'checkbox') {
         config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
-      } else if (kind === 'select' && options.length) {
-        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
       } else {
         config = {
           property: name,

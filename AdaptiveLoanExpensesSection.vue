@@ -27,25 +27,62 @@
 
       <div class="field-grid">
         <el-form-item label="Responsible applicant" required>
-          <FormField
+          <el-select
             :model-value="item.application_party_id"
-            :property="field('Expense', 'applicationpartiesid', 'Responsible applicant', 'select', { options: applicationPartyOptions, force: true })"
-            :form="item"
+            placeholder="Select applicant"
             @update:model-value="set(index, 'application_party_id', $event)"
-          />
+          >
+            <el-option
+              v-for="option in applicationPartyOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </el-form-item>
 
         <!--
           Options are ExpenseType records filtered by the parent to the
-          selected loan category, sorted by group.
+          selected loan category. Grouped when the types define a group.
         -->
         <el-form-item label="Expense type" required>
-          <FormField
+          <el-select
             :model-value="item.expense_type"
-            :property="field('Expense', 'expense_type', 'Expense type', 'select', { options: typeOptionsFor(item), force: true })"
-            :form="item"
+            placeholder="Select expense type"
             @update:model-value="set(index, 'expense_type', $event)"
-          />
+          >
+            <!-- Keeps a no-longer-applicable value readable instead of showing its ID -->
+            <el-option
+              v-if="isInapplicable(item)"
+              :key="`current-${item.expense_type}`"
+              :label="typeName(item.expense_type) || 'Unavailable type'"
+              :value="item.expense_type"
+              disabled
+            />
+
+            <template v-if="hasGroups">
+              <el-option-group
+                v-for="group in groupedOptions"
+                :key="group.label"
+                :label="group.label"
+              >
+                <el-option
+                  v-for="option in group.options"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-option-group>
+            </template>
+            <template v-else>
+              <el-option
+                v-for="option in expenseTypeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </template>
+          </el-select>
           <small v-if="isInapplicable(item)" class="helper invalid">
             This expense doesn't apply to a {{ loanCategoryLabel }}. Choose
             another type or remove it.
@@ -73,7 +110,7 @@
         <el-form-item label="Frequency">
           <FormField
             :model-value="item.frequency"
-            :property="field('Expense', 'frequency', 'Frequency', 'select', { options: lookup('expense_frequency') })"
+            :property="field('Expense', 'frequency', 'Frequency', 'select')"
             :form="item"
             @update:model-value="set(index, 'frequency', $event)"
           />
@@ -106,7 +143,7 @@
  *
  * Every input is Saturn's built-in FormField, using Saturn's own
  * definitions of the Expense properties when they exist. The responsible
- * applicant and expense type always use the options from the parent.
+ * applicant and expense type are el-selects of the options from the parent.
  */
 export default {
   props: {
@@ -183,22 +220,23 @@ export default {
       return new Set(this.expenseTypeOptions.map((option) => option.value));
     },
 
-    /**
-     * Selectable types as dropdown options, with types in the same
-     * ExpenseType.group kept together (in first-seen order).
-     */
-    sortedTypeOptions() {
+    hasGroups() {
+      return this.expenseTypeOptions.some((option) => option.group);
+    },
+
+    /** Options grouped by ExpenseType.group, in first-seen order. */
+    groupedOptions() {
       const groups = [];
       this.expenseTypeOptions.forEach((option) => {
-        if (!groups.includes(option.group || '')) groups.push(option.group || '');
+        const label = option.group || 'Other';
+        let group = groups.find((entry) => entry.label === label);
+        if (!group) {
+          group = { label, options: [] };
+          groups.push(group);
+        }
+        group.options.push(option);
       });
-      const rows = [];
-      groups.forEach((group) => {
-        this.expenseTypeOptions
-          .filter((option) => (option.group || '') === group)
-          .forEach((option) => rows.push({ label: option.label, value: option.value }));
-      });
-      return rows;
+      return groups;
     },
   },
 
@@ -264,20 +302,6 @@ export default {
       return true;
     },
 
-    /**
-     * Type options for one expense. A type that no longer applies stays in
-     * the list (marked unavailable) so it shows its name, not its ID.
-     */
-    typeOptionsFor(item) {
-      if (!this.isInapplicable(item)) return this.sortedTypeOptions;
-      return [
-        {
-          label: `${this.typeName(item.expense_type) || 'Unavailable type'} (not available)`,
-          value: item.expense_type,
-        },
-      ].concat(this.sortedTypeOptions);
-    },
-
     title(item, index) {
       return item.expense_name || this.typeName(item.expense_type) || `Expense ${index + 1}`;
     },
@@ -315,15 +339,15 @@ export default {
 
     /**
      * FormField property config for one field. Uses Saturn's own definition
-     * of the property (with our label) when there is one, unless
-     * extra.force is set (for dropdowns whose options the form decides).
-     * Otherwise builds a basic one from the Saturn guide; a dropdown with
-     * no options becomes a text box. Configs are reused while unchanged, so
-     * FormField isn't handed a new object on every keystroke.
+     * of the property (with our label) when there is one. Otherwise builds a
+     * basic one from the Saturn guide; a dropdown becomes a text box, since
+     * FormField's own option lists (lookup_type "values") don't work in
+     * Saturn. Dropdowns whose choices the form decides use el-select
+     * instead. Configs are reused while unchanged, so FormField isn't handed
+     * a new object on every keystroke.
      */
-    field(resourceName, name, label, kind, extra) {
-      const options = (extra && extra.options) || [];
-      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+    field(resourceName, name, label, kind) {
+      const saved = this.savedProperty(resourceName, name);
       let config;
       if (saved) {
         config = Object.assign({}, saved, { property: name, label });
@@ -331,8 +355,6 @@ export default {
         config = { property: name, label, type: kind };
       } else if (kind === 'checkbox') {
         config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
-      } else if (kind === 'select' && options.length) {
-        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
       } else {
         config = {
           property: name,

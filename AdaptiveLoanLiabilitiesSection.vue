@@ -37,12 +37,18 @@
 
         <!-- Options come from LiabilityType records; value is the record ID -->
         <el-form-item label="Liability type" required>
-          <FormField
+          <el-select
             :model-value="item.liability_type"
-            :property="field('Liability', 'liability_type', 'Liability type', 'select', { options: liabilityTypeOptions, force: true })"
-            :form="item"
+            placeholder="Select liability type"
             @update:model-value="set(index, 'liability_type', $event)"
-          />
+          >
+            <el-option
+              v-for="option in liabilityTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
           <small
             v-if="item.liability_type && !typeOf(item)"
             class="helper invalid"
@@ -86,7 +92,7 @@
         <el-form-item label="Payment frequency">
           <FormField
             :model-value="item.payment_frequency"
-            :property="field('Liability', 'payment_frequency', 'Payment frequency', 'select', { options: lookup('payment_frequency') })"
+            :property="field('Liability', 'payment_frequency', 'Payment frequency', 'select')"
             :form="item"
             @update:model-value="set(index, 'payment_frequency', $event)"
           />
@@ -146,7 +152,7 @@
  *
  * Every input is Saturn's built-in FormField, using Saturn's own
  * definitions of the Liability properties when they exist. Liability type
- * always uses the LiabilityType records passed in by the parent.
+ * is an el-select of the LiabilityType records passed in by the parent.
  */
 export default {
   props: {
@@ -330,15 +336,15 @@ export default {
 
     /**
      * FormField property config for one field. Uses Saturn's own definition
-     * of the property (with our label) when there is one, unless
-     * extra.force is set (for dropdowns whose options the form decides).
-     * Otherwise builds a basic one from the Saturn guide; a dropdown with
-     * no options becomes a text box. Configs are reused while unchanged, so
-     * FormField isn't handed a new object on every keystroke.
+     * of the property (with our label) when there is one. Otherwise builds a
+     * basic one from the Saturn guide; a dropdown becomes a text box, since
+     * FormField's own option lists (lookup_type "values") don't work in
+     * Saturn. Dropdowns whose choices the form decides use el-select
+     * instead. Configs are reused while unchanged, so FormField isn't handed
+     * a new object on every keystroke.
      */
-    field(resourceName, name, label, kind, extra) {
-      const options = (extra && extra.options) || [];
-      const saved = extra && extra.force ? null : this.savedProperty(resourceName, name);
+    field(resourceName, name, label, kind) {
+      const saved = this.savedProperty(resourceName, name);
       let config;
       if (saved) {
         config = Object.assign({}, saved, { property: name, label });
@@ -346,8 +352,6 @@ export default {
         config = { property: name, label, type: kind };
       } else if (kind === 'checkbox') {
         config = { property: name, label, type: 'boolean', input_properties: { type: 'check-box' } };
-      } else if (kind === 'select' && options.length) {
-        config = { property: name, label, type: 'string', lookup_type: 'values', map: { values: options } };
       } else {
         config = {
           property: name,
