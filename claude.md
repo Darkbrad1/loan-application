@@ -9,10 +9,9 @@ These are the developer's standing preferences. Follow them in every session.
 - **Explain at a beginner level.** Write the way you'd explain it to a first-year student: plain words, short sentences, everyday comparisons. Avoid jargon; when a technical term is needed, say what it means.
 - **Ask before product decisions.** If a choice changes how the app behaves for the applicant (how a feature works, what happens in an edge case, what something is called), lay out the options, say which you'd pick and why, and let the developer choose. Don't decide quietly.
 - **Technical choices are yours.** If a choice doesn't change what the user sees or experiences, decide it, then say what you picked.
-- **Return complete code.** Give whole files or whole code blocks that can be copied and pasted in, not fragments or diffs.
+- **Make the requested changes and push them to `main`.** Don't paste code into the chat; edit the files in the repo, commit, and push to the `main` branch. If pushing to `main` fails for any reason, tell the developer what went wrong.
 - **Label every file clearly as NEW or UPDATED,** and say which files didn't change.
-- **Very long files** (the main form is about 5,200 lines) are too long to paste reliably in chat; deliver them as a file instead and say so.
-- **Keep this file up to date as we go.** Whenever a change affects anything described here (components, rules, data model, decisions, lessons learned, or status), update this file in the same session and deliver it as UPDATED alongside the code. When a decision is made, move it out of "Decisions still waiting" and record the outcome.
+- **Keep this file up to date as we go.** Whenever a change affects anything described here (components, rules, data model, decisions, lessons learned, or status), update this file in the same session and push it with the code. When a decision is made, move it out of "Decisions still waiting" and record the outcome.
 
 ## What this is
 
