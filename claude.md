@@ -11,7 +11,7 @@ These are the developer's standing preferences. Follow them in every session.
 - **Technical choices are yours.** If a choice doesn't change what the user sees or experiences, decide it, then say what you picked.
 - **Return complete code.** Give whole files or whole code blocks that can be copied and pasted in, not fragments or diffs.
 - **Label every file clearly as NEW or UPDATED,** and say which files didn't change.
-- **Very long files** (the main form is about 4,500 lines) are too long to paste reliably in chat; deliver them as a file instead and say so.
+- **Very long files** (the main form is about 5,200 lines) are too long to paste reliably in chat; deliver them as a file instead and say so.
 - **Keep this file up to date as we go.** Whenever a change affects anything described here (components, rules, data model, decisions, lessons learned, or status), update this file in the same session and deliver it as UPDATED alongside the code. When a decision is made, move it out of "Decisions still waiting" and record the outcome.
 
 ## What this is
@@ -21,7 +21,7 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 - **Framework:** Vue 3, **Options API** (`data`, `computed`, `methods`).
 - **UI libraries:** Element Plus (`el-*` inputs, buttons, selects) and Vuetify icons (`v-icon` with `mdi-*` names).
 - **Currency:** EC$ (Eastern Caribbean dollars). Default country: Grenada.
-- **Shared tools:** one Saturn composable, `useLoanIntake` (see below).
+- **Shared tools:** none outside the main form. All helpers, rules, and settings live inside the main form (see below).
 - **Server access:** Saturn's global `Resource` class, e.g. `new Resource(this, "Asset").get(id)`, `.list()`, `.create()`, `.update()`, `.delete()`, `.request()`.
 - **Saturn documentation:** `Saturn_Dynamic_Component_Documentation.md` (uploaded by the developer).
 
@@ -29,8 +29,7 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 
 |File|Role|
 |---|---|
-|`AdaptiveLoanApplication.vue`|The main form (parent). Owns all state, the wizard steps, validation, saving, restoring, deleting, document scopes, and uploads. Gets its shared tools from `useLoanIntake`. About 4,500 lines.|
-|`useLoanIntake` (composable)|The single shared toolbox: helpers (IDs, money, dates), validation rules, NIS and income tax estimates, and factories for server records (`createRecords`) and document uploads (`createDocuments`). Lives in Saturn under Settings → UI Components.|
+|`AdaptiveLoanApplcationFrom.vue`|The main form (parent), called the Adaptive Loan intake form. Owns all state, the wizard steps, validation, saving, restoring, deleting, document scopes, and uploads. Also holds every shared helper and setting (IDs, money, dates, validation rules, NIS and income tax). About 5,200 lines. (The file name's spelling is how it is in the repo.)|
 |`AdaptiveLoanProductSection`|Step 1: loan category and product.|
 |`AdaptiveLoanApplicantsSection.vue`|Applicants step: one tab per applicant, plus that applicant's documents.|
 |`AdaptiveLoanApplicantEditor.vue`|One applicant: personal details, split address, NIS number, IDs (with scans), employment and income, estimated deductions, and consents.|
@@ -45,17 +44,12 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 
 `AdaptiveLoanDocumentsSection` was replaced by `AdaptiveLoanDocumentRequirements` and should be deleted from Saturn.
 
-### The shared composable (`useLoanIntake`)
+### Everything lives in the main form
 
-Saturn puts custom composables on an injected `composables` object; they are **not** global names. So the main form calls `composables.useLoanIntake(...)`, never `useLoanIntake(...)`.
+The developer tried moving shared code into a Saturn composable (`useLoanIntake`) and **reverted it**. All shared code is back inside the main form, and that's the setup to work with.
 
-- **It must stay one self-contained function.** Saturn compiles each composable on its own, so one composable can't call another, and `composables` isn't defined inside a composable. The earlier five-composable split (`useLoanHelpers`, `useLoanRecords`, `useLoanDocuments`, `useLoanRules`, `useStatutoryDeductions`) failed for this reason and was replaced. Don't split it again.
-- **How the form uses it:**
-    - `setup()` returns `composables.useLoanIntake({ minimumIdentifications, defaultCountry })` as-is, so every tool is `this.<name>` (e.g. `this.money`, `this.toId`, `this.applicantIssue`, `this.statutoryDeductions`).
-    - `created()` sets `this.records = this.createRecords(this)` and `this.docs = this.createDocuments(this)`. These need the component to talk to Saturn, and are kept off `data()` because they aren't screen state.
-- **Don't define a form method with the same name as a composable tool.** Vue warns, and the composable's version wins.
-- `STATUTORY_DEDUCTIONS` (the NIS and tax settings) now lives in the composable.
-- `records.byIds` fetches records in parallel.
+- **Don't create composables or move code out of the main form.** Keep helpers, rules, and settings in the main form.
+- The settings sit as constants at the top of the main form's `<script>`: `DEFAULT_REVOLVING_RATE`, `TRACKED_RESOURCES`, `MINIMUM_IDENTIFICATIONS`, `STATUTORY_DEDUCTIONS` (NIS and tax), and `DEFAULT_COUNTRY`, plus the `createEmpty…` factories for new rows.
 
 ### The section pattern
 
@@ -124,7 +118,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 ## Business rules
 
 - **Revolving credit** (credit cards, overdrafts): the assessed repayment is `credit_limit × rate`. The rate is the type's `revolving_rate`, falling back to `DEFAULT_REVOLVING_RATE` (3%).
-- **NIS and income tax are calculated** from gross monthly income and shown read-only. The settings are in `STATUTORY_DEDUCTIONS`, inside the `useLoanIntake` composable:
+- **NIS and income tax are calculated** from gross monthly income and shown read-only. The settings are in `STATUTORY_DEDUCTIONS`, near the top of the main form:
     - **NIS:** 6.25% of income up to EC$5,200 (maximum EC$325). Self-employed pay 13.5%. Nothing for the unemployed, the retired, anyone under 16, or anyone at or over 65. 65 is used because pensionable age is being phased from 60 to 65 by birth year, and 65 never understates NIS.
     - **Income tax:** 0% on the first EC$3,000 a month, 10% on the next EC$2,000, and 30% above EC$5,000.
     - Worked examples that must hold: EC$4,000 gives EC$250 NIS, EC$100 tax, EC$3,650 net. EC$6,000 gives EC$325 NIS, EC$500 tax, EC$5,175 net.
@@ -141,7 +135,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 - **Required links need a save order.** PartyIdentification requires `party`, so the Party is saved first, then the IDs, then `Party.ids` is updated.
 - **Element Plus `el-radio`** changed its value prop between versions (`label` vs `value`). Prefer `el-select` or buttons for choices.
 - **The Saturn guide's `FormField`** is unclear about its update event payload (`{ property, data }` vs the value). Test before relying on it.
-- **Saturn composables can't call each other** and can't see the `composables` object. Keep all shared code in the one `useLoanIntake` composable, and reach it from components through `composables.useLoanIntake(...)`.
+- **Saturn composables can't call each other** and can't see the `composables` object. A split into five composables failed, and then a single `useLoanIntake` composable was reverted too. Keep all shared code in the main form.
 - **Don't use the spread operator (`...`)** anywhere in Saturn code: it fails at runtime ("Spread syntax requires ...iterable[Symbol.iterator] to be a function"). Use `concat`, `slice()`, `Object.assign`, and `Array.from(new Set(...))` instead. To be safe, also avoid destructuring by position (`const [a] = list`, `for (const [i, x] of list.entries())`); use indexes instead.
 - **When a Saturn error mentions a missing name, log the object first** (e.g. `console.log(composables)`) to see its real shape before guessing.
 - **Dates:** compare `YYYY-MM-DD` strings. `new Date().toISOString()` is UTC, which is 4 hours ahead of Grenada, so "today" is wrong after 8pm. Prefer a local date.
@@ -156,7 +150,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 - Per-section document uploads with the reusable requirements component, and per-item saving.
 - Multiple IDs (PartyIdentification), the split address, the NIS number, and calculated NIS and income tax.
 - Collateral: removed the category dropdown, added insurance details, and added third-party collateral.
-- Shared code moved into one composable, `useLoanIntake`. The main form was rewired to it, with every spread operator and positional destructuring removed. Records now load in parallel, and "today" uses the local date.
+- Tried moving shared code into a `useLoanIntake` composable, then reverted. Everything lives in the main form again.
 
 ### Decisions still waiting on the developer
 
@@ -171,8 +165,9 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 ### Next up
 
 - **Projected insurance expense:** turn each collateral insurance premium into a read-only monthly expense marked `is_projected`.
-- **Test the `useLoanIntake` wiring in Saturn:** load the form, restore a draft, save, and upload a document.
-- **Cleanup:** remove the dead CSS from the old Documents screen (e.g. `.legacy-queue`), and reorganize the main form into labelled sections. Keep the single-composable setup.
+- **Remove spread syntax (`...`):** the reverted code still uses it (about 25 places in the main form, plus one each in `AdaptiveLoanAllocationEditor.vue` and `AdaptiveLoanApplicantsSection.vue`), and Saturn fails on it at runtime.
+- **Add missing files to the repo:** `AdaptiveLoanDocumentRequirements.vue` is used by the main form but isn't in the repo yet.
+- **Cleanup:** remove the dead CSS from the old Documents screen (e.g. `.legacy-queue`), and reorganize the main form into labelled sections.
 
 ### Later (Phase 3: back office)
 
