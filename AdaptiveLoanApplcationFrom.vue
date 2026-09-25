@@ -2553,21 +2553,30 @@ export default {
                 property.lookup_reference || property.lookupReference || [];
             const entries = Array.isArray(raw) ? raw : String(raw).split(",");
 
+            // Labels and values are always plain text, so a nested object
+            // can never show up as "[object Object]" in a dropdown.
+            const text = (value) => {
+                if (value && typeof value === "object") {
+                    return text(value.label || value.name || value.value || value.id);
+                }
+                return String(value ?? "").trim();
+            };
+
             return entries
                 .map((entry) =>
-                    typeof entry === "object"
+                    entry && typeof entry === "object"
                         ? {
-                              label: entry.label || entry.name || entry.value,
-                              value:
+                              label: text(
+                                  entry.label || entry.name || entry.value,
+                              ),
+                              value: text(
                                   entry.value ||
-                                  entry.id ||
-                                  entry.name ||
-                                  entry.label,
+                                      entry.id ||
+                                      entry.name ||
+                                      entry.label,
+                              ),
                           }
-                        : {
-                              label: String(entry).trim(),
-                              value: String(entry).trim(),
-                          },
+                        : { label: text(entry), value: text(entry) },
                 )
                 .filter((entry) => entry.value !== "");
         },

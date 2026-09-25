@@ -228,11 +228,14 @@
           </div>
 
           <div class="field-grid">
-            <!-- Types already used on this applicant's other IDs are left out -->
+            <!--
+              Uses Saturn's own PartyIdentification.identification_type
+              setup. Using a type twice is caught when the applicant continues.
+            -->
             <el-form-item label="Identification type" required>
               <FormField
                 :model-value="row.identification_type"
-                :property="field('Party', 'ids', 'Identification type', 'select', { options: lookup('ids')})"
+                :property="field('PartyIdentification', 'identification_type', 'Identification type', 'select', { options: lookup('identification_type') })"
                 :form="row"
                 @update:model-value="setIdentification(index, 'identification_type', $event)"
               />
@@ -411,8 +414,8 @@
  *
  * Every input is Saturn's built-in FormField. Each field uses Saturn's own
  * definition of the property (Party, ApplicationParty, or
- * PartyIdentification) when there is one. Role and identification type
- * always use the form's own options, since some choices are left out.
+ * PartyIdentification) when there is one. Role always uses the form's own
+ * options, since "Primary Applicant" is left out.
  */
 export default {
   props: {
@@ -648,19 +651,6 @@ export default {
 
     isExpired(row) {
       return Boolean(row.expiry_date && row.expiry_date < this.toDateString(new Date()));
-    },
-
-    /**
-     * ID types for one row: each type can only be used once per applicant,
-     * so types chosen on the applicant's other IDs are left out.
-     */
-    identificationTypeOptions(index) {
-      return this.lookup('identification_type').filter(
-        (option) =>
-          !this.draft.identifications.some(
-            (row, rowIndex) => rowIndex !== index && row.identification_type === option.value
-          )
-      );
     },
 
     setIdentification(index, key, event, kind) {
