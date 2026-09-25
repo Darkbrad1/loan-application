@@ -77,7 +77,11 @@ Every section renders its inputs with Saturn's built-in `FormField` instead of `
 
 ## Test mode
 
-A **Test mode** switch in the header fills each step with sample data as you reach it (`fillTestData()`). It only fills empty fields, and only adds an asset, liability, or expense when the list is empty, so nothing typed is overwritten. It picks an auto loan when there is one, so collateral gets exercised. Required documents still have to be uploaded by hand.
+A **Test mode** switch in the header fills each step with sample data as you reach it (`fillTestData()`). It only fills empty fields, and only adds an asset, liability, or expense when the list is empty, so nothing typed is overwritten. It picks an auto loan when there is one, so collateral gets exercised.
+
+- **Documents are optional in test mode:** `firstIncompleteScope()` returns nothing, so Continue and Submit don't ask for uploads. Uploading still works.
+- **A second switch, "Remember draft on reload",** appears while test mode is on. It's **off** by default: the draft's location isn't kept in `localStorage` (and any saved one is removed), so reloading the page starts from the beginning. The draft is still saved on the server. Turning it on, or turning test mode off, remembers the current draft again. All `localStorage` writes go through `rememberDraftLocation()`.
+- Test mode itself is off after every reload.
 
 - **The switch shows while `TEST_MODE_AVAILABLE` is `true`** (top of the main form). **Set it to `false` before real applicants use the form.**
 - Asset owners and responsible applicants are filled with the primary applicant, whose IDs exist once the Applicants step has been saved.
@@ -141,15 +145,16 @@ Only fields this form relies on are listed.
 
 Dropdown options come from each resource's property `lookup_reference`, loaded with `loadResourceProps()` and parsed by `options()`.
 
-### Fields the form uses that Saturn doesn't have yet
+### Fields added to Saturn for the form
 
-Checked against the developer's full property list (September 2026). Saturn seems to ignore unknown fields without an error, so these values are silently lost, and anything restored from them comes back empty. **They need adding in Saturn** (or the code changing):
+Checked against the developer's full property list in September 2026. These were missing, so Saturn silently dropped them (and restores came back empty); **the developer has since added them**:
 
-- **Application:** `asset_ids`, `liability_ids`, `expense_ids` (lists of record IDs). Without `asset_ids`, **assets (and their collateral) don't come back when a draft is restored.** Liabilities and expenses fall back to slower lookups. (`application_parties` is also sent but isn't needed; `parties` holds the same list.)
+- **Application:** `asset_ids`, `liability_ids`, `expense_ids` (without `asset_ids`, assets and collateral didn't restore).
 - **Party:** `nis_number`.
-- **ApplicationParty:** `relationship_to_applicant` (Third Party Owners).
-- **Collateral:** `insurance_type`, `insurance_status`, `insurance_provider`, `insurance_reference`, `insurance_coverage_amount`, `insurance_premium`, `insurance_premium_frequency`, `insurance_expiry_date`.
-- The form also sends `party_id` alongside `party` on ApplicationParty and PartyIdentification. Neither resource has it; it's harmless.
+- **ApplicationParty:** `relationship_to_applicant`.
+- **Collateral:** the eight `insurance_*` fields.
+
+The form also sends `application_parties` on Application and `party_id` on ApplicationParty and PartyIdentification. Those resources don't have them; it's harmless (`parties` and `party` hold the same values).
 
 Resource fields that exist but the form doesn't use yet include Expense `is_projected` and `monthly_equivalent`, Liability `monthly_equivalent`, `is_secured` and `is_to_be_paid_off`, and Collateral `appraised_value`, `appraisal_date`, `appraisal_source`, `lien_position` and `lien_status` (back office, Phase 3).
 

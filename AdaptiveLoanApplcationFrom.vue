@@ -39,6 +39,13 @@
                         />
                         <span>Test mode</span>
                     </label>
+                    <label v-if="testMode" class="test-switch">
+                        <el-switch
+                            :model-value="testKeepDraft"
+                            @update:model-value="toggleTestKeepDraft"
+                        />
+                        <span>Remember draft on reload</span>
+                    </label>
                     <span>Secure loan application</span>
                 </div>
             </header>
@@ -542,6 +549,9 @@ export default {
             // Test mode (see TEST_MODE_AVAILABLE)
             testModeAvailable: TEST_MODE_AVAILABLE,
             testMode: false,
+            // In test mode, whether the draft is remembered in localStorage.
+            // Off by default, so reloading the page starts from the beginning.
+            testKeepDraft: false,
 
             // Institution-wide minimum, passed to the applicant editor.
             minimumIdentifications: MINIMUM_IDENTIFICATIONS,
@@ -1436,18 +1446,52 @@ export default {
 
         // ---- Test mode ----
 
-        /** Turns test mode on or off; turning it on fills the current step. */
+        /**
+         * Turns test mode on or off. Turning it on fills the current step,
+         * makes documents optional, and (unless "Remember draft on reload"
+         * is on) forgets the saved draft so a reload starts from the beginning.
+         */
         toggleTestMode(value) {
             this.testMode = Boolean(value);
             if (this.testMode) {
+                if (!this.testKeepDraft) this.forgetDraftLocation();
                 this.fillTestData();
                 this.warn(
-                    "Test mode is on. Each step is filled with sample data as you reach it. Required documents still need to be uploaded.",
+                    "Test mode is on. Each step is filled with sample data as you reach it, and documents are optional.",
                     "info",
                 );
             } else {
                 this.alert = { text: "", type: "warning" };
+                // Back to normal: remember the current draft again.
+                if (this.formData.id) this.rememberDraftLocation();
             }
+        },
+
+        /** Test mode only: whether a reload brings back the current draft. */
+        toggleTestKeepDraft(value) {
+            this.testKeepDraft = Boolean(value);
+            if (this.testKeepDraft) {
+                if (this.formData.id) this.rememberDraftLocation();
+            } else {
+                this.forgetDraftLocation();
+            }
+        },
+
+        /**
+         * Saves the draft's record ID and step in localStorage, so the draft
+         * can be restored after a reload. Skipped in test mode unless
+         * "Remember draft on reload" is on.
+         */
+        rememberDraftLocation() {
+            if (this.testMode && !this.testKeepDraft) return;
+            localStorage.setItem("gccu_draft_app_id", this.formData.id);
+            localStorage.setItem("gccu_draft_step", String(this.step));
+        },
+
+        /** Removes the saved draft location, so a reload starts fresh. */
+        forgetDraftLocation() {
+            localStorage.removeItem("gccu_draft_app_id");
+            localStorage.removeItem("gccu_draft_step");
         },
 
         /**
@@ -1846,8 +1890,12 @@ export default {
             );
         },
 
-        /** First scope (optionally of the given kinds) still missing documents. */
+        /**
+         * First scope (optionally of the given kinds) still missing documents.
+         * Documents aren't required in test mode, so it returns null then.
+         */
         firstIncompleteScope(kinds = null) {
+            if (this.testMode) return null;
             return (
                 this.documentScopeList.find(
                     (scope) =>
@@ -2178,8 +2226,7 @@ export default {
                 throw Error("Application did not return a record ID.");
             }
             this.formData.id = createdId;
-            localStorage.setItem("gccu_draft_app_id", createdId);
-            localStorage.setItem("gccu_draft_step", String(this.step));
+            this.rememberDraftLocation();
         },
 
         /** Updates the application's asset/liability/expense ID lists. */
@@ -3083,9 +3130,7 @@ export default {
             }
 
             this.step++;
-            if (this.formData.id) {
-                localStorage.setItem("gccu_draft_step", String(this.step));
-            }
+            if (this.formData.id) this.rememberDraftLocation();
         },
 
         back() {
@@ -3708,8 +3753,7 @@ export default {
                 const failedDeletes = await this.deleteStaleRecords();
                 this.rememberPersistedIds(failedDeletes);
 
-                localStorage.setItem("gccu_draft_app_id", this.formData.id);
-                localStorage.setItem("gccu_draft_step", String(this.step));
+                this.rememberDraftLocation();
 
                 if (!silent) this.warn("Draft saved successfully.", "success");
                 return this.formData.id;
