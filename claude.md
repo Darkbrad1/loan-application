@@ -75,6 +75,13 @@ Every section renders its inputs with Saturn's built-in `FormField` instead of `
 - Each `FormField` sits inside an `el-form-item`, which shows the label and required star.
 - **What was lost:** `FormField` has no min/max, so amounts, terms, and percentages aren't limited as they're typed (the main form still checks them on Continue). The expense type dropdown no longer shows group headings; types are kept together by group instead. Placeholders are gone.
 
+## Test mode
+
+A **Test mode** switch in the header fills each step with sample data as you reach it (`fillTestData()`). It only fills empty fields, and only adds an asset, liability, or expense when the list is empty, so nothing typed is overwritten. It picks an auto loan when there is one, so collateral gets exercised. Required documents still have to be uploaded by hand.
+
+- **The switch shows while `TEST_MODE_AVAILABLE` is `true`** (top of the main form). **Set it to `false` before real applicants use the form.**
+- Asset owners and responsible applicants are filled with the primary applicant, whose IDs exist once the Applicants step has been saved.
+
 ## Wizard steps
 
 Choose loan → Applicants → Your request → Assets → Liabilities → Expenses → Documents (only when the product has application-level documents) → Review.
@@ -133,6 +140,18 @@ Only fields this form relies on are listed.
 - **In the form,** collateral details live on each asset as `asset.collateral` (`enabled`, `id`, `description`, `insurance`, `document_ids`), not in a separate list.
 
 Dropdown options come from each resource's property `lookup_reference`, loaded with `loadResourceProps()` and parsed by `options()`.
+
+### Fields the form uses that Saturn doesn't have yet
+
+Checked against the developer's full property list (September 2026). Saturn seems to ignore unknown fields without an error, so these values are silently lost, and anything restored from them comes back empty. **They need adding in Saturn** (or the code changing):
+
+- **Application:** `asset_ids`, `liability_ids`, `expense_ids` (lists of record IDs). Without `asset_ids`, **assets (and their collateral) don't come back when a draft is restored.** Liabilities and expenses fall back to slower lookups. (`application_parties` is also sent but isn't needed; `parties` holds the same list.)
+- **Party:** `nis_number`.
+- **ApplicationParty:** `relationship_to_applicant` (Third Party Owners).
+- **Collateral:** `insurance_type`, `insurance_status`, `insurance_provider`, `insurance_reference`, `insurance_coverage_amount`, `insurance_premium`, `insurance_premium_frequency`, `insurance_expiry_date`.
+- The form also sends `party_id` alongside `party` on ApplicationParty and PartyIdentification. Neither resource has it; it's harmless.
+
+Resource fields that exist but the form doesn't use yet include Expense `is_projected` and `monthly_equivalent`, Liability `monthly_equivalent`, `is_secured` and `is_to_be_paid_off`, and Collateral `appraised_value`, `appraisal_date`, `appraisal_source`, `lien_position` and `lien_status` (back office, Phase 3).
 
 ## Business rules
 

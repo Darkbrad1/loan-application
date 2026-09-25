@@ -30,7 +30,17 @@
                     </div>
                     <strong>{{ companyName }}</strong>
                 </div>
-                <span>Secure loan application</span>
+                <div class="header-actions">
+                    <!-- Testing only: fills each step with sample data -->
+                    <label v-if="testModeAvailable" class="test-switch">
+                        <el-switch
+                            :model-value="testMode"
+                            @update:model-value="toggleTestMode"
+                        />
+                        <span>Test mode</span>
+                    </label>
+                    <span>Secure loan application</span>
+                </div>
             </header>
 
             <div class="layout">
@@ -368,6 +378,13 @@ const STATUTORY_DEDUCTIONS = {
 const DEFAULT_COUNTRY = "Grenada";
 
 /**
+ * Shows the "Test mode" switch in the header. When it's on, each step is
+ * filled with sample data as you reach it, so the form can be run through
+ * quickly. Set this to false before real applicants use the form.
+ */
+const TEST_MODE_AVAILABLE = true;
+
+/**
  * Role for someone who isn't borrowing but owns (or part-owns) an asset
  * offered as collateral. Only applicants can own assets on the
  * application, so these owners are added on the Applicants step with a
@@ -521,6 +538,10 @@ export default {
             savingDraft: false,
             receipt: null,
             alert: { text: "", type: "warning" },
+
+            // Test mode (see TEST_MODE_AVAILABLE)
+            testModeAvailable: TEST_MODE_AVAILABLE,
+            testMode: false,
 
             // Institution-wide minimum, passed to the applicant editor.
             minimumIdentifications: MINIMUM_IDENTIFICATIONS,
@@ -1027,6 +1048,13 @@ export default {
         },
     },
 
+    watch: {
+        // In test mode, fill each step with sample data as it's reached.
+        "current.id"() {
+            if (this.testMode) this.fillTestData();
+        },
+    },
+
     async mounted() {
         await Promise.all([
             this.loadBranding(),
@@ -1403,6 +1431,227 @@ export default {
                     } that belonged to them.`,
                     "warning",
                 );
+            }
+        },
+
+        // ---- Test mode ----
+
+        /** Turns test mode on or off; turning it on fills the current step. */
+        toggleTestMode(value) {
+            this.testMode = Boolean(value);
+            if (this.testMode) {
+                this.fillTestData();
+                this.warn(
+                    "Test mode is on. Each step is filled with sample data as you reach it. Required documents still need to be uploaded.",
+                    "info",
+                );
+            } else {
+                this.alert = { text: "", type: "warning" };
+            }
+        },
+
+        /**
+         * Value of the first dropdown option whose label matches the pattern,
+         * else the first option, else the fallback.
+         */
+        testOption(field, pattern, fallback = "") {
+            const options = this.lookups[field] || [];
+            const match = pattern
+                ? options.find((option) => pattern.test(String(option.label)))
+                : null;
+            if (match) return match.value;
+            return options.length ? options[0].value : fallback;
+        },
+
+        /** Sets each value on the target only where the field is still empty. */
+        fillBlanks(target, values) {
+            Object.keys(values).forEach((key) => {
+                const current = target[key];
+                if (current === "" || current === null || current === undefined) {
+                    target[key] = values[key];
+                }
+            });
+        },
+
+        /**
+         * Fills the current step with sample data. Only empty fields are
+         * filled and lists are only added to when they're empty, so nothing
+         * already typed is overwritten.
+         */
+        fillTestData() {
+            const form = this.formData;
+            const primary = form.primary;
+            const id = this.current.id;
+
+            if (id === "loan") {
+                if (!form.loan_category) {
+                    // An auto loan exercises collateral too, when one exists.
+                    const categories = this.products.map((product) =>
+                        String(product.category || "").toLowerCase(),
+                    );
+                    const category = categories.includes("auto")
+                        ? "auto"
+                        : categories[0] || "personal";
+                    this.chooseLoan(category);
+                }
+                if (!this.toId(form.loan_type_id) && this.productsForLoan.length) {
+                    this.selectProduct(this.toId(this.productsForLoan[0]));
+                }
+            }
+
+            if (id === "parties") {
+                this.fillBlanks(primary, {
+                    first_name: "Test",
+                    last_name: "Applicant",
+                    email: "test.applicant@example.com",
+                    phone: "473-555-0100",
+                    date_of_birth: "1990-05-15",
+                    marital_status: this.testOption("marital_status", /single/i),
+                    address: "12 Test Street, Grand Anse",
+                    country: DEFAULT_COUNTRY,
+                    parish: this.testOption("parish", /george/i, "St. George"),
+                    nis_number: "TEST123456",
+                    employment_status: this.testOption("employment_status", /^employed/i),
+                    employer_name: "Test Employer Ltd",
+                    job_title: "Clerk",
+                    years_employed: 5,
+                    gross_monthly_income: 6000,
+                });
+                primary.consent_accuracy_confirmation = true;
+                primary.consent_credit_check = true;
+                primary.consent_data_processing = true;
+
+                if (!primary.identifications.length) {
+                    primary.identifications.push(createEmptyIdentification(true));
+                }
+                this.fillBlanks(primary.identifications[0], {
+                    identification_type: this.testOption("identification_type", /passport/i),
+                    identification_number: "TEST-0001",
+                    issuing_country: DEFAULT_COUNTRY,
+                    issue_date: "2022-01-10",
+                    expiry_date: "2032-01-10",
+                });
+            }
+
+            if (id === "request") {
+                this.fillBlanks(form, {
+                    requested_loan_amount: Math.min(
+                        this.amountMaximum,
+                        Math.max(this.amountMinimum, 25000),
+                    ),
+                    requested_loan_term: Math.min(
+                        this.termMaximum,
+                        Math.max(this.termMinimum, 60),
+                    ),
+                    repayment_frequency: this.testOption("repayment_frequency", /month/i),
+                    loan_purpose: "Test application created in test mode.",
+                });
+                if (form.loan_category === "auto") {
+                    this.fillBlanks(form, {
+                        vehicle_make: "Toyota",
+                        vehicle_model: "Corolla",
+                        vehicle_year: "2020",
+                        vehicle_condition: this.testOption("vehicle_condition", /used/i),
+                    });
+                }
+                if (form.loan_category === "home") {
+                    this.fillBlanks(form, {
+                        property_address: "5 Test Road, St. George's",
+                        property_type: this.testOption("property_type", /house|single/i),
+                        property_value: 350000,
+                    });
+                }
+                if (form.loan_category === "business") {
+                    this.fillBlanks(form, {
+                        business_name: "Test Business Ltd",
+                        business_registration_number: "TEST-REG-001",
+                        business_type: this.testOption("business_type", null),
+                        business_incorporation_date: "2015-06-01",
+                        business_employee_count: 5,
+                    });
+                }
+            }
+
+            if (id === "assets" && !form.assets.length) {
+                const asset = {
+                    client_key: generateRowKey("asset"),
+                    id: null,
+                    name: "Test vehicle",
+                    asset_type: this.testOption("asset_type", /vehicle|car|auto/i),
+                    description: "Sample asset added in test mode.",
+                    declared_value: 45000,
+                    document_ids: [],
+                    owners: [
+                        {
+                            client_key: generateRowKey("owner"),
+                            id: null,
+                            party_id: this.toId(primary.party_id) || "",
+                            percentage: 100,
+                        },
+                    ],
+                    collateral: createEmptyCollateral(),
+                };
+                if (this.requiresCollateral) {
+                    asset.collateral.enabled = true;
+                    asset.collateral.description = "Sample collateral.";
+                    asset.collateral.insurance = {
+                        type: this.testOption("insurance_type", /comprehensive/i, "Comprehensive"),
+                        status: this.testOption("insurance_status", /policy/i, "Policy"),
+                        provider: "Test Insurance Co.",
+                        reference: "POL-TEST-001",
+                        coverage_amount: 45000,
+                        premium: 150,
+                        premium_frequency: this.testOption(
+                            "insurance_premium_frequency",
+                            /month/i,
+                        ),
+                        expiry_date: "2030-12-31",
+                    };
+                }
+                form.assets.push(asset);
+            }
+
+            if (id === "liabilities" && !form.liabilities.length) {
+                const type =
+                    this.liabilityTypes.find((entry) => !entry.is_revolving) ||
+                    this.liabilityTypes[0] ||
+                    null;
+                form.liabilities.push({
+                    client_key: generateRowKey("liability"),
+                    id: null,
+                    creditor_name: "Test Lender",
+                    liability_type: type ? this.toId(type) : "",
+                    outstanding_balance: 5000,
+                    payment_amount: 250,
+                    payment_frequency: this.testOption("payment_frequency", /month/i),
+                    credit_limit: type && type.is_revolving ? 5000 : null,
+                    assessed_payment: null,
+                    document_ids: [],
+                    responsibilities: [
+                        {
+                            client_key: generateRowKey("resp"),
+                            id: null,
+                            application_party_id:
+                                this.toId(primary.application_party_id) || "",
+                            percentage: 100,
+                            responsibility_type: "Borrower",
+                        },
+                    ],
+                });
+            }
+
+            if (id === "expenses" && !form.expenses.length) {
+                const type = this.expenseTypeOptions[0] || null;
+                form.expenses.push({
+                    client_key: generateRowKey("expense"),
+                    id: null,
+                    application_party_id: this.toId(primary.application_party_id) || "",
+                    expense_name: "",
+                    expense_type: type ? type.value : "",
+                    amount: 800,
+                    frequency: this.testOption("expense_frequency", /month/i),
+                    document_ids: [],
+                });
             }
         },
 
@@ -4047,6 +4296,23 @@ export default {
     min-height: 100vh;
     color: var(--ink);
     background: #f4f7fb;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+.test-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
 }
 
 .app-header {
