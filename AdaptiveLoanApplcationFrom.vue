@@ -122,6 +122,7 @@
                             :loan-category="formData.loan_category"
                             :selected-product="selectedProduct"
                             :lookups="lookups"
+                            :application-props="applicationProps"
                             :amount-minimum="amountMinimum"
                             :amount-maximum="amountMaximum"
                             :term-minimum="termMinimum"
@@ -545,6 +546,10 @@ export default {
             // save or restore. Anything in here that's no longer in the form
             // was removed by the applicant and is deleted on the next save.
             persistedIds: {},
+
+            // Saturn's own field definitions for Application, so the request
+            // step can render them with Saturn's FormField.
+            applicationProps: [],
 
             // Dropdown option lists keyed by field name
             lookups: {
@@ -2306,6 +2311,7 @@ export default {
             ]);
 
             this.products = this.toList(products);
+            this.applicationProps = this.toList(applicationProps);
 
             this.liabilityTypes = this.activeSortedTypes(liabilityTypeRows).map(
                 (type) => ({

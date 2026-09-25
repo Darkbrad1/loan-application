@@ -9,7 +9,7 @@ These are the developer's standing preferences. Follow them in every session.
 - **Explain at a beginner level.** Write the way you'd explain it to a first-year student: plain words, short sentences, everyday comparisons. Avoid jargon; when a technical term is needed, say what it means.
 - **Ask before product decisions.** If a choice changes how the app behaves for the applicant (how a feature works, what happens in an edge case, what something is called), lay out the options, say which you'd pick and why, and let the developer choose. Don't decide quietly.
 - **Technical choices are yours.** If a choice doesn't change what the user sees or experiences, decide it, then say what you picked.
-- **Make the requested changes and push them to `main`.** Don't paste code into the chat; edit the files in the repo, commit, and push to the `main` branch. If pushing to `main` fails for any reason, tell the developer what went wrong.
+- **Make the requested changes and push them to `main`.** Don't paste code into the chat; edit the files in the repo, commit, and push to the `main` branch. If pushing to `main` fails for any reason, tell the developer what went wrong. **Exception:** experiments the developer puts on the `dev` branch are committed and pushed to `dev`, not `main`, until the developer says to merge them.
 - **Flag any Saturn resource changes.** When a change needs a new resource, a new or changed field (property) on a resource, a new dropdown option (`lookup_reference`), a new AttachmentGroup, or a workflow change, say so clearly in a "Changes to make in Saturn" list: which resource, which field, its type, and the options if it's a dropdown. The developer makes these by hand, so the code won't work until they're done.
 - **After finishing anything, list the files changed.** Label each one NEW, UPDATED, or DELETED, with a line on what changed, and say which files didn't change.
 - **Keep this file up to date as we go.** Whenever a change affects anything described here (components, rules, data model, decisions, lessons learned, or status), update this file in the same session and push it with the code. When a decision is made, move it out of "Decisions still waiting" and record the outcome.
@@ -33,7 +33,7 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 |`AdaptiveLoanProductSection`|Step 1: loan category and product.|
 |`AdaptiveLoanApplicantsSection.vue`|Applicants step: one tab per applicant, plus that applicant's documents. Shows a note that only people listed here can own assets, so owners who aren't borrowing are added as Third Party Owners.|
 |`AdaptiveLoanApplicantEditor.vue`|One applicant: personal details, split address, NIS number, IDs (with scans), employment and income, estimated deductions, and consents. A Third Party Owner gets a short form instead (see Business rules).|
-|`AdaptiveLoanRequestSection`|Amount, term, purpose, and auto, home, or business details.|
+|`AdaptiveLoanRequestSection`|Amount, term, purpose, and auto, home, or business details. **On `dev`:** every input is Saturn's `FormField` (see below).|
 |`AdaptiveLoanAssetsSection.vue`|Assets with ownership splits and per-asset documents. On loans that need collateral, each asset has a "Use this asset as collateral" checkbox that reveals the insurance questions, collateral notes, and collateral documents.|
 |`AdaptiveLoanLiabilitiesSection.vue`|Liabilities with responsibility splits, credit limits for revolving credit, and documents.|
 |`AdaptiveLoanExpensesSection.vue`|Expenses, filtered by loan category, with documents.|
@@ -58,6 +58,17 @@ Section components keep a local `draft` (a deep copy of `modelValue`), edit it, 
 - **Never store `File` objects inside section data.** The JSON copy turns them into `{}`. Staged files live only in the parent's `documentState`.
 - **The parent's objects can be replaced mid-operation** when the applicant types. After async saves, `syncSavedIds(scopeKey, saved)` copies server IDs onto the current object.
 - Document events (`stage-file`, `remove-file`, `request-file-upload`, `file-rejected`) are passed straight up from sections to the parent.
+
+### Saturn `FormField` (trial on `dev`)
+
+The request section renders every input with Saturn's built-in `FormField` instead of `el-input`, `el-select`, and so on.
+
+- The main form loads Saturn's field definitions for Application (`loadResourceProps("Application")`) into `applicationProps` and passes them to the section.
+- **Each field uses Saturn's own definition** of that property when it exists, with our label, so the input type and dropdown options follow the resource settings in Saturn. Without one, the section builds a basic definition from the Saturn guide (`type: "number"`, `type: "date"`, `lookup_type: "values"` with `map.values`, or `input_properties.type` of `input`/`textarea`).
+- The property configs are built once in a computed `fields` map, not in the template, so `FormField` isn't handed a new object on every keystroke.
+- **The update event payload is unclear** in the guide (the value, or `{ property, data }`), so `valueOf()` accepts both.
+- Each `FormField` sits inside an `el-form-item`, which shows the label and required star. If Saturn also shows its own label, remove one of them.
+- `FormField` has no min/max, so the amount and term limits are only checked when the applicant presses Continue (they're still shown under the inputs).
 
 ## Wizard steps
 
@@ -167,7 +178,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 2. **Minimum IDs:** 1 or 2.
 3. **Credit bureau consent:** signed in the form, or a form downloaded, signed, and uploaded. Skipped for now.
 4. **Review screen:** Saturn's `ResourceViewInline` or expanding our own.
-5. **Input boxes:** Saturn `FormField` or our hand-built ones.
+5. **Input boxes:** Saturn `FormField` or our hand-built ones. **Being tried on the `dev` branch** in `AdaptiveLoanRequestSection` first; decide after testing it in Saturn.
 6. **Upload boxes:** Saturn `typed_file_upload` or ours.
 7. **Submit failure:** have the workflow set the status and the number together (recommended), or keep the current order and let officers spot stuck applications.
 
