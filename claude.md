@@ -11,7 +11,7 @@ These are the developer's standing preferences. Follow them in every session.
 - **Technical choices are yours.** If a choice doesn't change what the user sees or experiences, decide it, then say what you picked.
 - **Make the requested changes and push them to `main`.** Don't paste code into the chat; edit the files in the repo, commit, and push to the `main` branch. If pushing to `main` fails for any reason, tell the developer what went wrong.
 - **Flag any Saturn resource changes.** When a change needs a new resource, a new or changed field (property) on a resource, a new dropdown option (`lookup_reference`), a new AttachmentGroup, or a workflow change, say so clearly in a "Changes to make in Saturn" list: which resource, which field, its type, and the options if it's a dropdown. The developer makes these by hand, so the code won't work until they're done.
-- **Label every file clearly as NEW or UPDATED,** and say which files didn't change.
+- **After finishing anything, list the files changed.** Label each one NEW, UPDATED, or DELETED, with a line on what changed, and say which files didn't change.
 - **Keep this file up to date as we go.** Whenever a change affects anything described here (components, rules, data model, decisions, lessons learned, or status), update this file in the same session and push it with the code. When a decision is made, move it out of "Decisions still waiting" and record the outcome.
 
 ## What this is
@@ -31,25 +31,24 @@ An online loan application form for a Grenadian credit union (localStorage keys 
 |---|---|
 |`AdaptiveLoanApplcationFrom.vue`|The main form (parent), called the Adaptive Loan intake form. Owns all state, the wizard steps, validation, saving, restoring, deleting, document scopes, and uploads. Also holds every shared helper and setting (IDs, money, dates, validation rules, NIS and income tax). About 5,200 lines. (The file name's spelling is how it is in the repo.)|
 |`AdaptiveLoanProductSection`|Step 1: loan category and product.|
-|`AdaptiveLoanApplicantsSection.vue`|Applicants step: one tab per applicant, plus that applicant's documents.|
-|`AdaptiveLoanApplicantEditor.vue`|One applicant: personal details, split address, NIS number, IDs (with scans), employment and income, estimated deductions, and consents.|
+|`AdaptiveLoanApplicantsSection.vue`|Applicants step: one tab per applicant, plus that applicant's documents. Shows a note that only people listed here can own assets, so owners who aren't borrowing are added as Third Party Owners.|
+|`AdaptiveLoanApplicantEditor.vue`|One applicant: personal details, split address, NIS number, IDs (with scans), employment and income, estimated deductions, and consents. A Third Party Owner gets a short form instead (see Business rules).|
 |`AdaptiveLoanRequestSection`|Amount, term, purpose, and auto, home, or business details.|
-|`AdaptiveLoanAssetsSection.vue`|Assets with ownership splits and per-asset documents.|
+|`AdaptiveLoanAssetsSection.vue`|Assets with ownership splits and per-asset documents. On loans that need collateral, each asset has a "Use this asset as collateral" checkbox that reveals the insurance questions, collateral notes, and collateral documents.|
 |`AdaptiveLoanLiabilitiesSection.vue`|Liabilities with responsibility splits, credit limits for revolving credit, and documents.|
 |`AdaptiveLoanExpensesSection.vue`|Expenses, filtered by loan category, with documents.|
-|`AdaptiveLoanCollateralSection.vue`|Collateral: a declared asset or a third-party asset, plus insurance and documents.|
 |`AdaptiveLoanAllocationEditor`|Percentage split editor (ownership and responsibility) that must total 100%.|
 |`AdaptiveLoanDocumentRequirements.vue`|Reusable document upload cards for one owner (the application, an applicant, an ID, or an item).|
 |`AdaptiveLoanReviewSection.vue`|Final review step. Currently thin: totals and counts only.|
 
-`AdaptiveLoanDocumentsSection` was replaced by `AdaptiveLoanDocumentRequirements` and should be deleted from Saturn.
+`AdaptiveLoanDocumentsSection` was replaced by `AdaptiveLoanDocumentRequirements`, and `AdaptiveLoanCollateralSection` was removed (collateral is now on the Assets step). Both should be deleted from Saturn.
 
 ### Everything lives in the main form
 
 The developer tried moving shared code into a Saturn composable (`useLoanIntake`) and **reverted it**. All shared code is back inside the main form, and that's the setup to work with.
 
 - **Don't create composables or move code out of the main form.** Keep helpers, rules, and settings in the main form.
-- The settings sit as constants at the top of the main form's `<script>`: `DEFAULT_REVOLVING_RATE`, `TRACKED_RESOURCES`, `MINIMUM_IDENTIFICATIONS`, `STATUTORY_DEDUCTIONS` (NIS and tax), and `DEFAULT_COUNTRY`, plus the `createEmpty…` factories for new rows.
+- The settings sit as constants at the top of the main form's `<script>`: `DEFAULT_REVOLVING_RATE`, `TRACKED_RESOURCES`, `MINIMUM_IDENTIFICATIONS`, `STATUTORY_DEDUCTIONS` (NIS and tax), `DEFAULT_COUNTRY`, and `THIRD_PARTY_OWNER_ROLE`, plus the `createEmpty…` factories for new rows.
 
 ### The section pattern
 
@@ -62,10 +61,11 @@ Section components keep a local `draft` (a deep copy of `modelValue`), edit it, 
 
 ## Wizard steps
 
-Choose loan → Applicants → Your request → Assets → Liabilities → Expenses → Collateral (only when required) → Documents (only when the product has application-level documents) → Review.
+Choose loan → Applicants → Your request → Assets → Liabilities → Expenses → Documents (only when the product has application-level documents) → Review.
 
-- **Collateral is required** for auto and home loans, or when the product has `secured === true`. At least one collateral item is then required.
-- **Leaving each data step** (parties, assets, liabilities, expenses, collateral) auto-saves the draft.
+- **There is no Collateral step.** Collateral is marked on the Assets step, with a checkbox on each asset.
+- **Collateral is required** for auto and home loans, or when the product has `secured === true`. At least one asset must then be marked as collateral before leaving the Assets step. On other loans the checkbox isn't shown.
+- **Leaving each data step** (parties, assets, liabilities, expenses) auto-saves the draft.
 
 ## Saving, restoring, and deleting
 
@@ -89,11 +89,12 @@ Requirements come from Saturn **AttachmentGroups** named `<kind>-<name>`. A grou
 |`asset-<asset type>`|Assets of that type|
 |`liability-<liability type>`|Liabilities of that type|
 |`expense-<expense type>`|Expenses of that type|
-|`collateral-<asset type>`|Collateral backed by that asset type|
-|`collateral-third party`|Third-party collateral only (e.g. the owner's consent)|
+|`collateral-<asset type>`|Assets of that type marked as collateral (shown in the asset's card)|
+|`collateral-third party`|Collateral assets that a Third Party Owner owns all or part of (e.g. the owner's consent)|
 |`applicant-all`|Every applicant. The mandatory NIS card goes here.|
 
-- **Scope keys** are `application` or `<kind>:<client_key>`. Upload state is keyed `<scopeKey>::<attachmentTypeId>`.
+- **Scope keys** are `application` or `<kind>:<client_key>`. Upload state is keyed `<scopeKey>::<attachmentTypeId>`. Collateral scopes use the asset's key (`collateral:<asset client_key>`), and their owner record is `asset.collateral`.
+- **Third Party Owners have no document or ID scopes** for now.
 - **Uploads save only the owning record** (plus what it depends on), not the whole draft. Uploads stay locked, with a message, until that item's required fields are filled in. Co-applicant uploads also need the primary applicant to be complete first.
 - **Upload endpoint:** `POST /uploads/<Resource>/<ownerId>/documents` with multipart fields **`file`, `name`, `saturn_file_type`, `tags` (`"[]"`), and `meta_data` (`"{}"`)**. Missing `tags` or `meta_data` gives a 400 whose response is `{"status":"FAILURE","type":"single","message":{}}`, with no useful message.
 - After uploading, the form confirms by re-reading the owner record, tags the Upload with `saturn_file_type`, and updates the owner's `documents` list.
@@ -105,14 +106,15 @@ Only fields this form relies on are listed.
 - **Application:** `status`, `loan_category`, `loan_type_id`, `loan_name`, amounts and terms, category-specific fields, `parties`/`application_parties`, `asset_ids`, `liability_ids`, `expense_ids`, `documents`, `submitted_at`, and `application_number` (**assigned by the submit workflow; the form never sends it**).
 - **Party** (shared across applications): `kind` (`PERSON` or `ORGANIZATION`), names, `business_name`, `date_of_birth`, `marital_status`, `email`, `phone`, `address`, `parish`, `country`, `nis_number`, and `ids` (links to PartyIdentification). `identification_type` and `identification_number` were removed from Party.
 - **PartyIdentification:** `party` (**required**), `identification_type`, `identification_number`, `issuing_country`, `issue_date`, `expiry_date`, `is_primary`, `documents`.
-- **ApplicationParty:** `party`, `role`, employment fields, `gross_monthly_income`, `nis_deduction` and `income_tax_deduction` (**calculated, not entered**), consent fields, `documents`.
+- **ApplicationParty:** `party`, `role` (including `Third Party Owner`), `relationship_to_applicant` (Third Party Owners only), employment fields, `gross_monthly_income`, `nis_deduction` and `income_tax_deduction` (**calculated, not entered**), consent fields, `documents`.
 - **Asset / AssetOwnership:** ownership percentages link to Party.
 - **Liability:** `liability_type` (link to LiabilityType), `credit_limit` and `assessed_payment` (revolving only), `documents`.
 - **LiabilityResponsibility:** responsibility percentages link to ApplicationParty.
 - **LiabilityType:** `name`, `code`, `is_revolving`, `revolving_rate` (e.g. 3 or 0.03), `is_active`, `sort_order`.
 - **Expense:** `expense_type` (link to ExpenseType), `applicationpartiesid`, `amount`, `frequency`, `documents`.
 - **ExpenseType:** `name`, `code`, `applies_to` (loan categories; empty means all), `group`, `user_selectable`, `is_active`, `sort_order`.
-- **Collateral:** `application`, `ownership` (`applicant` or `third_party`), `asset_id`, `third_party_owner`, `third_party_relationship`, `category` (derived from the asset type, with no dropdown), `estimated_value`, the `insurance_*` fields, `status`, and `documents`.
+- **Collateral:** `application`, `asset_id`, `category` (derived from the asset type, with no dropdown), `description` (collateral notes), the `insurance_*` fields, `status`, and `documents`. One record per asset marked as collateral. It has **no value of its own**: the asset's `declared_value` is used. `ownership`, `third_party_owner`, `third_party_relationship`, and `estimated_value` are no longer used.
+- **In the form,** collateral details live on each asset as `asset.collateral` (`enabled`, `id`, `description`, `insurance`, `document_ids`), not in a separate list.
 
 Dropdown options come from each resource's property `lookup_reference`, loaded with `loadResourceProps()` and parsed by `options()`.
 
@@ -126,7 +128,11 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 - **IDs:** `MINIMUM_IDENTIFICATIONS` (currently 1) is one rule for the whole credit union, not per product. No duplicate ID types, no expired IDs, and exactly one primary.
 - **Parish** is required only when the country is Grenada.
 - **Business-only expense types** are hidden on personal loans, via `applies_to`.
-- **Third-party collateral assets** are saved as an Asset owned 100% by the third-party Party, and are **kept out of the application's `asset_ids`** so they don't count toward the applicant's net worth.
+- **Only applicants can own assets.** Someone who isn't borrowing but owns all or part of an asset is added on the Applicants step with the role **Third Party Owner** (`THIRD_PARTY_OWNER_ROLE`).
+    - **Their short form:** person or business, name (first and last, or business name), relationship to the primary applicant, phone (all required), and email (optional). No address, date of birth, NIS, IDs, documents, employment, income, or consents.
+    - They appear in asset ownership splits, but **not** in liability or expense assignments, since they owe nothing on the loan.
+    - **An asset owned only by Third Party Owners must be marked as collateral,** or it can't stay on the application.
+    - All assets, including third-party-owned ones, go in the application's `asset_ids`. **Net worth and underwriting should count only the borrowers' ownership share,** using the AssetOwnership percentages. (The form doesn't calculate net worth yet.)
 - The server should **recalculate** `assessed_payment`, `nis_deduction`, and `income_tax_deduction` before underwriting uses them. The browser's figures are estimates.
 
 ## Lessons learned (don't repeat these)
@@ -152,7 +158,8 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 - Multiple IDs (PartyIdentification), the split address, the NIS number, and calculated NIS and income tax.
 - Collateral: removed the category dropdown, added insurance details, and added third-party collateral.
 - Tried moving shared code into a `useLoanIntake` composable, then reverted. Everything lives in the main form again.
-- Rebuilt `AdaptiveLoanCollateralSection.vue` to match the main form: the owner choice (applicant or third party), the third-party asset and owner fields, and the insurance fields. The old Category dropdown is gone. The repo copy had been an old version, so the form warned about insurance fields that weren't on screen.
+- Rebuilt `AdaptiveLoanCollateralSection.vue` to match the main form (it had been an old version, so the form warned about insurance fields that weren't on screen). Then replaced it entirely, below.
+- **Collateral moved onto the Assets step,** and third-party owners became applicants with the role Third Party Owner and a short form. The Collateral step and `AdaptiveLoanCollateralSection.vue` were removed. Collateral uses the asset's value; its own value fields were dropped.
 
 ### Decisions still waiting on the developer
 
@@ -167,7 +174,7 @@ Dropdown options come from each resource's property `lookup_reference`, loaded w
 ### Next up
 
 - **Projected insurance expense:** turn each collateral insurance premium into a read-only monthly expense marked `is_projected`.
-- **Remove spread syntax (`...`):** the reverted code still uses it (about 25 places in the main form, plus one each in `AdaptiveLoanAllocationEditor.vue` and `AdaptiveLoanApplicantsSection.vue`), and Saturn fails on it at runtime.
+- **Remove spread syntax (`...`):** the reverted code still uses it (about 14 places left in the main form, plus one in `AdaptiveLoanAllocationEditor.vue`; the code touched so far has been cleaned), and Saturn fails on it at runtime.
 - **Add missing files to the repo:** `AdaptiveLoanDocumentRequirements.vue` is used by the main form but isn't in the repo yet.
 - **Cleanup:** remove the dead CSS from the old Documents screen (e.g. `.legacy-queue`), and reorganize the main form into labelled sections.
 

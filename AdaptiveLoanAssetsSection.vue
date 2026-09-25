@@ -4,7 +4,15 @@
     <div class="collection-header">
       <div>
         <h3>Assets</h3>
-        <p>Ownership is allocated to saved Party records.</p>
+        <p>
+          Only the people on the Applicants step can own assets here. If someone
+          else owns all or part of an asset, go back and add them as a Third
+          Party Owner.
+        </p>
+        <p v-if="requiresCollateral">
+          This loan needs collateral. Mark the asset or assets securing it as
+          collateral.
+        </p>
       </div>
       <el-button type="primary" plain @click="add">
         <v-icon start>mdi-plus</v-icon>
@@ -22,7 +30,10 @@
     >
       <div class="item-title">
         <strong>{{ asset.name || `Asset ${index + 1}` }}</strong>
-        <el-button text type="danger" @click="remove(index)">Remove</el-button>
+        <div>
+          <el-tag v-if="isCollateral(asset)" type="warning" size="small">Collateral</el-tag>
+          <el-button text type="danger" @click="remove(index)">Remove</el-button>
+        </div>
       </div>
 
       <div class="field-grid">
@@ -74,6 +85,10 @@
         total-label="Ownership total"
         @update:model-value="set(index, 'owners', $event)"
       />
+      <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
+        This asset is owned only by a Third Party Owner, so it can only be on
+        this application as collateral.
+      </small>
 
       <!-- Required documents for this asset; uploads unlock once it's complete -->
       <AdaptiveLoanDocumentRequirements
@@ -85,6 +100,134 @@
         @request-file-upload="$emit('request-file-upload', $event)"
         @file-rejected="$emit('file-rejected', $event)"
       />
+
+      <!-- Collateral: only for loans that need it -->
+      <section v-if="requiresCollateral" class="context">
+        <el-checkbox
+          :model-value="asset.collateral.enabled"
+          @update:model-value="setCollateral(index, 'enabled', $event)"
+        >
+          Use this asset as collateral for this loan
+        </el-checkbox>
+
+        <template v-if="asset.collateral.enabled">
+          <h4 class="subheading">Insurance</h4>
+          <div class="field-grid">
+            <el-form-item label="Insurance type" required>
+              <el-select
+                v-if="lookup('insurance_type').length"
+                :model-value="asset.collateral.insurance.type"
+                placeholder="Select a type"
+                @update:model-value="setInsurance(index, 'type', $event)"
+              >
+                <el-option
+                  v-for="option in lookup('insurance_type')"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-input
+                v-else
+                :model-value="asset.collateral.insurance.type"
+                placeholder="e.g. Comprehensive"
+                @input="setInsurance(index, 'type', $event)"
+              />
+            </el-form-item>
+
+            <el-form-item label="Policy or quote?" required>
+              <el-select
+                :model-value="asset.collateral.insurance.status"
+                @update:model-value="setInsurance(index, 'status', $event)"
+              >
+                <el-option
+                  v-for="option in insuranceStatusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="Insurer" required>
+              <el-input
+                :model-value="asset.collateral.insurance.provider"
+                @input="setInsurance(index, 'provider', $event)"
+              />
+            </el-form-item>
+
+            <el-form-item
+              :label="isPolicy(asset) ? 'Policy number' : 'Quote number'"
+              :required="isPolicy(asset)"
+            >
+              <el-input
+                :model-value="asset.collateral.insurance.reference"
+                @input="setInsurance(index, 'reference', $event)"
+              />
+            </el-form-item>
+
+            <el-form-item label="Amount covered (EC$)">
+              <el-input-number
+                :model-value="asset.collateral.insurance.coverage_amount"
+                :min="0"
+                @update:model-value="setInsurance(index, 'coverage_amount', $event)"
+              />
+            </el-form-item>
+
+            <el-form-item label="Premium (EC$)" required>
+              <el-input-number
+                :model-value="asset.collateral.insurance.premium"
+                :min="0"
+                @update:model-value="setInsurance(index, 'premium', $event)"
+              />
+            </el-form-item>
+
+            <el-form-item label="Premium paid" required>
+              <el-select
+                :model-value="asset.collateral.insurance.premium_frequency"
+                placeholder="How often?"
+                @update:model-value="setInsurance(index, 'premium_frequency', $event)"
+              >
+                <el-option
+                  v-for="option in lookup('insurance_premium_frequency')"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item v-if="isPolicy(asset)" label="Policy expiry date">
+              <el-date-picker
+                :model-value="asset.collateral.insurance.expiry_date"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="Select a date"
+                @update:model-value="setInsurance(index, 'expiry_date', $event || '')"
+              />
+            </el-form-item>
+          </div>
+
+          <el-form-item label="Collateral notes">
+            <el-input
+              :model-value="asset.collateral.description"
+              @input="setCollateral(index, 'description', $event)"
+            />
+          </el-form-item>
+
+          <!-- Collateral documents; uploads unlock once the asset is complete -->
+          <AdaptiveLoanDocumentRequirements
+            title="Collateral documents"
+            :scope="documentScopes[`collateral:${asset.client_key}`]"
+            :uploading-key="uploadingKey"
+            :disabled="documentsDisabled"
+            @stage-file="$emit('stage-file', $event)"
+            @remove-file="$emit('remove-file', $event)"
+            @request-file-upload="$emit('request-file-upload', $event)"
+            @file-rejected="$emit('file-rejected', $event)"
+          />
+        </template>
+      </section>
     </article>
   </section>
 </template>
@@ -95,6 +238,11 @@
  * (draft) of the assets array so the parent only receives clean,
  * committed updates via update:modelValue. Required documents for each
  * asset are shown inside its card; upload state lives in the parent.
+ *
+ * On loans that need collateral, each asset can be marked as collateral.
+ * Its collateral details (insurance and notes) live on asset.collateral,
+ * matching createEmptyCollateral() in the main form. The asset's own name,
+ * type, and value are used for the collateral.
  */
 export default {
   props: {
@@ -107,6 +255,16 @@ export default {
     partyOptions: {
       type: Array,
       default: () => [],
+    },
+    /** Party IDs of the Third Party Owners (people who aren't borrowing). */
+    thirdPartyOwnerIds: {
+      type: Array,
+      default: () => [],
+    },
+    /** True when this loan needs collateral (shows the collateral options). */
+    requiresCollateral: {
+      type: Boolean,
+      default: false,
     },
     /** Dropdown option lists keyed by field name. */
     lookups: {
@@ -145,6 +303,18 @@ export default {
     };
   },
 
+  computed: {
+    /** Policy or quote, from the lookup when loaded, else the two defaults. */
+    insuranceStatusOptions() {
+      const loaded = this.lookup('insurance_status');
+      if (loaded.length) return loaded;
+      return [
+        { label: 'Policy', value: 'Policy' },
+        { label: 'Quote', value: 'Quote' },
+      ];
+    },
+  },
+
   watch: {
     // Keep the draft in sync if the parent replaces the array
     // (e.g. when a saved draft is restored from the server).
@@ -157,9 +327,39 @@ export default {
   },
 
   methods: {
-    /** Deep-clones an array so edits never mutate the parent's state. */
+    /**
+     * Deep-clones an array so edits never mutate the parent's state, and
+     * gives older rows the collateral details they're missing.
+     */
     copy(value) {
-      return JSON.parse(JSON.stringify(value || []));
+      return JSON.parse(JSON.stringify(value || [])).map((row) => {
+        row.collateral = Object.assign(this.emptyCollateral(), row.collateral || {});
+        row.collateral.insurance = Object.assign(
+          this.emptyCollateral().insurance,
+          row.collateral.insurance || {}
+        );
+        return row;
+      });
+    },
+
+    /** Empty collateral details: not collateral, with a blank insurance quote. */
+    emptyCollateral() {
+      return {
+        enabled: false,
+        id: null,
+        description: '',
+        document_ids: [],
+        insurance: {
+          type: '',
+          status: 'Quote',
+          provider: '',
+          reference: '',
+          coverage_amount: null,
+          premium: null,
+          premium_frequency: '',
+          expiry_date: '',
+        },
+      };
     },
 
     /** Unique client-side key for rows that have no server ID yet. */
@@ -172,6 +372,24 @@ export default {
       return this.lookups[fieldName] || [];
     },
 
+    isCollateral(asset) {
+      return this.requiresCollateral && asset.collateral.enabled;
+    },
+
+    /** True when the asset's insurance is a current policy (not a quote). */
+    isPolicy(asset) {
+      return String(asset.collateral.insurance.status || '').trim().toLowerCase() === 'policy';
+    },
+
+    /** True when every assigned owner is a Third Party Owner. */
+    ownedOnlyByThirdParty(asset) {
+      const rows = (asset.owners || []).filter((row) => row.party_id);
+      return (
+        rows.length > 0 &&
+        rows.every((row) => this.thirdPartyOwnerIds.includes(row.party_id))
+      );
+    },
+
     /** Pushes the current draft up to the parent. */
     notify() {
       this.$emit('update:modelValue', this.copy(this.draft));
@@ -180,6 +398,18 @@ export default {
     /** Updates one field on one asset and notifies the parent. */
     set(index, fieldName, value) {
       this.draft[index][fieldName] = value;
+      this.notify();
+    },
+
+    /** Updates one collateral field on one asset. */
+    setCollateral(index, fieldName, value) {
+      this.draft[index].collateral[fieldName] = value;
+      this.notify();
+    },
+
+    /** Updates one insurance field on one asset's collateral. */
+    setInsurance(index, fieldName, value) {
+      this.draft[index].collateral.insurance[fieldName] = value;
       this.notify();
     },
 
@@ -204,6 +434,7 @@ export default {
             percentage: 100,
           },
         ],
+        collateral: this.emptyCollateral(),
       });
       this.notify();
     },
@@ -215,3 +446,11 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.subheading {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+</style>

@@ -1,5 +1,13 @@
 <template>
   <section>
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="owner-note"
+      title="Only the people listed here can own assets on this application."
+      description="If an asset you're offering as collateral is fully or partly owned by someone who isn't applying, add them here with the role Third Party Owner. We only need a few details about them."
+    />
     <el-tabs
       :model-value="activeTab"
       type="border-card"
@@ -132,7 +140,7 @@ export default {
 
   computed: {
     applicants() {
-      return [this.primary, ...this.parties];
+      return [this.primary].concat(this.parties);
     },
 
     /** Roles for additional applicants; "Primary Applicant" is reserved. */
@@ -145,7 +153,10 @@ export default {
 
   methods: {
     label(person, index) {
-      const name = `${person.first_name || ''} ${person.last_name || ''}`.trim();
+      const name =
+        person.kind === 'ORGANIZATION'
+          ? String(person.business_name || '').trim()
+          : `${person.first_name || ''} ${person.last_name || ''}`.trim();
       const fallback = index === 0 ? 'Primary Applicant' : 'Additional Party';
       return name ? `${name} · ${person.role || fallback}` : person.role || fallback;
     },
@@ -166,3 +177,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.owner-note {
+  margin-bottom: 16px;
+}
+</style>

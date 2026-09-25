@@ -62,8 +62,9 @@ export default {
         },
         {
           label: 'Collateral',
+          // Collateral is marked on each asset.
           value: this.requiresCollateral
-            ? `${(form.collaterals || []).length} item(s)`
+            ? `${(form.assets || []).filter((asset) => asset.collateral && asset.collateral.enabled).length} asset(s)`
             : 'Not required',
         },
       ];

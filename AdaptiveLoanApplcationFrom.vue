@@ -133,6 +133,8 @@
                             v-else-if="current.id === 'assets'"
                             :model-value="formData.assets"
                             :party-options="partyOptions"
+                            :third-party-owner-ids="thirdPartyOwnerPartyIds"
+                            :requires-collateral="requiresCollateral"
                             :lookups="lookups"
                             @update:model-value="formData.assets = $event"
                             :document-scopes="documentScopes"
@@ -188,25 +190,11 @@
                             @file-rejected="handleRejectedDocument"
                         />
 
-                        <AdaptiveLoanCollateralSection
-                            v-else-if="current.id === 'collateral'"
-                            :model-value="formData.collaterals"
-                            :assets="formData.assets"
-                            :lookups="lookups"
-                            @update:model-value="formData.collaterals = $event"
-                            :document-scopes="documentScopes"
-                            :uploading-key="uploadingDocumentKey"
-                            :documents-disabled="documentsDisabled"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
-
                         <!--
                         Application-level documents only. Applicant, asset,
                         liability, expense, and collateral documents are
-                        uploaded inside their own sections.
+                        uploaded inside their own sections (collateral
+                        documents inside the asset's card).
                         -->
                         <AdaptiveLoanDocumentRequirements
                             v-else-if="current.id === 'documents'"
@@ -375,6 +363,14 @@ const STATUTORY_DEDUCTIONS = {
 const DEFAULT_COUNTRY = "Grenada";
 
 /**
+ * Role for someone who isn't borrowing but owns (or part-owns) an asset
+ * offered as collateral. Only applicants can own assets on the
+ * application, so these owners are added on the Applicants step with a
+ * short form: name, relationship, and contact details only.
+ */
+const THIRD_PARTY_OWNER_ROLE = "Third Party Owner";
+
+/**
  * Creates an empty identification row (a PartyIdentification record).
  */
 const createEmptyIdentification = (isPrimary = false) => ({
@@ -399,8 +395,13 @@ const createEmptyApplicant = (role = "") => ({
     party_id: null,
     application_party_id: null,
     role,
+    // PERSON or ORGANIZATION. Only a Third Party Owner can be a business.
+    kind: "PERSON",
     first_name: "",
     last_name: "",
+    business_name: "",
+    // Third Party Owners only: how they're related to the primary applicant.
+    relationship_to_applicant: "",
     email: "",
     phone: "",
     date_of_birth: "",
@@ -429,36 +430,17 @@ const createEmptyApplicant = (role = "") => ({
 });
 
 /**
- * Creates an empty collateral item. It's either one of the applicant's
- * declared assets (ownership "applicant") or an asset owned by someone who
- * isn't a borrower (ownership "third_party"), described on the card itself.
+ * Creates the collateral details kept on each asset (asset.collateral).
+ * An asset is offered as collateral when "enabled" is on; it's then saved
+ * as a Collateral record linked to the application and the asset. The
+ * asset's own name, type, and declared value are used; collateral has no
+ * value of its own.
  */
 const createEmptyCollateral = () => ({
-    client_key: generateRowKey("collateral"),
+    enabled: false,
     id: null,
-    ownership: "applicant",
-    // Declared asset, for ownership "applicant"
-    asset_ref: "",
-    estimated_value: null,
     description: "",
     document_ids: [],
-    // Asset and owner, for ownership "third_party"
-    third_party: {
-        asset_id: null,
-        ownership_id: null,
-        name: "",
-        asset_type: "",
-        declared_value: null,
-        description: "",
-        owner_party_id: null,
-        owner_kind: "PERSON",
-        first_name: "",
-        last_name: "",
-        business_name: "",
-        relationship: "",
-        phone: "",
-        email: "",
-    },
     // Insurance policy, or a quote when there's no policy yet
     insurance: {
         type: "",
@@ -508,7 +490,6 @@ const createEmptyApplication = () => ({
     assets: [],
     liabilities: [],
     expenses: [],
-    collaterals: [],
     document_ids: [],
 });
 
@@ -583,7 +564,7 @@ export default {
                 insurance_type: [],
                 insurance_status: [],
                 insurance_premium_frequency: [],
-                third_party_relationship: [],
+                relationship_to_applicant: [],
             },
 
             // Top-level loan categories shown on step 1
@@ -628,7 +609,15 @@ export default {
 
         /** Primary applicant plus all additional parties. */
         allApplicants() {
-            return [this.formData.primary, ...this.formData.parties];
+            return [this.formData.primary].concat(this.formData.parties);
+        },
+
+        /** Party IDs of the Third Party Owners (people who aren't borrowing). */
+        thirdPartyOwnerPartyIds() {
+            return this.allApplicants
+                .filter((person) => this.isThirdPartyOwner(person))
+                .map((person) => this.toId(person.party_id))
+                .filter(Boolean);
         },
 
         /** Products filtered down to the selected loan category. */
@@ -714,10 +703,17 @@ export default {
                 }));
         },
 
-        /** Select options for liabilities/expenses, keyed by ApplicationParty ID. */
+        /**
+         * Select options for liabilities/expenses, keyed by ApplicationParty
+         * ID. Third Party Owners aren't borrowing, so they're left out.
+         */
         applicationPartyOptions() {
             return this.allApplicants
-                .filter((person) => person.application_party_id)
+                .filter(
+                    (person) =>
+                        person.application_party_id &&
+                        !this.isThirdPartyOwner(person),
+                )
                 .map((person) => ({
                     value: this.toId(person.application_party_id),
                     label: this.applicantLabel(person, person.role),
@@ -764,9 +760,9 @@ export default {
 
         /**
          * Every document scope in the application, in wizard order: the
-         * application itself, each applicant, then each asset, liability,
-         * expense, and (when required) collateral item. Scopes with no
-         * required documents are left out.
+         * application itself, each applicant, then each asset (and its
+         * collateral, when it's offered as collateral), liability, and
+         * expense. Scopes with no required documents are left out.
          *
          * Each scope carries its attachment types, requirement view models
          * with upload state, and a lockedMessage while its owner isn't
@@ -800,6 +796,9 @@ export default {
             );
             const primaryReady = this.validApplicant(form.primary);
             this.allApplicants.forEach((person, index) => {
+                // Third Party Owners give no documents or IDs for now.
+                if (this.isThirdPartyOwner(person)) return;
+
                 let locked = "";
                 if (!this.validApplicant(person)) {
                     locked =
@@ -836,20 +835,45 @@ export default {
                 });
             });
 
-            form.assets.forEach((asset, index) =>
+            form.assets.forEach((asset, index) => {
+                const assetLabel = asset.name || `asset ${index + 1}`;
+                const typeLabel = this.assetTypeLabel(asset.asset_type);
+                const assetLocked = this.assetReady(asset)
+                    ? ""
+                    : "Enter this asset's name, type, and value to upload documents.";
+
                 add(
                     `asset:${asset.client_key}`,
                     "asset",
-                    asset.name || `asset ${index + 1}`,
-                    this.requirementTypesFor(
-                        "asset",
-                        this.assetTypeLabel(asset.asset_type),
-                    ),
-                    this.assetReady(asset)
-                        ? ""
-                        : "Enter this asset's name, type, and value to upload documents.",
-                ),
-            );
+                    assetLabel,
+                    this.requirementTypesFor("asset", typeLabel),
+                    assetLocked,
+                );
+
+                // Collateral documents, shown inside the asset's card.
+                if (!this.isCollateral(asset)) return;
+
+                // "collateral-<asset type>" and "collateral-all", plus
+                // "collateral-third party" when a Third Party Owner owns part
+                // of it (e.g. the owner's signed consent to pledge it).
+                const types = this.requirementTypesFor("collateral", typeLabel);
+                if (this.hasThirdPartyOwner(asset)) {
+                    const seen = new Set(types.map(this.toId));
+                    this.requirementTypesFor("collateral", "third party").forEach(
+                        (type) => {
+                            if (!seen.has(this.toId(type))) types.push(type);
+                        },
+                    );
+                }
+
+                add(
+                    `collateral:${asset.client_key}`,
+                    "collateral",
+                    `collateral (${assetLabel})`,
+                    types,
+                    assetLocked,
+                );
+            });
 
             form.liabilities.forEach((liability, index) =>
                 add(
@@ -883,41 +907,6 @@ export default {
                 ),
             );
 
-            if (this.requiresCollateral) {
-                form.collaterals.forEach((collateral, index) => {
-                    const info = this.collateralAssetInfo(collateral);
-                    const typeLabel = this.assetTypeLabel(info.asset_type);
-                    const thirdParty = collateral.ownership === "third_party";
-
-                    // "collateral-<asset type>" and "collateral-all", plus
-                    // "collateral-third party" for assets owned by others
-                    // (e.g. the owner's signed consent to pledge it).
-                    const types = this.requirementTypesFor("collateral", typeLabel);
-                    if (thirdParty) {
-                        const seen = new Set(types.map(this.toId));
-                        this.requirementTypesFor("collateral", "third party").forEach(
-                            (type) => {
-                                if (!seen.has(this.toId(type))) types.push(type);
-                            },
-                        );
-                    }
-
-                    add(
-                        `collateral:${collateral.client_key}`,
-                        "collateral",
-                        info.name
-                            ? `collateral (${info.name})`
-                            : `collateral ${index + 1}`,
-                        types,
-                        this.collateralReady(collateral)
-                            ? ""
-                            : thirdParty
-                              ? "Describe the asset and its owner to upload documents."
-                              : "Select a completed declared asset to upload documents.",
-                    );
-                });
-            }
-
             return scopes;
         },
 
@@ -947,8 +936,9 @@ export default {
         },
 
         /**
-         * Ordered list of wizard steps. Collateral and documents steps are
-         * inserted conditionally based on the product and its requirements.
+         * Ordered list of wizard steps. The documents step is inserted only
+         * when the product has application-level documents. Collateral is
+         * chosen on the Assets step.
          */
         path() {
             const steps = [
@@ -974,8 +964,12 @@ export default {
                 {
                     id: "assets",
                     title: "Assets",
-                    note: "Party ownership",
-                    description: "Declare assets and ownership.",
+                    note: this.requiresCollateral
+                        ? "Ownership and collateral"
+                        : "Party ownership",
+                    description: this.requiresCollateral
+                        ? "Declare assets and ownership, and mark the assets securing this loan as collateral."
+                        : "Declare assets and ownership.",
                 },
                 {
                     id: "liabilities",
@@ -990,16 +984,6 @@ export default {
                     description: "Assign expenses to applicants.",
                 },
             ];
-
-            if (this.requiresCollateral) {
-                steps.push({
-                    id: "collateral",
-                    title: "Collateral",
-                    note: "Stable asset links",
-                    description:
-                        "Choose the assets securing this loan and their insurance.",
-                });
-            }
 
             // Only application-level documents have their own step.
             if (this.documentScopes.application) {
@@ -1084,10 +1068,17 @@ export default {
             this.alert = { text, type };
         },
 
+        /** A person's full name, or the business name for a business owner. */
+        fullName(person) {
+            if (person.kind === "ORGANIZATION") {
+                return String(person.business_name || "").trim();
+            }
+            return `${person.first_name || ""} ${person.last_name || ""}`.trim();
+        },
+
         /** "Jane Doe · Co-Applicant", falling back to just the role. */
         applicantLabel(person, fallback) {
-            const name =
-                `${person.first_name || ""} ${person.last_name || ""}`.trim();
+            const name = this.fullName(person);
             return name
                 ? `${name} · ${person.role || fallback}`
                 : person.role || fallback;
@@ -1095,11 +1086,42 @@ export default {
 
         /** Display name for a person, with positional fallbacks. */
         applicantName(person, index) {
-            const name =
-                `${person.first_name || ""} ${person.last_name || ""}`.trim();
+            const name = this.fullName(person);
             return (
                 name ||
                 (index === 0 ? "Primary Applicant" : `Co-applicant ${index}`)
+            );
+        },
+
+        /** True for someone who owns collateral but isn't borrowing. */
+        isThirdPartyOwner(person) {
+            return (
+                String(person?.role || "")
+                    .trim()
+                    .toLowerCase() === THIRD_PARTY_OWNER_ROLE.toLowerCase()
+            );
+        },
+
+        /** True when an asset is offered as collateral on a loan that needs it. */
+        isCollateral(asset) {
+            return Boolean(this.requiresCollateral && asset?.collateral?.enabled);
+        },
+
+        /** True when a Third Party Owner owns any share of the asset. */
+        hasThirdPartyOwner(asset) {
+            const ownerIds = this.thirdPartyOwnerPartyIds;
+            return (asset.owners || []).some((row) =>
+                ownerIds.includes(this.toId(row.party_id)),
+            );
+        },
+
+        /** True when every owner of the asset is a Third Party Owner. */
+        ownedOnlyByThirdParty(asset) {
+            const ownerIds = this.thirdPartyOwnerPartyIds;
+            const rows = (asset.owners || []).filter((row) => row.party_id);
+            return (
+                rows.length > 0 &&
+                rows.every((row) => ownerIds.includes(this.toId(row.party_id)))
             );
         },
 
@@ -1326,7 +1348,7 @@ export default {
          * pointing at someone who is no longer on the application.
          */
         removeApplicant(index) {
-            const [removed] = this.formData.parties.splice(index, 1);
+            const removed = this.formData.parties.splice(index, 1)[0];
             this.activePartyTab = this.formData.primary.client_key;
             if (!removed) return;
 
@@ -1363,9 +1385,7 @@ export default {
             }
 
             if (cleared) {
-                const name =
-                    `${removed.first_name || ""} ${removed.last_name || ""}`.trim() ||
-                    "The applicant";
+                const name = this.fullName(removed) || "The applicant";
                 this.warn(
                     `${name} was removed. Reassign the ${cleared} asset, liability, or expense ${
                         cleared === 1 ? "entry" : "entries"
@@ -1528,57 +1548,6 @@ export default {
                     expense.amount !== null &&
                     expense.amount !== undefined,
             );
-        },
-
-        /** Whether the collateral's asset (and owner) is complete enough to save. */
-        collateralReady(collateral) {
-            if (collateral.ownership === "third_party") {
-                return !this.thirdPartyIssue(collateral);
-            }
-            const asset = this.assetForCollateral(collateral);
-            return Boolean(asset && this.assetReady(asset));
-        },
-
-        /**
-         * Name, type, and value of the asset behind a collateral item, from
-         * the applicant's declared asset or the third-party details.
-         */
-        collateralAssetInfo(collateral) {
-            if (collateral.ownership === "third_party") {
-                const asset = collateral.third_party || {};
-                return {
-                    name: asset.name || "",
-                    asset_type: asset.asset_type || "",
-                    value: asset.declared_value ?? null,
-                };
-            }
-            const asset = this.assetForCollateral(collateral);
-            return {
-                name: asset?.name || "",
-                asset_type: asset?.asset_type || "",
-                value: asset?.declared_value ?? null,
-            };
-        },
-
-        /** What's missing from a third-party asset or its owner, or "". */
-        thirdPartyIssue(collateral) {
-            const party = collateral.third_party || {};
-            if (
-                !party.name ||
-                !party.asset_type ||
-                party.declared_value === null ||
-                party.declared_value === undefined
-            ) {
-                return "Enter the third-party asset's name, type, and value.";
-            }
-            const ownerNamed =
-                party.owner_kind === "ORGANIZATION"
-                    ? party.business_name
-                    : party.first_name && party.last_name;
-            if (!ownerNamed || !party.relationship || !party.phone) {
-                return "Enter the asset owner's name, relationship to you, and phone number.";
-            }
-            return "";
         },
 
         /** What's missing from a collateral item's insurance, or "". */
@@ -1899,16 +1868,21 @@ export default {
                     resourceName: "Expense",
                     record: find(form.expenses),
                 }),
-                collateral: () => ({
-                    resourceName: "Collateral",
-                    record: find(form.collaterals),
-                }),
+                // Collateral details live on their asset (asset.collateral).
+                collateral: () => {
+                    const asset = find(form.assets);
+                    return {
+                        resourceName: "Collateral",
+                        record: asset ? asset.collateral || null : null,
+                        asset,
+                    };
+                },
             };
 
             const owner = owners[kind]
                 ? owners[kind]()
                 : { resourceName: "", record: null };
-            return { kind, ...owner };
+            return Object.assign({ kind }, owner);
         },
 
         /** The server ID documents are attached to for an owner. */
@@ -1952,8 +1926,8 @@ export default {
         async linkFinancialsToApplication() {
             const ids = this.collectPersistedIds();
             await new Resource(this, "Application").update(this.formData.id, {
-                // Only the applicants' own assets; third-party collateral
-                // assets are linked through their Collateral record.
+                // Every declared asset, including ones part- or fully owned
+                // by a Third Party Owner. Ownership rows say whose share is whose.
                 asset_ids: this.formData.assets
                     .map((asset) => this.toId(asset.id))
                     .filter(Boolean),
@@ -1998,15 +1972,15 @@ export default {
                 await this.saveExpense(record);
                 await this.linkFinancialsToApplication();
             } else if (owner.kind === "collateral") {
-                const asset =
-                    record.ownership === "third_party"
-                        ? null
-                        : this.assetForCollateral(record);
-                if (asset && !asset.id) {
+                // The Collateral record points at its asset, so save the
+                // asset first if it's new.
+                const asset = owner.asset;
+                if (!asset.id) {
                     await this.saveAsset(asset);
+                    this.syncSavedIds(`asset:${asset.client_key}`, asset);
                     await this.linkFinancialsToApplication();
                 }
-                await this.saveCollateral(record);
+                await this.saveCollateral(asset);
             }
 
             // Track new IDs so removing the item later deletes it.
@@ -2036,13 +2010,9 @@ export default {
                 }
             });
 
-            // Third-party asset and owner IDs live in a nested object.
-            if (saved.third_party && current.third_party) {
-                ["asset_id", "ownership_id", "owner_party_id"].forEach((field) => {
-                    if (saved.third_party[field]) {
-                        current.third_party[field] = saved.third_party[field];
-                    }
-                });
+            // An asset's collateral ID lives in a nested object.
+            if (saved.collateral && current.collateral && saved.collateral.id) {
+                current.collateral.id = saved.collateral.id;
             }
 
             ["owners", "responsibilities", "identifications"].forEach((listKey) =>
@@ -2093,7 +2063,9 @@ export default {
                 await this.ensureOwnerSaved(owner);
                 const record = this.syncSavedIds(payload.scopeKey, owner.record);
                 const resourceName = owner.resourceName;
-                const ownerId = this.ownerIdOf({ ...owner, record });
+                const ownerId = this.ownerIdOf(
+                    Object.assign({}, owner, { record }),
+                );
 
                 if (!ownerId) {
                     throw Error("The document owner has not been saved.");
@@ -2399,9 +2371,9 @@ export default {
                 ).length
                     ? this.options(collateralProps, "insurance_premium_frequency")
                     : this.options(expenseProps, "frequency"),
-                third_party_relationship: this.options(
-                    collateralProps,
-                    "third_party_relationship",
+                relationship_to_applicant: this.options(
+                    applicationPartyProps,
+                    "relationship_to_applicant",
                 ),
             });
         },
@@ -2600,9 +2572,44 @@ export default {
             return "";
         },
 
+        /**
+         * What a Third Party Owner still needs, or "". They aren't borrowing,
+         * so only their name, relationship, and phone number are required.
+         */
+        thirdPartyOwnerIssue(person) {
+            const named =
+                person.kind === "ORGANIZATION"
+                    ? person.business_name
+                    : person.first_name && person.last_name;
+            if (!named) {
+                return person.kind === "ORGANIZATION"
+                    ? "Enter the business name."
+                    : "Enter the first and last name.";
+            }
+            if (!person.relationship_to_applicant) {
+                return "Enter their relationship to the primary applicant.";
+            }
+            if (!person.phone) return "Enter a phone number.";
+            return "";
+        },
+
         /** All required applicant fields, IDs, deductions, and consents. */
         validApplicant(person) {
+            if (this.isThirdPartyOwner(person)) {
+                return !this.thirdPartyOwnerIssue(person);
+            }
             return !this.applicantIssue(person);
+        },
+
+        /** True when an ApplicationParty ID belongs to a borrower (not a Third Party Owner). */
+        isBorrowerLink(applicationPartyId) {
+            const id = this.toId(applicationPartyId);
+            return Boolean(
+                id &&
+                    this.applicationPartyOptions.some(
+                        (option) => option.value === id,
+                    ),
+            );
         },
 
         /**
@@ -2622,7 +2629,8 @@ export default {
                 const primaryIssue = this.applicantIssue(form.primary);
                 if (primaryIssue) return `Primary applicant: ${primaryIssue}`;
 
-                for (const [index, person] of form.parties.entries()) {
+                for (let index = 0; index < form.parties.length; index++) {
+                    const person = form.parties[index];
                     const name = this.applicantName(person, index + 1);
                     if (
                         !person.role ||
@@ -2630,7 +2638,9 @@ export default {
                     ) {
                         return `${name}: select a role other than Primary Applicant.`;
                     }
-                    const issue = this.applicantIssue(person);
+                    const issue = this.isThirdPartyOwner(person)
+                        ? this.thirdPartyOwnerIssue(person)
+                        : this.applicantIssue(person);
                     if (issue) return `${name}: ${issue}`;
                 }
             }
@@ -2667,6 +2677,32 @@ export default {
                 if (hasInvalidAsset) {
                     return "Complete every asset and total ownership to 100%.";
                 }
+
+                for (let index = 0; index < form.assets.length; index++) {
+                    const asset = form.assets[index];
+                    const name = asset.name || `Asset ${index + 1}`;
+
+                    // Someone else's asset is only here to secure the loan.
+                    if (this.ownedOnlyByThirdParty(asset) && !this.isCollateral(asset)) {
+                        return this.requiresCollateral
+                            ? `${name} is owned only by a Third Party Owner, so it can only be on this application as collateral. Mark it as collateral or remove it.`
+                            : `${name} is owned only by a Third Party Owner. Remove it, since this loan doesn't use collateral.`;
+                    }
+
+                    if (this.isCollateral(asset)) {
+                        const issue = this.insuranceIssue(asset.collateral);
+                        if (issue) return `${name}: ${issue}`;
+                    }
+                }
+
+                if (
+                    this.requiresCollateral &&
+                    !form.assets.some((asset) => this.isCollateral(asset))
+                ) {
+                    return form.assets.length
+                        ? "This loan needs collateral. Mark at least one asset as collateral."
+                        : "This loan needs collateral. Add the asset securing it and mark it as collateral.";
+                }
             }
 
             if (this.current.id === "liabilities") {
@@ -2696,7 +2732,7 @@ export default {
                         item.payment_amount === null ||
                         !this.allocationComplete(item.responsibilities) ||
                         item.responsibilities.some(
-                            (row) => !row.application_party_id,
+                            (row) => !this.isBorrowerLink(row.application_party_id),
                         ),
                 );
                 if (hasInvalidLiability) {
@@ -2718,7 +2754,7 @@ export default {
 
                 const hasInvalidExpense = form.expenses.some(
                     (item) =>
-                        !item.application_party_id ||
+                        !this.isBorrowerLink(item.application_party_id) ||
                         !item.expense_type ||
                         item.amount === null,
                 );
@@ -2727,37 +2763,14 @@ export default {
                 }
             }
 
-            if (this.current.id === "collateral") {
-                if (!form.collaterals.length) {
-                    return "Add at least one collateral item for this loan.";
-                }
-                for (const [index, item] of form.collaterals.entries()) {
-                    const label = `Collateral ${index + 1}`;
-                    if (item.ownership === "third_party") {
-                        const issue = this.thirdPartyIssue(item);
-                        if (issue) return `${label}: ${issue}`;
-                    } else {
-                        if (!item.asset_ref) {
-                            return `${label}: select one of your declared assets.`;
-                        }
-                        if (!this.assetForCollateral(item)) {
-                            return `${label}: its asset was removed. Select another asset.`;
-                        }
-                    }
-                    const insuranceIssue = this.insuranceIssue(item);
-                    if (insuranceIssue) return `${label}: ${insuranceIssue}`;
-                }
-            }
-
             // Required documents for the items on this step. Field checks
             // above run first, since items can't receive uploads until
             // they're complete.
             const kindsByStep = {
                 parties: ["applicant", "identification"],
-                assets: ["asset"],
+                assets: ["asset", "collateral"],
                 liabilities: ["liability"],
                 expenses: ["expense"],
-                collateral: ["collateral"],
                 documents: ["application"],
             };
             const kinds = kindsByStep[this.current.id];
@@ -2786,7 +2799,6 @@ export default {
                 "assets",
                 "liabilities",
                 "expenses",
-                "collateral",
             ];
             if (persistedSteps.includes(this.current.id)) {
                 this.saving = true;
@@ -2866,6 +2878,20 @@ export default {
 
         /** Identity data stored on the Party resource (shared across applications). */
         partyPayload(person) {
+            // Third Party Owners give only their name and contact details.
+            // Other Party fields are left as they are, not blanked.
+            if (this.isThirdPartyOwner(person)) {
+                const isBusiness = person.kind === "ORGANIZATION";
+                return {
+                    kind: isBusiness ? "ORGANIZATION" : "PERSON",
+                    first_name: isBusiness ? "" : person.first_name,
+                    last_name: isBusiness ? "" : person.last_name,
+                    business_name: isBusiness ? person.business_name : "",
+                    email: person.email,
+                    phone: person.phone,
+                };
+            }
+
             return {
                 kind: "PERSON",
                 first_name: person.first_name,
@@ -2903,6 +2929,32 @@ export default {
          * ApplicationParty link record. (No longer dependent on Application ID).
          */
         applicationPartyPayload(person, isPrimary) {
+            // Third Party Owners aren't borrowing: no employment, income,
+            // deductions, or consents are asked for or kept.
+            if (!isPrimary && this.isThirdPartyOwner(person)) {
+                return {
+                    party: this.toId(person.party_id),
+                    party_id: this.toId(person.party_id),
+                    role: THIRD_PARTY_OWNER_ROLE,
+                    relationship_status: "Active",
+                    is_primary_contact: false,
+                    relationship_to_applicant: person.relationship_to_applicant,
+                    employment_status: "",
+                    employer_name: "",
+                    job_title: "",
+                    years_employed: null,
+                    gross_monthly_income: null,
+                    nis_deduction: null,
+                    income_tax_deduction: null,
+                    consent_accuracy_confirmation: false,
+                    consent_credit_check: false,
+                    consent_data_processing: false,
+                    consented_at: null,
+                    consent_policy_version: "",
+                    documents: this.documentIdsOf(person),
+                };
+            }
+
             const allConsentsGiven =
                 person.consent_accuracy_confirmation &&
                 person.consent_credit_check &&
@@ -2918,6 +2970,7 @@ export default {
                 role: isPrimary ? "Primary Applicant" : person.role,
                 relationship_status: "Active",
                 is_primary_contact: isPrimary,
+                relationship_to_applicant: "",
                 employment_status: person.employment_status,
                 employer_name: showEmployment ? person.employer_name : "",
                 job_title: showEmployment ? person.job_title : "",
@@ -2974,6 +3027,12 @@ export default {
                 this.partyPayload(person),
             );
 
+            // Third Party Owners give no identification, so their IDs are
+            // skipped (any saved earlier under another role are left alone).
+            if (!isPrimary && this.isThirdPartyOwner(person)) {
+                return this.saveApplicationParty(person, isPrimary);
+            }
+
             for (const row of person.identifications || []) {
                 row.id = await this.upsert(
                     "PartyIdentification",
@@ -3005,8 +3064,13 @@ export default {
                     if (status !== 404) failedIds.push(id);
                 }
             }
-            person.saved_identification_ids = [...currentIds, ...failedIds];
+            person.saved_identification_ids = currentIds.concat(failedIds);
 
+            return this.saveApplicationParty(person, isPrimary);
+        },
+
+        /** Saves the ApplicationParty link for one applicant and returns its ID. */
+        async saveApplicationParty(person, isPrimary) {
             const applicationPartyPayload = this.applicationPartyPayload(
                 person,
                 isPrimary,
@@ -3142,70 +3206,18 @@ export default {
         },
 
         /**
-         * Saves a third-party collateral asset and its owner: the owner as a
-         * Party (person or business), the asset as an Asset, and a 100%
-         * AssetOwnership linking them. The asset isn't added to the
-         * application's asset_ids, so it doesn't count as the applicant's.
+         * Saves the Collateral record for an asset offered as collateral. It
+         * uses the asset's own details: collateral has no value of its own,
+         * and its category follows the asset's type.
          */
-        async saveThirdPartyAsset(collateral) {
-            const party = collateral.third_party;
-            const isBusiness = party.owner_kind === "ORGANIZATION";
-
-            party.owner_party_id = await this.upsert("Party", party.owner_party_id, {
-                kind: isBusiness ? "ORGANIZATION" : "PERSON",
-                first_name: isBusiness ? "" : party.first_name,
-                last_name: isBusiness ? "" : party.last_name,
-                business_name: isBusiness ? party.business_name : "",
-                phone: party.phone,
-                email: party.email,
-            });
-
-            party.asset_id = await this.upsert("Asset", party.asset_id, {
-                name: party.name,
-                asset_type: party.asset_type,
-                description: party.description,
-                declared_value: party.declared_value,
-                status: "Third party",
-            });
-
-            party.ownership_id = await this.upsert(
-                "AssetOwnership",
-                party.ownership_id,
-                {
-                    asset: party.asset_id,
-                    party: party.owner_party_id,
-                    ownership_percentage: 100,
-                },
-            );
-        },
-
-        async saveCollateral(collateral) {
-            const thirdParty = collateral.ownership === "third_party";
-            if (thirdParty) await this.saveThirdPartyAsset(collateral);
-
-            const linkedAsset = thirdParty
-                ? null
-                : this.assetForCollateral(collateral);
-            const info = this.collateralAssetInfo(collateral);
+        async saveCollateral(asset) {
+            const collateral = asset.collateral;
             const insurance = collateral.insurance || {};
 
             collateral.id = await this.upsert("Collateral", collateral.id, {
                 application: this.formData.id,
-                ownership: collateral.ownership,
-                asset_id: thirdParty
-                    ? collateral.third_party.asset_id
-                    : linkedAsset
-                      ? linkedAsset.id
-                      : null,
-                third_party_owner: thirdParty
-                    ? collateral.third_party.owner_party_id
-                    : null,
-                third_party_relationship: thirdParty
-                    ? collateral.third_party.relationship
-                    : "",
-                // Category follows the asset's type; there's no dropdown.
-                category: this.assetTypeLabel(info.asset_type),
-                estimated_value: collateral.estimated_value,
+                asset_id: this.toId(asset.id),
+                category: this.assetTypeLabel(asset.asset_type),
                 description: collateral.description,
                 insurance_type: insurance.type,
                 insurance_status: insurance.status,
@@ -3231,8 +3243,12 @@ export default {
             const liabilityIds = [];
             const expenseIds = [];
 
+            // Collateral is saved with its asset, and only while the loan
+            // requires it. If the applicant switched to an unsecured loan,
+            // deleteStaleRecords() removes any collateral saved earlier.
             for (const asset of this.formData.assets) {
                 assetIds.push(await this.saveAsset(asset));
+                if (this.isCollateral(asset)) await this.saveCollateral(asset);
             }
             for (const liability of this.formData.liabilities) {
                 liabilityIds.push(await this.saveLiability(liability));
@@ -3241,32 +3257,7 @@ export default {
                 expenseIds.push(await this.saveExpense(expense));
             }
 
-            // Collateral is only saved while the loan requires it. If the
-            // applicant switched to an unsecured loan, deleteStaleRecords()
-            // removes any collateral saved earlier.
-            if (this.requiresCollateral) {
-                for (const collateral of this.formData.collaterals) {
-                    await this.saveCollateral(collateral);
-                }
-            }
-
             return { assetIds, liabilityIds, expenseIds };
-        },
-
-        /**
-         * The declared asset a collateral item points at, matched by server
-         * ID or by client key (for assets not saved yet). Null if the asset
-         * was removed.
-         */
-        assetForCollateral(collateral) {
-            const ref = this.toId(collateral.asset_ref);
-            if (!ref) return null;
-            return (
-                this.formData.assets.find(
-                    (asset) =>
-                        this.toId(asset.id) === ref || asset.client_key === ref,
-                ) || null
-            );
         },
 
         // ---- Tracking and deleting removed records ----
@@ -3277,32 +3268,23 @@ export default {
             const idsOf = (rows) =>
                 (rows || []).map((row) => this.toId(row.id)).filter(Boolean);
 
-            // Third-party collateral assets count only while collateral is
-            // required and the item is still marked third-party; otherwise
-            // they're deleted on the next save.
-            const thirdParty = this.requiresCollateral
-                ? form.collaterals
-                      .filter((item) => item.ownership === "third_party")
-                      .map((item) => item.third_party || {})
-                : [];
-            const thirdPartyIds = (field) =>
-                thirdParty.map((party) => this.toId(party[field])).filter(Boolean);
-
             return {
-                Asset: [...idsOf(form.assets), ...thirdPartyIds("asset_id")],
-                AssetOwnership: [
-                    ...form.assets.flatMap((asset) => idsOf(asset.owners)),
-                    ...thirdPartyIds("ownership_id"),
-                ],
+                Asset: idsOf(form.assets),
+                AssetOwnership: form.assets.flatMap((asset) =>
+                    idsOf(asset.owners),
+                ),
                 Liability: idsOf(form.liabilities),
                 LiabilityResponsibility: form.liabilities.flatMap(
                     (liability) => idsOf(liability.responsibilities),
                 ),
                 Expense: idsOf(form.expenses),
-                // Collateral only counts while the loan requires it.
-                Collateral: this.requiresCollateral
-                    ? idsOf(form.collaterals)
-                    : [],
+                // Collateral counts only while its asset is marked as
+                // collateral and the loan requires it.
+                Collateral: idsOf(
+                    form.assets
+                        .filter((asset) => this.isCollateral(asset))
+                        .map((asset) => asset.collateral),
+                ),
                 ApplicationParty: this.allApplicants
                     .map((person) => this.toId(person.application_party_id))
                     .filter(Boolean),
@@ -3318,12 +3300,13 @@ export default {
             const current = this.collectPersistedIds();
             const merged = {};
             TRACKED_RESOURCES.forEach((resourceName) => {
-                merged[resourceName] = [
-                    ...new Set([
-                        ...(current[resourceName] || []),
-                        ...(extra[resourceName] || []),
-                    ]),
-                ];
+                merged[resourceName] = Array.from(
+                    new Set(
+                        (current[resourceName] || []).concat(
+                            extra[resourceName] || [],
+                        ),
+                    ),
+                );
             });
             this.persistedIds = merged;
         },
@@ -3396,22 +3379,12 @@ export default {
                 clear(liability.responsibilities, "LiabilityResponsibility"),
             );
             clear(form.expenses, "Expense");
-            clear(form.collaterals, "Collateral");
-
-            // Third-party asset records deleted after switching ownership.
-            form.collaterals.forEach((item) => {
-                const party = item.third_party;
-                if (!party) return;
-                if (party.asset_id && deleted.Asset?.has(this.toId(party.asset_id))) {
-                    party.asset_id = null;
-                }
-                if (
-                    party.ownership_id &&
-                    deleted.AssetOwnership?.has(this.toId(party.ownership_id))
-                ) {
-                    party.ownership_id = null;
-                }
-            });
+            clear(
+                form.assets
+                    .map((asset) => asset.collateral)
+                    .filter(Boolean),
+                "Collateral",
+            );
         },
 
         /**
@@ -3434,12 +3407,11 @@ export default {
 
                 // 2. Bundle the newly minted party IDs into the core payload
                 const resource = new Resource(this, "Application");
-                const payload = {
-                    ...this.appPayload(),
+                const payload = Object.assign(this.appPayload(), {
                     parties: partyLinks,
                     application_parties: partyLinks,
                     documents: this.formData.document_ids,
-                };
+                });
 
                 // 3. Create or update the Application in a single shot
                 if (!this.formData.id) {
@@ -3546,7 +3518,6 @@ export default {
                     "assets",
                     "liabilities",
                     "expenses",
-                    "collaterals",
                 ];
                 Object.keys(form).forEach((fieldName) => {
                     if (
@@ -3609,8 +3580,15 @@ export default {
                             party_id: partyId,
                             application_party_id: this.toId(link),
                             role: link.role || "",
+                            kind:
+                                party.kind === "ORGANIZATION"
+                                    ? "ORGANIZATION"
+                                    : "PERSON",
                             first_name: party.first_name || "",
                             last_name: party.last_name || "",
+                            business_name: party.business_name || "",
+                            relationship_to_applicant:
+                                link.relationship_to_applicant || "",
                             email: party.email || "",
                             phone: party.phone || "",
                             date_of_birth: party.date_of_birth || "",
@@ -3676,6 +3654,7 @@ export default {
                         description: item.description || "",
                         declared_value: item.declared_value ?? null,
                         owners: [],
+                        collateral: createEmptyCollateral(),
                     }),
                 );
 
@@ -3817,20 +3796,24 @@ export default {
                     frequency: item.frequency || "",
                 }));
 
-                // --- Rebuild collateral ---
+                // --- Rebuild collateral onto its assets ---
+                // Each Collateral record points at one of the declared assets.
+                // Records whose asset is no longer on the application are
+                // ignored.
                 const collateralRows = await this.listFor(
                     "Collateral",
                     `application = ${this.quote(applicationId)}`,
                 );
-                form.collaterals = [];
-                for (const item of collateralRows) {
-                    const collateral = Object.assign(createEmptyCollateral(), {
+                collateralRows.forEach((item) => {
+                    const assetId = this.toId(item.asset_id);
+                    const asset = form.assets.find(
+                        (entry) => assetId && this.toId(entry.id) === assetId,
+                    );
+                    if (!asset || asset.collateral.enabled) return;
+
+                    asset.collateral = Object.assign(createEmptyCollateral(), {
+                        enabled: true,
                         id: this.toId(item),
-                        ownership:
-                            item.ownership === "third_party"
-                                ? "third_party"
-                                : "applicant",
-                        estimated_value: item.estimated_value ?? null,
                         description: item.description || "",
                         document_ids: (item.documents || [])
                             .map(this.toId)
@@ -3846,51 +3829,7 @@ export default {
                             expiry_date: item.insurance_expiry_date || "",
                         },
                     });
-
-                    if (collateral.ownership === "applicant") {
-                        collateral.asset_ref = this.toId(item.asset_id);
-                    } else {
-                        // Rebuild the third-party asset and its owner.
-                        const assetId = this.toId(item.asset_id);
-                        const [asset] = assetId
-                            ? await this.byIds("Asset", [assetId])
-                            : [];
-                        const [ownershipRow] = assetId
-                            ? await this.listFor(
-                                  "AssetOwnership",
-                                  `asset = ${this.quote(assetId)}`,
-                              )
-                            : [];
-                        const ownerId =
-                            this.toId(item.third_party_owner) ||
-                            this.toId(ownershipRow?.party);
-                        const [owner] = ownerId
-                            ? await this.byIds("Party", [ownerId])
-                            : [];
-
-                        Object.assign(collateral.third_party, {
-                            asset_id: asset ? this.toId(asset) : null,
-                            ownership_id: ownershipRow ? this.toId(ownershipRow) : null,
-                            name: asset?.name || "",
-                            asset_type: asset?.asset_type || "",
-                            declared_value: asset?.declared_value ?? null,
-                            description: asset?.description || "",
-                            owner_party_id: owner ? this.toId(owner) : null,
-                            owner_kind:
-                                owner?.kind === "ORGANIZATION"
-                                    ? "ORGANIZATION"
-                                    : "PERSON",
-                            first_name: owner?.first_name || "",
-                            last_name: owner?.last_name || "",
-                            business_name: owner?.business_name || "",
-                            relationship: item.third_party_relationship || "",
-                            phone: owner?.phone || "",
-                            email: owner?.email || "",
-                        });
-                    }
-
-                    form.collaterals.push(collateral);
-                }
+                });
 
                 // Everything just loaded is what's on the server right now.
                 this.rememberPersistedIds();
@@ -3938,7 +3877,7 @@ export default {
                     asset: "assets",
                     liability: "liabilities",
                     expense: "expenses",
-                    collateral: "collateral",
+                    collateral: "assets",
                 };
                 const index = this.path.findIndex(
                     (item) => item.id === stepByKind[missing.kind],

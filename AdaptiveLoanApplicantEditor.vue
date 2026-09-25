@@ -1,5 +1,85 @@
 <template>
   <div class="applicant-editor">
+    <!-- Third Party Owner: owns collateral but isn't borrowing, so only a few details -->
+    <template v-if="isThirdPartyOwner">
+      <p class="helper">
+        A Third Party Owner owns all or part of an asset offered as collateral,
+        but isn't borrowing. We only need their name, relationship to you, and
+        contact details.
+      </p>
+      <div class="field-grid">
+        <el-form-item v-if="showRole" label="Role" required>
+          <el-select
+            :model-value="draft.role"
+            placeholder="Select role"
+            @update:model-value="set('role', $event)"
+          >
+            <el-option
+              v-for="option in roleOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Owner is a" required>
+          <el-select
+            :model-value="draft.kind || 'PERSON'"
+            @update:model-value="set('kind', $event)"
+          >
+            <el-option label="Person" value="PERSON" />
+            <el-option label="Business" value="ORGANIZATION" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="draft.kind === 'ORGANIZATION'" label="Business name" required>
+          <el-input :model-value="draft.business_name" @input="set('business_name', $event)" />
+        </el-form-item>
+
+        <template v-else>
+          <el-form-item label="First name" required>
+            <el-input :model-value="draft.first_name" @input="set('first_name', $event)" />
+          </el-form-item>
+
+          <el-form-item label="Last name" required>
+            <el-input :model-value="draft.last_name" @input="set('last_name', $event)" />
+          </el-form-item>
+        </template>
+
+        <el-form-item label="Relationship to the primary applicant" required>
+          <el-select
+            v-if="lookup('relationship_to_applicant').length"
+            :model-value="draft.relationship_to_applicant"
+            placeholder="Select relationship"
+            @update:model-value="set('relationship_to_applicant', $event)"
+          >
+            <el-option
+              v-for="option in lookup('relationship_to_applicant')"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <el-input
+            v-else
+            :model-value="draft.relationship_to_applicant"
+            placeholder="e.g. Parent"
+            @input="set('relationship_to_applicant', $event)"
+          />
+        </el-form-item>
+
+        <el-form-item label="Phone" required>
+          <el-input :model-value="draft.phone" @input="set('phone', $event)" />
+        </el-form-item>
+
+        <el-form-item label="Email">
+          <el-input :model-value="draft.email" type="email" @input="set('email', $event)" />
+        </el-form-item>
+      </div>
+    </template>
+
+    <template v-else>
     <!-- Personal details -->
     <div class="field-grid">
       <el-form-item v-if="showRole" label="Role" required>
@@ -331,6 +411,7 @@
         I agree to privacy and data-processing terms.
       </el-checkbox>
     </div>
+    </template>
   </div>
 </template>
 
@@ -340,6 +421,9 @@
  * number, identifications, employment and income (with estimated
  * statutory deductions calculated by the parent), and consent. Edits a deep-cloned draft and emits a fresh
  * copy on every change.
+ *
+ * A Third Party Owner (owns collateral but isn't borrowing) gets a short
+ * form instead: person or business, name, relationship, phone, and email.
  */
 export default {
   props: {
@@ -400,6 +484,11 @@ export default {
   },
 
   computed: {
+    /** Matches THIRD_PARTY_OWNER_ROLE in the main form. */
+    isThirdPartyOwner() {
+      return String(this.draft.role || '').trim().toLowerCase() === 'third party owner';
+    },
+
     showEmploymentDetails() {
       const value = String(this.draft.employment_status || '').trim().toLowerCase();
       return value !== 'unemployed' && value !== 'retired';
@@ -522,7 +611,7 @@ export default {
 
     /** Removing the primary ID makes the first remaining one primary. */
     removeIdentification(index) {
-      const [removed] = this.draft.identifications.splice(index, 1);
+      const removed = this.draft.identifications.splice(index, 1)[0];
       if (removed?.is_primary && this.draft.identifications.length) {
         this.draft.identifications[0].is_primary = true;
       }
