@@ -232,7 +232,7 @@
             <el-form-item label="Identification type" required>
               <FormField
                 :model-value="row.identification_type"
-                :property="field('PartyIdentification', 'identification_type', 'Identification type', 'select', { options: identificationTypeOptions(index), force: true })"
+                :property="field('Party', 'ids', 'Identification type', 'select', { options: lookup('ids')})"
                 :form="row"
                 @update:model-value="setIdentification(index, 'identification_type', $event)"
               />
