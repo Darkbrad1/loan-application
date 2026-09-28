@@ -1,92 +1,85 @@
 <template>
   <section>
-    <el-alert
-      type="info"
-      :closable="false"
-      show-icon
-      class="owner-note"
-      title="Only the people listed here can own assets on this application."
-      description="If an asset you're offering as collateral is fully or partly owned by someone who isn't applying, add them here with the role Third Party Owner. We only need a few details about them."
-    />
-    <el-tabs
-      :model-value="activeTab"
-      type="border-card"
-      @update:model-value="$emit('update:activeTab', $event)"
-    >
-      <el-tab-pane
-        v-for="(person, index) in applicants"
+    <!-- ===== Who else is on the loan ===== -->
+    <template v-if="screen === 'people'">
+      <article
+        v-for="(person, index) in parties"
         :key="person.client_key"
-        :label="label(person, index)"
-        :name="person.client_key"
+        class="item-card"
       >
-        <div v-if="index > 0" class="pane-actions">
-          <el-button text type="danger" @click="remove(index - 1)">
-            <v-icon start>mdi-delete</v-icon>
+        <div class="item-title">
+          <strong>{{ personName(person) || `Person ${index + 1}` }}</strong>
+          <el-button text type="danger" @click="$emit('request-remove', index)">
             Remove
           </el-button>
         </div>
 
-        <AdaptiveLoanApplicantEditor
-          :model-value="person"
-          :lookups="lookups"
-          :resource-props="resourceProps"
-          :role-options="additionalRoleOptions"
-          :show-role="index > 0"
-          :minimum-identifications="minimumIdentifications"
-          :deductions="deductions[person.client_key] || null"
-          :document-scopes="documentScopes"
-          :uploading-key="uploadingKey"
-          :documents-disabled="documentsDisabled"
-          @update:model-value="updatePerson(index, $event)"
-          @stage-file="$emit('stage-file', $event)"
-          @remove-file="$emit('remove-file', $event)"
-          @request-file-upload="$emit('request-file-upload', $event)"
-          @file-rejected="$emit('file-rejected', $event)"
-        />
+        <!-- The form decides these choices ("Primary Applicant" is left out), so it's an el-select -->
+        <el-form-item label="How are they involved?" required :error="need(person.role)">
+          <el-select
+            :model-value="person.role"
+            placeholder="Choose one"
+            @update:model-value="setPerson(index, 'role', $event)"
+          >
+            <el-option
+              v-for="option in roleOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <small v-if="roleHelp(person.role)" class="helper">{{ roleHelp(person.role) }}</small>
+        </el-form-item>
 
-        <!--
-          This applicant's required documents. Uploads unlock once their
-          details and consent are complete (and, for co-applicants, once
-          the primary applicant is complete).
-        -->
-        <AdaptiveLoanDocumentRequirements
-          title="Applicant documents"
-          description="Stored with this applicant's part of the application."
-          :scope="documentScopes[`applicant:${person.client_key}`]"
-          :uploading-key="uploadingKey"
-          :disabled="documentsDisabled"
-          @stage-file="$emit('stage-file', $event)"
-          @remove-file="$emit('remove-file', $event)"
-          @request-file-upload="$emit('request-file-upload', $event)"
-          @file-rejected="$emit('file-rejected', $event)"
-        />
-      </el-tab-pane>
-    </el-tabs>
+        <div class="field-grid">
+          <el-form-item label="First name">
+            <FormField
+              :model-value="person.first_name"
+              :property="field('Party', 'first_name', 'First name', 'input')"
+              :form="person"
+              @update:model-value="setPerson(index, 'first_name', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Last name">
+            <FormField
+              :model-value="person.last_name"
+              :property="field('Party', 'last_name', 'Last name', 'input')"
+              :form="person"
+              @update:model-value="setPerson(index, 'last_name', $event)"
+            />
+          </el-form-item>
+        </div>
+      </article>
 
-    <el-button
-      class="add-button"
-      type="primary"
-      plain
-      @click="$emit('request-add')"
-    >
-      <v-icon start>mdi-account-plus</v-icon>
-      Add another applicant or guarantor
-    </el-button>
+      <el-button type="primary" plain size="large" @click="$emit('request-add')">
+        <v-icon start>mdi-account-plus</v-icon>
+        Add {{ parties.length ? 'another person' : 'a person' }}
+      </el-button>
+      <p class="helper note">
+        Only the people on your application can own the things you list later.
+        If someone else co-owns something that secures the loan, add them here.
+      </p>
+    </template>
 
-    <!-- References for the primary applicant: one personal reference, one next of kin -->
-    <section class="context references">
-      <h3>References</h3>
-      <p>Someone who knows you, and your next of kin. They shouldn't be applying with you.</p>
+    <!-- ===== References: a personal reference and next of kin ===== -->
+    <template v-if="screen === 'references'">
       <article
         v-for="(row, index) in references"
         :key="row.client_key"
         class="item-card"
       >
         <div class="item-title">
-          <strong>{{ row.reference_type }}</strong>
+          <strong>{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
         </div>
+        <p class="helper">
+          {{
+            row.reference_type === 'Next of kin'
+              ? 'Your closest family member, like a spouse, parent, or adult child.'
+              : 'A friend, co-worker, or employer who has known you for a while.'
+          }}
+        </p>
         <div class="field-grid">
-          <el-form-item label="Full name" required>
+          <el-form-item label="Full name" required :error="need(row.name)">
             <FormField
               :model-value="row.name"
               :property="field('Reference', 'name', 'Full name', 'input')"
@@ -94,23 +87,23 @@
               @update:model-value="setReference(index, 'name', $event)"
             />
           </el-form-item>
-          <el-form-item label="Relationship to you" required>
+          <el-form-item label="How do they know you?" required :error="need(row.relationship)">
             <FormField
               :model-value="row.relationship"
-              :property="field('Reference', 'relationship', 'Relationship to you', 'select')"
+              :property="field('Reference', 'relationship', 'How do they know you?', 'select')"
               :form="row"
               @update:model-value="setReference(index, 'relationship', $event)"
             />
           </el-form-item>
-          <el-form-item label="Phone" required>
+          <el-form-item label="Phone number" required :error="need(row.phone)">
             <FormField
               :model-value="row.phone"
-              :property="field('Reference', 'phone', 'Phone', 'input')"
+              :property="field('Reference', 'phone', 'Phone number', 'input')"
               :form="row"
               @update:model-value="setReference(index, 'phone', $event)"
             />
           </el-form-item>
-          <el-form-item label="Email">
+          <el-form-item label="Email (if they have one)">
             <FormField
               :model-value="row.email"
               :property="field('Reference', 'email', 'Email', 'input')"
@@ -119,37 +112,43 @@
             />
           </el-form-item>
         </div>
-        <el-form-item label="Address">
-          <FormField
-            :model-value="row.address"
-            :property="field('Reference', 'address', 'Address', 'textarea')"
-            :form="row"
-            @update:model-value="setReference(index, 'address', $event)"
-          />
-        </el-form-item>
       </article>
-    </section>
+    </template>
   </section>
 </template>
 
 <script>
 /**
- * Applicants step of the loan wizard: one tab per applicant, with the
- * primary applicant first. Fully controlled by the parent. Each tab also
- * shows that applicant's required documents; upload state lives in the
- * parent form.
+ * Two short screens of the "About you" step, picked by `screen`:
  *
- * Below the tabs are the primary applicant's references (a personal
- * reference and next of kin), saved as Reference records. Their inputs are
- * Saturn's FormField, using Saturn's own Reference property definitions.
+ * - "people": the other people on the loan (co-borrowers, guarantors, and
+ *   Third Party Owners who co-own collateral). Each gets a role and a
+ *   name here; their details are filled in on the screens that follow.
+ * - "references": the primary applicant's personal reference and next of
+ *   kin, saved as Reference records.
+ *
+ * Adding and removing people is done by the parent (request-add and
+ * request-remove), which also clears anything assigned to someone removed.
+ * Inputs are Saturn's FormField, using Saturn's own property definitions;
+ * the role is an el-select because the form decides its choices.
  */
 export default {
   props: {
+    /** Which screen to show: "people" or "references". */
+    screen: {
+      type: String,
+      default: 'people',
+    },
     primary: {
       type: Object,
-      required: true,
+      default: () => ({}),
     },
     parties: {
+      type: Array,
+      default: () => [],
+    },
+    /** The personal reference and next of kin (Reference records). */
+    references: {
       type: Array,
       default: () => [],
     },
@@ -162,62 +161,23 @@ export default {
       type: Object,
       default: () => ({}),
     },
-    activeTab: {
-      type: String,
-      default: '',
-    },
-    /** Estimated NIS, income tax, and net income, keyed by client_key. */
-    deductions: {
-      type: Object,
-      default: () => ({}),
-    },
-    /** Institution-wide minimum number of identifications per applicant. */
-    minimumIdentifications: {
-      type: Number,
-      default: 1,
-    },
-    /** Document scopes from the parent, keyed by scope key. */
-    documentScopes: {
-      type: Object,
-      default: () => ({}),
-    },
-    /** Key of the upload in progress, passed through to the requirements. */
-    uploadingKey: {
-      type: String,
-      default: '',
-    },
-    documentsDisabled: {
+    /** After a failed Next, shows "this is needed" under empty required boxes. */
+    showErrors: {
       type: Boolean,
       default: false,
     },
-    /** The personal reference and next of kin (Reference records). */
-    references: {
-      type: Array,
-      default: () => [],
-    },
   },
 
-  emits: [
-    'update:primary',
-    'update:parties',
-    'update:references',
-    'update:activeTab',
-    'request-add',
-    'request-remove',
-    // Document events are passed straight through to the parent form.
-    'stage-file',
-    'remove-file',
-    'request-file-upload',
-    'file-rejected',
-  ],
+  emits: ['update:parties', 'update:references', 'request-add', 'request-remove'],
+
+  created() {
+    // FormField configs, reused while unchanged (see field()).
+    this.fieldCache = {};
+  },
 
   computed: {
-    applicants() {
-      return [this.primary].concat(this.parties);
-    },
-
-    /** Roles for additional applicants; "Primary Applicant" is reserved. */
-    additionalRoleOptions() {
+    /** Roles for the other people; "Primary Applicant" is only for the applicant. */
+    roleOptions() {
       return (this.lookups.role || []).filter(
         (option) => String(option.value).trim().toLowerCase() !== 'primary applicant'
       );
@@ -225,27 +185,34 @@ export default {
   },
 
   methods: {
-    label(person, index) {
-      const name =
-        person.kind === 'ORGANIZATION'
-          ? String(person.business_name || '').trim()
-          : `${person.first_name || ''} ${person.last_name || ''}`.trim();
-      const fallback = index === 0 ? 'Primary Applicant' : 'Additional Party';
-      return name ? `${name} · ${person.role || fallback}` : person.role || fallback;
+    personName(person) {
+      return person.kind === 'ORGANIZATION'
+        ? String(person.business_name || '').trim()
+        : `${person.first_name || ''} ${person.last_name || ''}`.trim();
     },
 
-    updatePerson(index, value) {
-      if (index === 0) {
-        this.$emit('update:primary', value);
-      } else {
-        const rows = this.parties.slice();
-        rows[index - 1] = value;
-        this.$emit('update:parties', rows);
+    /** A plain explanation of a role. */
+    roleHelp(role) {
+      const value = String(role || '').trim().toLowerCase();
+      if (value === 'guarantor') return 'Promises to pay the loan if you can\'t.';
+      if (value === 'third party owner') {
+        return 'Co-owns something that secures the loan, but isn\'t borrowing. We only need a few details.';
       }
+      if (value.includes('co')) return 'Borrows the money with you and pays it back with you.';
+      return '';
     },
 
-    remove(index) {
-      this.$emit('request-remove', index);
+    /** "This is needed" under an empty required box, after a failed Next. */
+    need(value) {
+      if (!this.showErrors) return '';
+      return value === null || value === undefined || value === '' ? 'This is needed' : '';
+    },
+
+    /** Updates one field on one person and sends a fresh copy up. */
+    setPerson(index, key, event) {
+      const rows = JSON.parse(JSON.stringify(this.parties));
+      rows[index][key] = this.valueOf(event);
+      this.$emit('update:parties', rows);
     },
 
     /** Updates one field on one reference and sends a fresh copy up. */
@@ -290,7 +257,6 @@ export default {
             type: 'string',
             input_properties: { type: kind === 'textarea' ? 'textarea' : 'input' },
           };
-      if (!this.fieldCache) this.fieldCache = {};
       const cacheKey = JSON.stringify(config);
       if (!this.fieldCache[cacheKey]) this.fieldCache[cacheKey] = config;
       return this.fieldCache[cacheKey];
@@ -300,11 +266,7 @@ export default {
 </script>
 
 <style scoped>
-.owner-note {
-  margin-bottom: 16px;
-}
-
-.references {
-  margin-top: 24px;
+.note {
+  margin-top: 16px;
 }
 </style>

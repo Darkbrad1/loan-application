@@ -1,26 +1,6 @@
 <template>
   <section>
-    <!-- Section header with add button -->
-    <div class="collection-header">
-      <div>
-        <h3>Assets</h3>
-        <p>
-          Only the people on the Applicants step can own assets here. If someone
-          else owns all or part of an asset, go back and add them as a Third
-          Party Owner.
-        </p>
-        <p v-if="requiresCollateral">
-          This loan needs collateral. Mark the asset or assets securing it as
-          collateral.
-        </p>
-      </div>
-      <el-button type="primary" plain @click="add">
-        <v-icon start>mdi-plus</v-icon>
-        Add asset
-      </el-button>
-    </div>
-
-    <el-empty v-if="!draft.length" description="No assets declared" />
+    <p v-if="!draft.length" class="helper empty-note">Nothing added yet.</p>
 
     <!-- One card per declared asset -->
     <article
@@ -29,10 +9,10 @@
       class="item-card"
     >
       <div class="item-title">
-        <strong>{{ asset.name || `Asset ${index + 1}` }}</strong>
+        <strong>{{ asset.name || `Item ${index + 1}` }}</strong>
         <div>
-          <el-tag v-if="asset.is_purchase" type="success" size="small">Being purchased</el-tag>
-          <el-tag v-if="isCollateral(asset)" type="warning" size="small">Collateral</el-tag>
+          <el-tag v-if="asset.is_purchase" type="success" size="small">Buying with this loan</el-tag>
+          <el-tag v-if="isCollateral(asset)" type="warning" size="small">Secures the loan</el-tag>
           <el-button v-if="!asset.is_purchase" text type="danger" @click="remove(index)">Remove</el-button>
         </div>
       </div>
@@ -40,26 +20,26 @@
       <!-- The vehicle or property being bought comes from "Your request" -->
       <div v-if="asset.is_purchase" class="purchase-summary">
         <p>
-          <strong>{{ lookupLabel('asset_type', asset.asset_type) || 'Asset' }}</strong>
-          valued at the purchase price, {{ money(asset.declared_value) }}.
+          You're buying this for {{ money(asset.declared_value) }}.
         </p>
         <p class="helper">
-          To change these details, go back to the "Your request" step. Choose
-          who will own it below, and add its insurance.
+          To change it, go back to "The loan you need". Below, tell us who will
+          own it and how it will be insured.
         </p>
       </div>
 
       <div v-else class="field-grid">
-        <el-form-item label="Asset name" required>
+        <el-form-item label="What is it?" required :error="need(asset.name)">
           <FormField
             :model-value="asset.name"
             :property="field('Asset', 'name', 'Asset name', 'input')"
             :form="asset"
             @update:model-value="set(index, 'name', $event)"
           />
+          <small class="helper">For example "My house in Grand Anse" or "2018 Honda Fit".</small>
         </el-form-item>
 
-        <el-form-item label="Asset type" required>
+        <el-form-item label="Type" required :error="need(asset.asset_type)">
           <FormField
             :model-value="asset.asset_type"
             :property="field('Asset', 'asset_type', 'Asset type', 'select')"
@@ -68,7 +48,7 @@
           />
         </el-form-item>
 
-        <el-form-item label="Declared value (EC$)" required>
+        <el-form-item label="What is it worth? (EC$)" required :error="need(asset.declared_value)">
           <FormField
             :model-value="asset.declared_value"
             :property="field('Asset', 'declared_value', 'Declared value (EC$)', 'number')"
@@ -77,7 +57,7 @@
           />
         </el-form-item>
 
-        <el-form-item label="Description">
+        <el-form-item v-if="asset.description || moreFor[asset.client_key]" label="Description">
           <FormField
             :model-value="asset.description"
             :property="field('Asset', 'description', 'Description', 'input')"
@@ -132,22 +112,33 @@
         :closable="false"
         show-icon
         class="lien-note"
-        :title="`Existing loan on this asset: ${liens[asset.client_key].join('; ')}`"
+        :title="`You still owe money on this: ${liens[asset.client_key].join('; ')}`"
       />
+
+      <el-button
+        v-if="!asset.is_purchase && !asset.description && !moreFor[asset.client_key]"
+        text
+        type="primary"
+        @click="moreFor[asset.client_key] = true"
+      >
+        + Add a description
+      </el-button>
 
       <!-- Ownership percentages must total 100% across saved parties -->
       <AdaptiveLoanAllocationEditor
         :model-value="asset.owners"
         :options="partyOptions"
         reference-key="party_id"
-        title="Ownership"
-        select-label="Party owner"
-        total-label="Ownership total"
+        simple
+        :default-value="primaryPartyId"
+        title="Who owns it?"
+        select-label="Owner"
+        total-label="Shares add up to"
         @update:model-value="set(index, 'owners', $event)"
       />
       <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
-        This asset is owned only by a Third Party Owner, so it can only be on
-        this application as collateral.
+        Someone who isn't borrowing owns all of this, so it can only be listed
+        if it secures the loan.
       </small>
 
       <!-- Required documents for this asset; uploads unlock once it's complete -->
@@ -165,21 +156,22 @@
       <section v-if="requiresCollateral" class="context">
         <!-- The asset being bought is always the collateral -->
         <p v-if="asset.is_purchase" class="helper">
-          This is the collateral for the loan. Add its insurance below; a quote is fine for now.
+          This secures the loan. Tell us how it's insured below; a quote is fine for now.
         </p>
-        <el-form-item v-else label="Use this asset as collateral for this loan">
+        <el-form-item v-else label="Use this to secure the loan">
           <FormField
             :model-value="asset.collateral.enabled"
-            :property="field(null, 'enabled', 'Use this asset as collateral for this loan', 'checkbox')"
+            :property="field(null, 'enabled', 'Use this to secure the loan', 'checkbox')"
             :form="asset.collateral"
             @update:model-value="setCollateral(index, 'enabled', $event)"
           />
         </el-form-item>
 
         <template v-if="asset.collateral.enabled">
-          <h4 class="subheading">Insurance</h4>
+          <h4 class="subheading">How is it insured?</h4>
+          <p class="helper">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
           <div class="field-grid">
-            <el-form-item label="Insurance type" required>
+            <el-form-item label="Type of insurance" required :error="need(asset.collateral.insurance.type)">
               <FormField
                 :model-value="asset.collateral.insurance.type"
                 :property="field('Collateral', 'insurance_type', 'Insurance type', 'select')"
@@ -188,7 +180,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="Policy or quote?" required>
+            <el-form-item label="Do you have a policy, or a quote?" required :error="need(asset.collateral.insurance.status)">
               <FormField
                 :model-value="asset.collateral.insurance.status"
                 :property="field('Collateral', 'insurance_status', 'Policy or quote?', 'select')"
@@ -197,7 +189,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="Insurer" required>
+            <el-form-item label="Insurance company" required :error="need(asset.collateral.insurance.provider)">
               <FormField
                 :model-value="asset.collateral.insurance.provider"
                 :property="field('Collateral', 'insurance_provider', 'Insurer', 'input')"
@@ -218,7 +210,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="Amount covered (EC$)">
+            <el-form-item v-if="insuranceMore[asset.client_key] || asset.collateral.insurance.coverage_amount" label="Amount covered (EC$)">
               <FormField
                 :model-value="asset.collateral.insurance.coverage_amount"
                 :property="field('Collateral', 'insurance_coverage_amount', 'Amount covered (EC$)', 'number')"
@@ -227,7 +219,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="Premium (EC$)" required>
+            <el-form-item label="Cost of the insurance (EC$)" required :error="need(asset.collateral.insurance.premium)">
               <FormField
                 :model-value="asset.collateral.insurance.premium"
                 :property="field('Collateral', 'insurance_premium', 'Premium (EC$)', 'number')"
@@ -236,7 +228,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="Premium paid" required>
+            <el-form-item label="How often do you pay it?" required :error="need(asset.collateral.insurance.premium_frequency)">
               <FormField
                 :model-value="asset.collateral.insurance.premium_frequency"
                 :property="field('Collateral', 'insurance_premium_frequency', 'Premium paid', 'select')"
@@ -255,7 +247,15 @@
             </el-form-item>
           </div>
 
-          <el-form-item label="Collateral notes">
+          <el-button
+            v-if="!insuranceMore[asset.client_key] && !asset.collateral.insurance.coverage_amount"
+            text
+            type="primary"
+            @click="insuranceMore[asset.client_key] = true"
+          >
+            + Add the amount covered and notes
+          </el-button>
+          <el-form-item v-if="insuranceMore[asset.client_key] || asset.collateral.description" label="Notes">
             <FormField
               :model-value="asset.collateral.description"
               :property="field('Collateral', 'description', 'Collateral notes', 'input')"
@@ -266,7 +266,7 @@
 
           <!-- Collateral documents; uploads unlock once the asset is complete -->
           <AdaptiveLoanDocumentRequirements
-            title="Collateral documents"
+            title="Documents for this"
             :scope="documentScopes[`collateral:${asset.client_key}`]"
             :uploading-key="uploadingKey"
             :disabled="documentsDisabled"
@@ -278,6 +278,11 @@
         </template>
       </section>
     </article>
+
+    <el-button type="primary" plain size="large" @click="add">
+      <v-icon start>mdi-plus</v-icon>
+      Add {{ draft.length ? 'something else' : 'something you own' }}
+    </el-button>
   </section>
 </template>
 
@@ -308,6 +313,16 @@ export default {
     modelValue: {
       type: Array,
       default: () => [],
+    },
+    /** The primary applicant's Party ID: the owner for "Just me". */
+    primaryPartyId: {
+      type: String,
+      default: '',
+    },
+    /** After a failed Next, shows "this is needed" under empty required boxes. */
+    showErrors: {
+      type: Boolean,
+      default: false,
     },
     /** Existing loans secured on each asset, keyed by client key (labels). */
     liens: {
@@ -368,7 +383,16 @@ export default {
     return {
       // Local working copy; synced back to the parent on every change.
       draft: this.copy(this.modelValue),
+      // Shows the optional description, by the asset's client key.
+      moreFor: {},
+      // Shows the optional insurance extras, by the asset's client key.
+      insuranceMore: {},
     };
+  },
+
+  mounted() {
+    // They said they own something, so start with one to fill in.
+    if (!this.draft.length) this.add();
   },
 
   created() {
@@ -443,6 +467,12 @@ export default {
     /** Dropdown options for a field, or [] when none were loaded. */
     lookup(fieldName) {
       return this.lookups[fieldName] || [];
+    },
+
+    /** "This is needed" under an empty required box, after a failed Next. */
+    need(value) {
+      if (!this.showErrors) return '';
+      return value === null || value === undefined || value === '' ? 'This is needed' : '';
     },
 
     isCollateral(asset) {
@@ -596,7 +626,7 @@ export default {
           {
             client_key: this.generateRowKey('owner'),
             id: null,
-            party_id: '',
+            party_id: this.primaryPartyId,
             percentage: 100,
           },
         ],

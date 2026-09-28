@@ -51,7 +51,7 @@
             </header>
 
             <div class="layout">
-                <!-- Left rail: step tracker -->
+                <!-- Left rail: the main parts of the form (hidden on phones) -->
                 <aside class="path">
                     <p class="eyebrow">Your application</p>
                     <ol>
@@ -71,24 +71,23 @@
                             </span>
                             <div>
                                 <b>{{ stepItem.title }}</b>
-                                <small>{{ stepItem.note }}</small>
                             </div>
                         </li>
                     </ol>
                 </aside>
 
-                <!-- Center: the current step's form -->
+                <!-- Center: one short screen at a time -->
                 <section class="workspace">
+                    <p class="progress-label">
+                        Part {{ step + 1 }} of {{ path.length }}: {{ current.title }}
+                    </p>
                     <div class="progress">
                         <i :style="{ width: progressWidth }"></i>
                     </div>
 
                     <div class="heading">
-                        <p class="eyebrow">
-                            Step {{ step + 1 }} of {{ path.length }}
-                        </p>
-                        <h1>{{ current.title }}</h1>
-                        <p>{{ current.description }}</p>
+                        <h1>{{ currentScreen.title }}</h1>
+                        <p v-if="currentScreen.help">{{ currentScreen.help }}</p>
                     </div>
 
                     <el-alert
@@ -101,8 +100,36 @@
                     />
 
                     <el-form label-position="top" class="card" @submit.prevent>
+                        <!-- A Yes/No question. "No" skips the section after it. -->
+                        <div v-if="currentScreen.kind === 'gate'" class="gate">
+                            <button
+                                type="button"
+                                class="gate-option"
+                                :class="{ selected: answers[currentScreen.answer] === true }"
+                                @click="answer(currentScreen.answer, true)"
+                            >
+                                <v-icon>mdi-check-circle-outline</v-icon>
+                                <span>Yes</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="gate-option"
+                                :class="{ selected: answers[currentScreen.answer] === false }"
+                                @click="answer(currentScreen.answer, false)"
+                            >
+                                <v-icon>mdi-close-circle-outline</v-icon>
+                                <span>No</span>
+                            </button>
+                            <p
+                                v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
+                                class="gate-warning"
+                            >
+                                {{ gateWarning(currentScreen.answer) }}
+                            </p>
+                        </div>
+
                         <AdaptiveLoanProductSection
-                            v-if="current.id === 'loan'"
+                            v-else-if="currentScreen.kind === 'loan'"
                             :loans="loans"
                             :products="productsForLoan"
                             :loan-category="formData.loan_category"
@@ -111,25 +138,38 @@
                             @select-product="selectProduct"
                         />
 
+                        <!-- The other people on the loan, or the references -->
                         <AdaptiveLoanApplicantsSection
-                            v-else-if="current.id === 'parties'"
+                            v-else-if="currentScreen.kind === 'people' || currentScreen.kind === 'references'"
+                            :screen="currentScreen.kind"
                             :primary="formData.primary"
                             :parties="formData.parties"
+                            :references="formData.references"
                             :lookups="lookups"
                             :resource-props="resourceProps"
-                            :active-tab="activePartyTab"
-                            :minimum-identifications="minimumIdentifications"
-                            :deductions="deductionsByApplicant"
-                            :references="formData.references"
-                            @update:primary="formData.primary = $event"
+                            :show-errors="showErrors"
                             @update:parties="formData.parties = $event"
                             @update:references="formData.references = $event"
-                            @update:active-tab="activePartyTab = $event"
                             @request-add="addApplicant"
                             @request-remove="removeApplicant"
+                        />
+
+                        <!-- One part of one person's details -->
+                        <AdaptiveLoanApplicantEditor
+                            v-else-if="currentScreen.kind === 'person' && currentPerson"
+                            :key="currentScreen.id"
+                            :model-value="currentPerson"
+                            :screen="currentScreen.part"
+                            :is-primary="currentScreen.personKey === formData.primary.client_key"
+                            :show-errors="showErrors"
+                            :lookups="lookups"
+                            :resource-props="resourceProps"
+                            :minimum-identifications="minimumIdentifications"
+                            :deductions="deductionsByApplicant[currentScreen.personKey] || null"
                             :document-scopes="documentScopes"
                             :uploading-key="uploadingDocumentKey"
                             :documents-disabled="documentsDisabled"
+                            @update:model-value="updatePerson(currentScreen.personKey, $event)"
                             @stage-file="stageDocument"
                             @remove-file="removeStagedDocument"
                             @request-file-upload="uploadScopedDocument"
@@ -137,7 +177,9 @@
                         />
 
                         <AdaptiveLoanRequestSection
-                            v-else-if="current.id === 'request'"
+                            v-else-if="currentScreen.kind === 'request'"
+                            :screen="currentScreen.part"
+                            :show-errors="showErrors"
                             :model-value="requestData"
                             :loan-category="formData.loan_category"
                             :selected-product="selectedProduct"
@@ -152,12 +194,14 @@
                         />
 
                         <AdaptiveLoanAssetsSection
-                            v-else-if="current.id === 'assets'"
+                            v-else-if="currentScreen.kind === 'assets'"
                             :model-value="formData.assets"
                             :party-options="partyOptions"
+                            :primary-party-id="toId(formData.primary.party_id) || ''"
                             :third-party-owner-ids="thirdPartyOwnerPartyIds"
                             :requires-collateral="requiresCollateral"
                             :liens="liensByAsset"
+                            :show-errors="showErrors"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.assets = $event"
@@ -171,17 +215,19 @@
                         />
 
                         <!--
-                        Liability types are now LiabilityType records. Revolving
+                        Liability types are LiabilityType records. Revolving
                         types (credit cards, overdrafts) require a credit limit
                         and show an assessed repayment based on a % of the limit.
                         -->
                         <AdaptiveLoanLiabilitiesSection
-                            v-else-if="current.id === 'liabilities'"
+                            v-else-if="currentScreen.kind === 'liabilities'"
                             :model-value="formData.liabilities"
                             :application-party-options="applicationPartyOptions"
+                            :primary-link-id="toId(formData.primary.application_party_id) || ''"
                             :liability-types="liabilityTypes"
                             :default-revolving-rate="defaultRevolvingRate"
                             :asset-options="assetOptions"
+                            :show-errors="showErrors"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.liabilities = $event"
@@ -195,17 +241,19 @@
                         />
 
                         <!--
-                        Expense types are now ExpenseType records, filtered by
-                        the selected loan category and user_selectable.
+                        Expense types are ExpenseType records, filtered by the
+                        selected loan category and user_selectable.
                         -->
                         <AdaptiveLoanExpensesSection
-                            v-else-if="current.id === 'expenses'"
+                            v-else-if="currentScreen.kind === 'expenses'"
                             :model-value="formData.expenses"
                             :application-party-options="applicationPartyOptions"
+                            :has-others="applicationPartyOptions.length > 1"
                             :expense-type-options="expenseTypeOptions"
                             :expense-types="expenseTypes"
                             :loan-category-label="loanCategoryLabel"
                             :projected-expenses="projectedInsuranceExpenses"
+                            :show-errors="showErrors"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.expenses = $event"
@@ -221,14 +269,13 @@
                         <!--
                         Application-level documents only. Applicant, asset,
                         liability, expense, and collateral documents are
-                        uploaded inside their own sections (collateral
-                        documents inside the asset's card).
+                        uploaded on their own screens.
                         -->
                         <AdaptiveLoanDocumentRequirements
-                            v-else-if="current.id === 'documents'"
+                            v-else-if="currentScreen.kind === 'documents'"
                             standalone
-                            title="Application documents"
-                            :description="`Documents required for the ${formData.loan_name} application.`"
+                            title="Documents for this loan"
+                            :description="`Please upload these for your ${formData.loan_name || 'loan'}.`"
                             :scope="documentScopes.application"
                             :uploading-key="uploadingDocumentKey"
                             :disabled="documentsDisabled"
@@ -238,9 +285,9 @@
                             @file-rejected="handleRejectedDocument"
                         />
 
-                        <!-- Final step: review everything before submitting -->
+                        <!-- Final step: check everything before sending -->
                         <AdaptiveLoanReviewSection
-                            v-else
+                            v-else-if="currentScreen.kind === 'review'"
                             :application="formData"
                             :applicants="allApplicants"
                             :requires-collateral="requiresCollateral"
@@ -250,81 +297,40 @@
 
                         <footer class="form-footer">
                             <el-button
-                                :disabled="step === 0 || saving"
+                                size="large"
+                                :disabled="isFirstScreen || saving"
                                 @click="back"
                             >
+                                <v-icon start>mdi-arrow-left</v-icon>
                                 Back
                             </el-button>
-                            <span>{{
-                                formData.id ? "Draft saved" : "Not yet saved"
-                            }}</span>
                             <el-button
-                                v-if="step > 1 && step < path.length - 1"
-                                plain
-                                :loading="savingDraft"
-                                @click="saveDraft(false)"
-                            >
-                                Save draft
-                            </el-button>
-                            <el-button
-                                v-if="step < path.length - 1"
+                                v-if="!isLastScreen"
                                 type="primary"
+                                size="large"
                                 :loading="saving || documentsLoading"
                                 @click="next"
                             >
-                                Continue
+                                Next
+                                <v-icon end>mdi-arrow-right</v-icon>
                             </el-button>
                             <el-button
                                 v-else
                                 type="success"
+                                size="large"
                                 :loading="saving"
                                 @click="submit"
                             >
-                                Submit application
+                                Send my application
                             </el-button>
                         </footer>
                     </el-form>
-                </section>
 
-                <!-- Right rail: live summary of the in-progress application -->
-                <aside class="summary">
-                    <p class="eyebrow">Live summary</p>
-                    <div>
-                        <span>Product</span>
-                        <strong>{{
-                            formData.loan_name || "Not selected"
-                        }}</strong>
-                    </div>
-                    <div>
-                        <span>Security</span>
-                        <strong>{{ securityLabel }}</strong>
-                    </div>
-                    <div>
-                        <span>Amount</span>
-                        <strong>{{
-                            money(formData.requested_loan_amount)
-                        }}</strong>
-                    </div>
-                    <div>
-                        <span>Term</span>
-                        <strong>
-                            {{
-                                formData.requested_loan_term
-                                    ? `${formData.requested_loan_term} months`
-                                    : "—"
-                            }}
-                        </strong>
-                    </div>
-                    <div v-if="requiredDocumentCount">
-                        <span>Documents</span>
-                        <strong>
-                            {{ uploadedDocumentCount }}/{{
-                                requiredDocumentCount
-                            }}
-                            uploaded
-                        </strong>
-                    </div>
-                </aside>
+                    <p v-if="formData.id" class="save-note">
+                        <v-icon size="small">mdi-content-save-check-outline</v-icon>
+                        Your answers are saved as you go.
+                    </p>
+                </section>
             </div>
         </template>
     </main>
@@ -394,6 +400,21 @@ const PURCHASE_ASSET_STATUS = "To be purchased";
 
 /** ExpenseType code for the projected monthly cost of collateral insurance. */
 const COLLATERAL_INSURANCE_CODE = "COLLATERAL_INSURANCE";
+
+/**
+ * The parts of an applicant's details, one short screen each, in order.
+ * applicantPartIssue() checks each part.
+ */
+const APPLICANT_PARTS = [
+    "about",
+    "home",
+    "membership",
+    "ids",
+    "job",
+    "pay",
+    "declarations",
+    "consent",
+];
 
 /** Applicant roles with their own meaning in the form. */
 const GUARANTOR_ROLE = "Guarantor";
@@ -680,6 +701,19 @@ export default {
             // Step saved in localStorage, applied after document uploads are
             // hydrated (the documents step may not exist in the path until then)
             pendingDraftStep: null,
+            // Position within the current step's short screens (see screensFor)
+            screenIndex: 0,
+            // Shows "this is needed" under empty required boxes after a
+            // failed Next; cleared when the screen changes.
+            showErrors: false,
+            // Answers to the Yes/No questions that skip sections: null until
+            // answered. Not saved to Saturn; worked out again on restore.
+            answers: {
+                others: null,
+                assets: null,
+                debts: null,
+                bills: null,
+            },
             saving: false,
             savingDraft: false,
             receipt: null,
@@ -764,25 +798,25 @@ export default {
                 {
                     id: "personal",
                     title: "Personal loan",
-                    note: "Flexible financing",
+                    note: "For personal needs",
                     icon: "mdi-account-cash",
                 },
                 {
                     id: "auto",
                     title: "Auto loan",
-                    note: "Vehicle financing",
+                    note: "To buy a vehicle",
                     icon: "mdi-car",
                 },
                 {
                     id: "home",
                     title: "Home loan",
-                    note: "Purchase or refinance",
+                    note: "To buy or fix up a home",
                     icon: "mdi-home",
                 },
                 {
                     id: "business",
                     title: "Business loan",
-                    note: "Growth capital",
+                    note: "For your business",
                     icon: "mdi-storefront",
                 },
             ],
@@ -1089,7 +1123,7 @@ export default {
                 );
 
             const loan = {
-                title: "Loan request",
+                title: "The loan you need",
                 step: "request",
                 items: [
                     {
@@ -1122,7 +1156,7 @@ export default {
             };
 
             const applicants = {
-                title: "Applicants",
+                title: "People on the loan",
                 step: "parties",
                 items: this.allApplicants.map((person, index) => {
                     const heading = this.applicantLabel(
@@ -1194,7 +1228,7 @@ export default {
             };
 
             const references = {
-                title: "References",
+                title: "People who know you",
                 step: "parties",
                 items: (form.references || []).map((row) => ({
                     heading: `${row.reference_type}: ${row.name || "Not entered"}`,
@@ -1207,7 +1241,7 @@ export default {
             };
 
             const assets = {
-                title: "Assets and collateral",
+                title: "Things you own",
                 step: "assets",
                 items: form.assets.map((asset, index) => {
                     const insurance = asset.collateral.insurance;
@@ -1229,7 +1263,7 @@ export default {
             };
 
             const liabilities = {
-                title: "Liabilities",
+                title: "Money you owe",
                 step: "liabilities",
                 items: form.liabilities.map((item, index) => ({
                     heading: item.creditor_name || `Liability ${index + 1}`,
@@ -1247,7 +1281,7 @@ export default {
             };
 
             const expenses = {
-                title: "Expenses",
+                title: "Your bills",
                 step: "expenses",
                 items: form.expenses
                     .map((item, index) => ({
@@ -1268,17 +1302,17 @@ export default {
 
             const totals = this.monthlyTotals;
             const monthly = {
-                title: "Monthly summary",
+                title: "Your month at a glance",
                 step: "",
                 items: [
                     {
-                        heading: "Estimated each month",
+                        heading: "An estimate, each month",
                         rows: [
-                            ["Gross income", money(totals.grossIncome)],
-                            ["Income after NIS and income tax", money(totals.netIncome)],
-                            ["Expenses", money(totals.expenses)],
-                            ["Loan and credit payments (not being paid off)", money(totals.liabilityPayments)],
-                            ["Left over", money(totals.remaining)],
+                            ["Money coming in, before tax", money(totals.grossIncome)],
+                            ["Take-home pay (after NIS and tax)", money(totals.netIncome)],
+                            ["Bills", money(totals.expenses)],
+                            ["Loan and card payments", money(totals.liabilityPayments)],
+                            ["Left over each month", money(totals.remaining)],
                         ],
                     },
                 ],
@@ -1340,17 +1374,19 @@ export default {
                 "applicant",
                 form.loan_name,
             );
-            const primaryReady = this.validApplicant(form.primary);
+            // Uploads unlock once the name, contact details, NIS number, and
+            // IDs are in: the screens before the documents are asked for.
+            const primaryReady = this.readyForUploads(form.primary);
             this.allApplicants.forEach((person, index) => {
                 // Third Party Owners give no documents or IDs for now.
                 if (this.isThirdPartyOwner(person)) return;
 
                 let locked = "";
-                if (!this.validApplicant(person)) {
+                if (!this.readyForUploads(person)) {
                     locked =
-                        "Complete this applicant's details and consent to upload documents.";
+                        "Fill in the name, contact details, NIS number, and ID first, then you can upload.";
                 } else if (index > 0 && !primaryReady) {
-                    locked = "Complete the primary applicant's details first.";
+                    locked = "Fill in your own details first.";
                 }
                 add(
                     `applicant:${person.client_key}`,
@@ -1505,66 +1541,20 @@ export default {
          */
         path() {
             const steps = [
-                {
-                    id: "loan",
-                    title: "Choose loan",
-                    note: "Select financing",
-                    description: "Choose the loan category and product.",
-                },
-                {
-                    id: "parties",
-                    title: "Applicants",
-                    note: "Identity and consent",
-                    description:
-                        "Provide identity, employment, and consent information.",
-                },
-                {
-                    id: "request",
-                    title: "Your request",
-                    note: "Amount and term",
-                    description: "Enter values within the product limits.",
-                },
-                {
-                    id: "assets",
-                    title: "Assets",
-                    note: this.requiresCollateral
-                        ? "Ownership and collateral"
-                        : "Party ownership",
-                    description: this.requiresCollateral
-                        ? "Declare assets and ownership, and mark the assets securing this loan as collateral."
-                        : "Declare assets and ownership.",
-                },
-                {
-                    id: "liabilities",
-                    title: "Liabilities",
-                    note: "Responsibility",
-                    description: "Declare liabilities and responsibility.",
-                },
-                {
-                    id: "expenses",
-                    title: "Expenses",
-                    note: "Recurring costs",
-                    description: "Assign expenses to applicants.",
-                },
+                { id: "loan", title: "Choose a loan" },
+                { id: "parties", title: "About you" },
+                { id: "request", title: "The loan you need" },
+                { id: "assets", title: "Things you own" },
+                { id: "liabilities", title: "Money you owe" },
+                { id: "expenses", title: "Your bills" },
             ];
 
             // Only application-level documents have their own step.
             if (this.documentScopes.application) {
-                steps.push({
-                    id: "documents",
-                    title: "Documents",
-                    note: "Application uploads",
-                    description:
-                        "Upload the documents required for this loan product.",
-                });
+                steps.push({ id: "documents", title: "Documents" });
             }
 
-            steps.push({
-                id: "review",
-                title: "Review",
-                note: "Confirm and submit",
-                description: "Review before submission.",
-            });
+            steps.push({ id: "review", title: "Check and send" });
 
             return steps;
         },
@@ -1574,8 +1564,49 @@ export default {
             return this.path[Math.min(this.step, this.path.length - 1)];
         },
 
+        /** The short screens of the current step. */
+        screens() {
+            return this.screensFor(this.current.id);
+        },
+
+        /** The screen being shown. */
+        currentScreen() {
+            const screens = this.screens;
+            return screens[Math.min(this.screenIndex, screens.length - 1)] || {};
+        },
+
+        /** The person the current screen is about, if it's a person screen. */
+        currentPerson() {
+            const key = this.currentScreen.personKey;
+            if (!key) return null;
+            return (
+                this.allApplicants.find((person) => person.client_key === key) ||
+                null
+            );
+        },
+
+        isFirstScreen() {
+            return this.step === 0 && this.screenIndex === 0;
+        },
+
+        isLastScreen() {
+            return (
+                this.step >= this.path.length - 1 &&
+                this.screenIndex >= this.screens.length - 1
+            );
+        },
+
+        /** How far through all the screens the applicant is. */
         progressWidth() {
-            return `${((this.step + 1) / this.path.length) * 100}%`;
+            let done = 0;
+            let total = 0;
+            this.path.forEach((stepItem, index) => {
+                const count = this.screensFor(stepItem.id).length;
+                total += count;
+                if (index < this.step) done += count;
+            });
+            done += Math.min(this.screenIndex, this.screens.length - 1) + 1;
+            return `${Math.round((done / Math.max(total, 1)) * 100)}%`;
         },
     },
 
@@ -1597,7 +1628,7 @@ export default {
         // before applying the saved step.
         await this.hydrateAllDocumentUploads();
         if (Number.isFinite(this.pendingDraftStep)) {
-            this.step = Math.min(this.pendingDraftStep, this.path.length - 1);
+            this.setStep(Math.min(this.pendingDraftStep, this.path.length - 1));
         }
     },
 
@@ -1774,7 +1805,21 @@ export default {
         /** Jumps to a step by its ID (used by "Edit" on the review step). */
         goToStep(id) {
             const index = this.path.findIndex((item) => item.id === id);
-            if (index >= 0) this.step = index;
+            if (index >= 0) this.setStep(index);
+        },
+
+        /** Moves to a step, at the given screen (the first by default). */
+        setStep(index, screenIndex = 0) {
+            this.step = index;
+            this.screenIndex = screenIndex;
+            this.showErrors = false;
+            this.scrollToTop();
+        },
+
+        scrollToTop() {
+            if (typeof window !== "undefined" && window.scrollTo) {
+                window.scrollTo(0, 0);
+            }
         },
 
         /** True when an asset type's label looks like a vehicle. */
@@ -2052,6 +2097,10 @@ export default {
                 requested_loan_amount: null,
                 requested_loan_term: null,
             });
+            // Only one loan of this type: choose it for them.
+            if (this.productsForLoan.length === 1) {
+                this.selectProduct(this.toId(this.productsForLoan[0]));
+            }
         },
 
         /**
@@ -2252,6 +2301,10 @@ export default {
             }
 
             if (id === "parties") {
+                // Just the one applicant, unless someone was already added.
+                if (this.answers.others === null) {
+                    this.answers.others = form.parties.length > 0;
+                }
                 this.fillBlanks(primary, {
                     first_name: "Test",
                     last_name: "Applicant",
@@ -2371,6 +2424,7 @@ export default {
             }
 
             if (id === "assets") {
+                this.answers.assets = true;
                 // A purchase loan already has the asset being bought.
                 if (!form.assets.length) {
                     form.assets.push({
@@ -2420,6 +2474,7 @@ export default {
                     });
             }
 
+            if (id === "liabilities") this.answers.debts = true;
             if (id === "liabilities" && !form.liabilities.length) {
                 const type =
                     this.liabilityTypes.find((entry) => !entry.is_revolving) ||
@@ -2453,6 +2508,7 @@ export default {
                 });
             }
 
+            if (id === "expenses") this.answers.bills = true;
             if (id === "expenses" && !form.expenses.length) {
                 const type = this.expenseTypeOptions[0] || null;
                 form.expenses.push({
@@ -3689,84 +3745,167 @@ export default {
          * or "" when they're complete (including all three consents).
          */
         applicantIssue(person) {
-            if (
-                !person.first_name ||
-                !person.last_name ||
-                !person.email ||
-                !person.phone ||
-                !person.date_of_birth
-            ) {
-                return "Complete the name, contact details, and date of birth.";
-            }
-            if (
-                !person.address ||
-                !person.country ||
-                (this.isGrenada(person.country) && !person.parish)
-            ) {
-                return this.isGrenada(person.country)
-                    ? "Complete the street address, parish, and country."
-                    : "Complete the street address and country.";
-            }
-            if (person.years_at_address === null || person.years_at_address === undefined || person.years_at_address === "") {
-                return "Enter how many years you've lived at this address.";
-            }
-            if (this.needsPreviousAddress(person) && !person.previous_address) {
-                return "Enter your previous address (you've been at this one under 2 years).";
-            }
-            if (!person.housing_status) return "Choose your housing situation.";
-            if (person.number_of_dependants === null || person.number_of_dependants === undefined || person.number_of_dependants === "") {
-                return "Enter the number of dependants (0 if none).";
-            }
-            if (person.is_member && !person.member_number) {
-                return "Enter your member number, or untick \"I'm a member\".";
-            }
-            if (!person.citizenship || !person.residency_status) {
-                return "Choose your citizenship and residency status.";
-            }
-            if (!person.nis_number) return "Enter the NIS number.";
-
-            const identificationIssue = this.identificationsIssue(person);
-            if (identificationIssue) return identificationIssue;
-
-            if (!person.employment_status) return "Choose your employment status.";
-            if (this.showsEmploymentDetails(person.employment_status)) {
-                if (!person.employment_type || !person.employment_start_date) {
-                    return "Enter your employment type and start date.";
-                }
-                if (this.needsPreviousEmployment(person) && !person.previous_employer_name) {
-                    return "Enter your previous employer (you've been in this job under 2 years).";
-                }
-            }
-            if (person.gross_pay === null || person.gross_pay === undefined || person.gross_pay === "") {
-                return "Enter your gross pay (0 if none).";
-            }
-            if (Number(person.gross_pay) > 0 && !person.pay_frequency) {
-                return "Choose how often you're paid.";
-            }
-            for (const income of person.incomes || []) {
-                const issue = this.incomeRowIssue(income);
+            for (const part of APPLICANT_PARTS) {
+                const issue = this.applicantPartIssue(person, part);
                 if (issue) return issue;
             }
-            if (this.isGuarantor(person) && (!person.guarantee_type || !(Number(person.guarantee_amount) > 0))) {
-                return "Enter the guarantee type and amount.";
+            return "";
+        },
+
+        /**
+         * What's missing from one part (one screen) of an applicant's
+         * details, or "". The parts are listed in APPLICANT_PARTS.
+         */
+        applicantPartIssue(person, part) {
+            const blank = (value) => value === null || value === undefined || value === "";
+
+            if (part === "about") {
+                if (!person.first_name || !person.last_name) {
+                    return "Please enter the first and last name.";
+                }
+                if (!person.phone) return "Please enter a phone number.";
+                if (!person.email) return "Please enter an email address.";
+                if (!person.date_of_birth) return "Please enter the date of birth.";
             }
-            if (person.is_pep && !person.pep_details) {
-                return "Explain the politically exposed person answer.";
+
+            if (part === "home") {
+                if (!person.address) return "Please enter the home address.";
+                if (!person.country) return "Please choose the country.";
+                if (this.isGrenada(person.country) && !person.parish) {
+                    return "Please choose the parish.";
+                }
+                if (blank(person.years_at_address)) {
+                    return "How many years have you lived at this address?";
+                }
+                if (this.needsPreviousAddress(person) && !person.previous_address) {
+                    return "You've lived here under 2 years, so please enter the previous address.";
+                }
+                if (!person.housing_status) return "Please choose your housing situation.";
+                if (blank(person.number_of_dependants)) {
+                    return "How many people depend on you? Enter 0 if none.";
+                }
             }
-            const declaredYes =
-                person.declared_bankruptcy ||
-                person.declared_judgments ||
-                person.declared_arrears ||
-                person.declared_other_applications;
-            if (declaredYes && !person.declaration_details) {
-                return "Explain any \"yes\" answer in the declarations.";
+
+            if (part === "membership") {
+                if (person.is_member && !person.member_number) {
+                    return "Please enter the member number, or untick \"I'm a member\".";
+                }
+                if (!person.citizenship) return "Please choose the country of citizenship.";
+                if (!person.residency_status) return "Please choose the residency status.";
+            }
+
+            if (part === "ids") {
+                if (!person.nis_number) return "Please enter the NIS number.";
+                const identificationIssue = this.identificationsIssue(person);
+                if (identificationIssue) return identificationIssue;
+            }
+
+            if (part === "job") {
+                if (!person.employment_status) return "Please choose the work situation.";
+                if (this.showsEmploymentDetails(person.employment_status)) {
+                    if (!person.employment_type) return "Please choose the type of job.";
+                    if (!person.employment_start_date) {
+                        return "When did the job start? Please enter the start date.";
+                    }
+                    if (this.needsPreviousEmployment(person) && !person.previous_employer_name) {
+                        return "The job started under 2 years ago, so please enter the previous employer.";
+                    }
+                }
+            }
+
+            if (part === "pay") {
+                if (blank(person.gross_pay)) {
+                    return "Please enter the pay before tax. Enter 0 if none.";
+                }
+                if (Number(person.gross_pay) > 0 && !person.pay_frequency) {
+                    return "How often is the pay received?";
+                }
+                for (const income of person.incomes || []) {
+                    const issue = this.incomeRowIssue(income);
+                    if (issue) return issue;
+                }
+                if (
+                    this.isGuarantor(person) &&
+                    (!person.guarantee_type || !(Number(person.guarantee_amount) > 0))
+                ) {
+                    return "Please enter the type and amount of the guarantee.";
+                }
+            }
+
+            if (part === "declarations") {
+                if (person.is_pep && !person.pep_details) {
+                    return "Please explain the public official answer.";
+                }
+                const declaredYes =
+                    person.declared_bankruptcy ||
+                    person.declared_judgments ||
+                    person.declared_arrears ||
+                    person.declared_other_applications;
+                if (declaredYes && !person.declaration_details) {
+                    return "Please explain each \"yes\" answer.";
+                }
+            }
+
+            if (part === "consent") {
+                if (
+                    !person.consent_accuracy_confirmation ||
+                    !person.consent_credit_check ||
+                    !person.consent_data_processing
+                ) {
+                    return "Please tick all three boxes to continue.";
+                }
+            }
+
+            return "";
+        },
+
+        /** True once a person's details are far enough along to upload documents. */
+        readyForUploads(person) {
+            return (
+                !this.applicantPartIssue(person, "about") &&
+                !this.applicantPartIssue(person, "ids")
+            );
+        },
+
+        /** What's missing from the amount, term, and purpose, or "". */
+        requestMainIssue() {
+            const form = this.formData;
+            const amount = Number(form.requested_loan_amount);
+            const term = Number(form.requested_loan_term);
+            if (!amount) return "Please enter how much you'd like to borrow.";
+            if (amount < this.amountMinimum || amount > this.amountMaximum) {
+                return `The amount must be between ${this.money(
+                    this.amountMinimum,
+                )} and ${this.money(this.amountMaximum)}.`;
+            }
+            if (!term) return "Please enter how many months you need to pay it back.";
+            if (term < this.termMinimum || term > this.termMaximum) {
+                return `The time to pay back must be between ${this.termMinimum} and ${this.termMaximum} months.`;
+            }
+            if (!form.loan_purpose) return "Please tell us what the loan is for.";
+            return "";
+        },
+
+        /** What's missing from the vehicle, property, or business details, or "". */
+        requestDetailsIssue() {
+            const form = this.formData;
+            const price = Number(form.purchase_price) || 0;
+            const downPayment = Number(form.down_payment_amount) || 0;
+            if (price > 0 && downPayment >= price) {
+                return "The down payment must be less than the price.";
+            }
+            if (downPayment > 0 && !form.source_of_funds) {
+                return "Where is the down payment coming from?";
             }
             if (
-                !person.consent_accuracy_confirmation ||
-                !person.consent_credit_check ||
-                !person.consent_data_processing
+                downPayment > 0 &&
+                String(form.source_of_funds).toLowerCase() === "other" &&
+                !form.source_of_funds_details
             ) {
-                return "Accept all three declarations.";
+                return "Please describe where the down payment is coming from.";
+            }
+            if (form.loan_category === "business" && !form.business_name) {
+                return "Please enter the business name.";
             }
             return "";
         },
@@ -3782,13 +3921,13 @@ export default {
                     : person.first_name && person.last_name;
             if (!named) {
                 return person.kind === "ORGANIZATION"
-                    ? "Enter the business name."
-                    : "Enter the first and last name.";
+                    ? "Please enter the business name."
+                    : "Please enter their first and last name.";
             }
             if (!person.relationship_to_applicant) {
-                return "Enter their relationship to the primary applicant.";
+                return "Please choose how they're related to you.";
             }
-            if (!person.phone) return "Enter a phone number.";
+            if (!person.phone) return "Please enter their phone number.";
             return "";
         },
 
@@ -3851,42 +3990,8 @@ export default {
             }
 
             if (this.current.id === "request") {
-                const amount = Number(form.requested_loan_amount);
-                const term = Number(form.requested_loan_term);
-
-                if (!amount || !term || !form.loan_purpose) {
-                    return "Complete amount, term, and purpose.";
-                }
-                if (
-                    amount < this.amountMinimum ||
-                    amount > this.amountMaximum
-                ) {
-                    return `Amount must be between ${this.money(
-                        this.amountMinimum,
-                    )} and ${this.money(this.amountMaximum)}.`;
-                }
-                if (term < this.termMinimum || term > this.termMaximum) {
-                    return `Term must be between ${this.termMinimum} and ${this.termMaximum} months.`;
-                }
-
-                const price = Number(form.purchase_price) || 0;
-                const downPayment = Number(form.down_payment_amount) || 0;
-                if (price > 0 && downPayment >= price) {
-                    return "The down payment must be less than the purchase price.";
-                }
-                if (downPayment > 0 && !form.source_of_funds) {
-                    return "Choose where the down payment is coming from.";
-                }
-                if (
-                    downPayment > 0 &&
-                    String(form.source_of_funds).toLowerCase() === "other" &&
-                    !form.source_of_funds_details
-                ) {
-                    return "Describe where the down payment is coming from.";
-                }
-                if (form.loan_category === "business" && !form.business_name) {
-                    return "Enter the business name.";
-                }
+                const issue = this.requestMainIssue() || this.requestDetailsIssue();
+                if (issue) return issue;
             }
 
             if (this.current.id === "assets") {
@@ -4019,14 +4124,34 @@ export default {
         },
 
         /**
-         * Advances the wizard, auto-saving the draft when leaving steps that
-         * persist server data.
+         * Goes to the next screen. The current screen is checked first; on
+         * a step's last screen the whole step is checked too (validate()),
+         * the draft is saved when leaving a step that holds server data, and
+         * the wizard moves to the next step.
          */
         async next() {
-            const issue = this.validate();
-            if (issue) return this.warn(issue);
+            const screen = this.currentScreen;
+            const lastScreen = this.screenIndex >= this.screens.length - 1;
+            let issue = this.screenIssue(screen);
+            if (!issue && lastScreen) issue = this.validate();
+            if (issue) {
+                this.showErrors = true;
+                return this.warn(issue);
+            }
 
             this.alert = { text: "", type: "warning" };
+            this.showErrors = false;
+
+            // "No" to a Yes/No question clears that section.
+            if (screen.kind === "gate" && this.answers[screen.answer] === false) {
+                this.clearForNo(screen.answer);
+            }
+
+            if (!lastScreen) {
+                this.screenIndex++;
+                this.scrollToTop();
+                return;
+            }
 
             // The vehicle or property being bought becomes a collateral asset.
             if (this.current.id === "request") this.syncPurchaseAsset();
@@ -4048,12 +4173,342 @@ export default {
                 this.saving = false;
             }
 
-            this.step++;
+            this.setStep(this.step + 1);
             if (this.formData.id) this.rememberDraftLocation();
         },
 
+        /** Goes back one screen (to the last screen of the previous step). */
         back() {
-            if (this.step > 0) this.step--;
+            this.alert = { text: "", type: "warning" };
+            if (this.screenIndex > 0) {
+                this.screenIndex--;
+                this.showErrors = false;
+                this.scrollToTop();
+                return;
+            }
+            if (this.step > 0) {
+                const previous = this.path[this.step - 1];
+                this.setStep(this.step - 1, this.screensFor(previous.id).length - 1);
+            }
+        },
+
+        // ---- Short screens ----
+
+        /**
+         * The short screens that make up one step, in order. Each is
+         * { id, kind, title, help } plus, depending on the kind, the part of
+         * a person's details (part, personKey) or the Yes/No answer it sets
+         * (answer). Yes/No questions ("gate" screens) skip the section after
+         * them when the answer is No.
+         */
+        screensFor(stepId) {
+            const form = this.formData;
+
+            if (stepId === "loan") {
+                return [
+                    {
+                        id: "loan",
+                        kind: "loan",
+                        title: "What kind of loan do you need?",
+                        help: "Choose the type of loan, then the loan that fits you best.",
+                    },
+                ];
+            }
+
+            if (stepId === "parties") {
+                let screens = this.personScreens(form.primary, true).concat([
+                    {
+                        id: "others-gate",
+                        kind: "gate",
+                        answer: "others",
+                        title: "Is anyone else on this loan?",
+                        help: "For example, someone borrowing with you, someone guaranteeing the loan, or someone who co-owns what secures it.",
+                    },
+                ]);
+                if (this.answers.others) {
+                    screens.push({
+                        id: "people",
+                        kind: "people",
+                        title: "Who else is on this loan?",
+                        help: "Add each person and choose how they're involved. You'll fill in their details next.",
+                    });
+                    form.parties.forEach((person) => {
+                        screens = screens.concat(this.personScreens(person, false));
+                    });
+                }
+                screens.push({
+                    id: "references",
+                    kind: "references",
+                    title: "People who know you",
+                    help: "Someone we can contact about you, and your next of kin. They shouldn't be applying with you.",
+                });
+                return screens;
+            }
+
+            if (stepId === "request") {
+                const screens = [
+                    {
+                        id: "request-main",
+                        kind: "request",
+                        part: "main",
+                        title: "How much would you like to borrow?",
+                        help: "Tell us the amount, how long you need to pay it back, and what it's for.",
+                    },
+                ];
+                const details = {
+                    auto: ["The vehicle", "Tell us about the vehicle and who you're buying it from."],
+                    home: ["The property", "Tell us about the property and who you're buying it from."],
+                    business: ["Your business", "Tell us about the business the loan is for."],
+                };
+                const extra = details[form.loan_category];
+                if (extra) {
+                    screens.push({
+                        id: "request-details",
+                        kind: "request",
+                        part: "details",
+                        title: extra[0],
+                        help: extra[1],
+                    });
+                }
+                return screens;
+            }
+
+            if (stepId === "assets") {
+                const list = {
+                    id: "assets",
+                    kind: "assets",
+                    title: "Things you own",
+                    help: this.requiresCollateral
+                        ? "This loan needs something valuable to secure it, like the vehicle or property. Tick \"Use this to secure the loan\" on it."
+                        : "Add each valuable thing you own, like a house, land, a vehicle, or savings.",
+                };
+                // A secured loan always needs an asset, so there's no question.
+                if (this.requiresCollateral) return [list];
+                const gate = {
+                    id: "assets-gate",
+                    kind: "gate",
+                    answer: "assets",
+                    title: "Do you own a house, land, a vehicle, or savings?",
+                    help: "Things you own help show you can repay the loan.",
+                };
+                return this.answers.assets ? [gate, list] : [gate];
+            }
+
+            if (stepId === "liabilities") {
+                const gate = {
+                    id: "debts-gate",
+                    kind: "gate",
+                    answer: "debts",
+                    title: "Do you owe money on any loans or cards?",
+                    help: "For example a car loan, mortgage, credit card, overdraft, or hire purchase.",
+                };
+                const list = {
+                    id: "liabilities",
+                    kind: "liabilities",
+                    title: "Money you owe",
+                    help: "Add each loan or card, how much is left to pay, and what you pay.",
+                };
+                return this.answers.debts ? [gate, list] : [gate];
+            }
+
+            if (stepId === "expenses") {
+                const gate = {
+                    id: "bills-gate",
+                    kind: "gate",
+                    answer: "bills",
+                    title: "Do you pay regular bills or living costs?",
+                    help: "For example rent, electricity, water, phone, groceries, or school fees.",
+                };
+                const list = {
+                    id: "expenses",
+                    kind: "expenses",
+                    title: "Your bills",
+                    help: "Add each regular bill and how much you pay.",
+                };
+                return this.answers.bills ? [gate, list] : [gate];
+            }
+
+            if (stepId === "documents") {
+                return [
+                    {
+                        id: "documents",
+                        kind: "documents",
+                        title: "Upload your documents",
+                        help: "Take a clear photo or upload a file for each one.",
+                    },
+                ];
+            }
+
+            return [
+                {
+                    id: "review",
+                    kind: "review",
+                    title: "Check your answers",
+                    help: "Make sure everything is right. Tap \"Change\" to fix anything, then send your application.",
+                },
+            ];
+        },
+
+        /**
+         * The screens for one person's details. A Third Party Owner has one
+         * short screen; everyone else has the full set.
+         */
+        personScreens(person, isPrimary) {
+            const key = person.client_key;
+            const name = this.fullName(person) || "this person";
+            if (!isPrimary && this.isThirdPartyOwner(person)) {
+                return [
+                    {
+                        id: `person-${key}-owner`,
+                        kind: "person",
+                        part: "owner",
+                        personKey: key,
+                        title: `About ${name}`,
+                        help: "They co-own something that secures the loan, but aren't borrowing. We only need a few details.",
+                    },
+                ];
+            }
+            const titles = isPrimary
+                ? {
+                      about: ["About you", "Your name and how to contact you."],
+                      home: ["Where you live", "Your home address and who lives with you."],
+                      membership: ["Membership and citizenship", "Are you a member of the credit union, and where are you a citizen?"],
+                      ids: ["Your NIS number and ID", "Your NIS number is on your NIS card. Then add a photo ID, like a passport or driver's licence."],
+                      job: ["Your work", "Tell us about your job, or choose unemployed or retired."],
+                      pay: ["Your pay", "What you earn before tax, and any other money you receive."],
+                      declarations: ["A few questions", "Please answer honestly. A \"yes\" won't stop your application."],
+                      consent: ["Your agreement", "Please read and tick each box."],
+                  }
+                : {
+                      about: [`About ${name}`, "Their name and how to contact them."],
+                      home: [`Where ${name} lives`, "Their home address and who lives with them."],
+                      membership: [`${name}: membership and citizenship`, ""],
+                      ids: [`${name}: NIS number and ID`, "Their NIS number, and a photo ID."],
+                      job: [`${name}'s work`, ""],
+                      pay: [`${name}'s pay`, "What they earn before tax, and any other money they receive."],
+                      declarations: [`A few questions for ${name}`, "Please answer honestly."],
+                      consent: [`${name}'s agreement`, "They need to read and agree to these."],
+                  };
+            return Object.keys(titles).map((part) => ({
+                id: `person-${key}-${part}`,
+                kind: "person",
+                part,
+                personKey: key,
+                title: titles[part][0],
+                help: titles[part][1],
+            }));
+        },
+
+        /** Records the answer to a Yes/No question. */
+        answer(key, value) {
+            this.answers[key] = value;
+            this.alert = { text: "", type: "warning" };
+        },
+
+        /** What answering "No" will remove, if anything was added. */
+        gateWarning(key) {
+            const form = this.formData;
+            const count = {
+                others: form.parties.length,
+                assets: form.assets.filter((asset) => !asset.is_purchase).length,
+                debts: form.liabilities.length,
+                bills: form.expenses.length,
+            }[key];
+            if (!count) return "";
+            return `Choosing "No" will remove the ${count} ${count === 1 ? "entry" : "entries"} you added here.`;
+        },
+
+        /** Clears a section after its Yes/No question is answered "No". */
+        clearForNo(key) {
+            const form = this.formData;
+            if (key === "others") {
+                for (let index = form.parties.length - 1; index >= 0; index--) {
+                    this.removeApplicant(index);
+                }
+                this.alert = { text: "", type: "warning" };
+            }
+            if (key === "assets") {
+                form.assets = form.assets.filter((asset) => asset.is_purchase);
+            }
+            if (key === "debts") form.liabilities = [];
+            if (key === "bills") form.expenses = [];
+        },
+
+        /** Replaces one person's details with an edited copy. */
+        updatePerson(key, value) {
+            const form = this.formData;
+            if (form.primary.client_key === key) {
+                form.primary = value;
+                return;
+            }
+            const index = form.parties.findIndex((person) => person.client_key === key);
+            if (index >= 0) form.parties.splice(index, 1, value);
+        },
+
+        /**
+         * What's missing on one screen, or "". The last screen of a step is
+         * also checked with validate(), which covers the whole step.
+         */
+        screenIssue(screen) {
+            if (screen.kind === "gate") {
+                return this.answers[screen.answer] === null ||
+                    this.answers[screen.answer] === undefined
+                    ? "Please choose Yes or No."
+                    : "";
+            }
+            if (screen.kind === "person") {
+                const person = this.allApplicants.find(
+                    (entry) => entry.client_key === screen.personKey,
+                );
+                if (!person) return "";
+                const issue =
+                    screen.part === "owner"
+                        ? this.thirdPartyOwnerIssue(person)
+                        : this.applicantPartIssue(person, screen.part);
+                if (issue) return issue;
+                return this.personDocumentsIssue(person, screen.part);
+            }
+            if (screen.kind === "people") {
+                if (!this.formData.parties.length) {
+                    return "Add each person, or go back and answer \"No\".";
+                }
+                const missingRole = this.formData.parties.some(
+                    (person) =>
+                        !person.role ||
+                        String(person.role).toLowerCase() === "primary applicant",
+                );
+                if (missingRole) return "Choose how each person is involved.";
+            }
+            if (screen.kind === "request") {
+                return screen.part === "main"
+                    ? this.requestMainIssue()
+                    : this.requestDetailsIssue();
+            }
+            return "";
+        },
+
+        /**
+         * Required documents still to upload on a person's screen: their
+         * applicant documents and ID scans on the ID screen, and proof of
+         * other income on the pay screen.
+         */
+        personDocumentsIssue(person, part) {
+            let keys = [];
+            if (part === "ids") {
+                keys = [`applicant:${person.client_key}`].concat(
+                    (person.identifications || []).map(
+                        (row) => `identification:${row.client_key}`,
+                    ),
+                );
+            }
+            if (part === "pay") {
+                keys = (person.incomes || []).map((row) => `income:${row.client_key}`);
+            }
+            if (!keys.length || this.testMode) return "";
+            const missing = this.documentScopeList.find(
+                (scope) => keys.includes(scope.key) && !this.scopeComplete(scope),
+            );
+            return missing ? `Please upload the documents for ${missing.label}.` : "";
         },
 
         // ---- Persistence payloads ----
@@ -5557,7 +6012,27 @@ export default {
                 if (Number.isFinite(savedStep))
                     this.pendingDraftStep = savedStep;
 
-                this.warn("Your application draft was restored.", "success");
+                // Work out the Yes/No answers from what was saved: "yes" if
+                // there's anything in the section, "no" if the applicant
+                // already went past it, otherwise not answered yet.
+                const passed = (stepId) => {
+                    const index = this.path.findIndex((item) => item.id === stepId);
+                    return Number.isFinite(savedStep) && index >= 0 && savedStep > index;
+                };
+                const answerFor = (hasItems, stepId) =>
+                    hasItems ? true : passed(stepId) ? false : null;
+                this.answers = {
+                    // The draft is first saved when leaving the people step.
+                    others: form.parties.length > 0,
+                    assets: answerFor(
+                        form.assets.some((asset) => !asset.is_purchase),
+                        "assets",
+                    ),
+                    debts: answerFor(form.liabilities.length > 0, "liabilities"),
+                    bills: answerFor(form.expenses.length > 0, "expenses"),
+                };
+
+                this.warn("Welcome back. We've loaded your saved application.", "success");
             } catch (error) {
                 this.warn(
                     "The saved draft could not be restored safely.",
@@ -5576,8 +6051,8 @@ export default {
                 (person) => person.role && this.validApplicant(person),
             );
             if (!allApplicantsValid) {
-                this.step = this.path.findIndex(
-                    (item) => item.id === "parties",
+                this.setStep(
+                    this.path.findIndex((item) => item.id === "parties"),
                 );
                 return this.warn(
                     "Complete every applicant and consent declaration.",
@@ -5599,7 +6074,7 @@ export default {
                 const index = this.path.findIndex(
                     (item) => item.id === stepByKind[missing.kind],
                 );
-                if (index >= 0) this.step = index;
+                if (index >= 0) this.setStep(index);
                 return this.warn(
                     `Upload the required documents for ${missing.label} before submitting.`,
                 );
@@ -5670,7 +6145,8 @@ export default {
             localStorage.removeItem("gccu_draft_step");
             this.formData = createEmptyApplication();
             this.activePartyTab = this.formData.primary.client_key;
-            this.step = 0;
+            this.setStep(0);
+            this.answers = { others: null, assets: null, debts: null, bills: null };
             this.pendingDraftStep = null;
             this.persistedIds = {};
             this.receipt = null;
@@ -5796,7 +6272,8 @@ export default {
 
 .layout {
     display: grid;
-    grid-template-columns: 220px minmax(0, 760px) 230px;
+    grid-template-columns: 220px minmax(0, 720px);
+    justify-content: center;
     gap: 24px;
     max-width: 1280px;
     margin: auto;
@@ -5918,6 +6395,92 @@ export default {
 
 .alert {
     margin-bottom: var(--sp-4);
+}
+
+/* ---- Short screens: easy to read and tap ---- */
+
+.progress-label {
+    margin: 0 0 var(--sp-2);
+    color: var(--muted);
+    font-size: var(--fs-sm, 14px);
+    font-weight: 600;
+}
+
+.save-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: var(--sp-3) 0 0;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+}
+
+/* Big Yes / No buttons */
+.gate {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-4);
+}
+
+.gate-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 88px;
+    border: 2px solid var(--border);
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gate-option:hover {
+    border-color: var(--brand);
+}
+
+.gate-option.selected {
+    border-color: var(--brand);
+    background: color-mix(in srgb, var(--brand) 10%, white);
+    color: var(--brand);
+}
+
+.gate-warning {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: #b54708;
+    font-weight: 600;
+}
+
+/* Larger labels and boxes, one clear question each */
+.card :deep(.el-form-item__label) {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.card :deep(.el-input__wrapper),
+.card :deep(.el-select__wrapper) {
+    min-height: 44px;
+    font-size: 16px;
+}
+
+.card :deep(.el-form-item__error) {
+    font-size: 14px;
+    position: static;
+    padding-top: 4px;
+}
+
+.card :deep(.helper) {
+    display: block;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.form-footer :deep(.el-button) {
+    min-width: 140px;
+    font-size: 16px;
 }
 
 .card {
@@ -6770,6 +7333,10 @@ export default {
 @media (max-width: 1100px) {
     .layout {
         grid-template-columns: 200px minmax(0, 1fr);
+    }
+
+    .form-footer :deep(.el-button) {
+        flex: 1;
     }
 
     .summary {

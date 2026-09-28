@@ -15,31 +15,38 @@
       </button>
     </div>
 
-    <!-- Product picker, only shown once a category is chosen -->
+    <!-- Product cards, only shown once a category is chosen -->
     <div v-if="loanCategory" class="context">
-      <el-form-item label="Loan product" required>
-        <el-select
-          :model-value="loanTypeId"
-          placeholder="Select a product"
-          @update:model-value="$emit('select-product', $event)"
+      <p class="product-question">
+        {{ products.length > 1 ? 'Which of these fits you best?' : 'Your loan' }}
+      </p>
+      <div class="product-list">
+        <button
+          v-for="product in products"
+          :key="product.id"
+          type="button"
+          class="product-card"
+          :class="{ selected: loanTypeId === product.id }"
+          @click="$emit('select-product', product.id)"
         >
-          <el-option
-            v-for="product in products"
-            :key="product.id"
-            :label="product.name"
-            :value="product.id"
-          />
-        </el-select>
-      </el-form-item>
+          <b>{{ product.name }}</b>
+          <small v-if="rangeText(product)">{{ rangeText(product) }}</small>
+        </button>
+      </div>
+      <p v-if="!products.length" class="helper">
+        There are no loans of this type right now. Please choose another type.
+      </p>
     </div>
   </section>
 </template>
 
-<script scoped>
+<script>
 /**
  * Step 1 of the loan wizard: pick a loan category, then a specific
- * product within that category. Fully controlled by the parent —
- * all state arrives as props and changes are emitted upward.
+ * product within that category, both as big cards to tap. Fully
+ * controlled by the parent: all state arrives as props and changes are
+ * emitted upward. (The parent picks the product itself when a category
+ * has only one.)
  */
 export default {
   props: {
@@ -66,5 +73,56 @@ export default {
   },
 
   emits: ['select-category', 'select-product'],
+
+  methods: {
+    /** "EC$ 1,000 to EC$ 50,000, up to 60 months", from the product's limits. */
+    rangeText(product) {
+      const money = (value) => `EC$ ${Number(value).toLocaleString()}`;
+      const parts = [];
+      if (Number(product.maximum_amount) > 0) {
+        parts.push(
+          Number(product.minimum_amount) > 0
+            ? `${money(product.minimum_amount)} to ${money(product.maximum_amount)}`
+            : `Up to ${money(product.maximum_amount)}`
+        );
+      }
+      if (Number(product.maximum_term_months) > 0) {
+        parts.push(`up to ${product.maximum_term_months} months`);
+      }
+      return parts.join(', ');
+    },
+  },
 };
 </script>
+
+<style scoped>
+.product-question {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.product-list {
+  display: grid;
+  gap: 12px;
+}
+
+.product-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.product-card.selected {
+  border-color: var(--brand, #1178bd);
+  background: rgba(17, 120, 189, 0.06);
+}
+</style>

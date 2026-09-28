@@ -1,18 +1,6 @@
 <template>
   <section>
-    <!-- Section header with add button -->
-    <div class="collection-header">
-      <div>
-        <h3>Expenses</h3>
-        <p>Each expense is assigned to an ApplicationParty.</p>
-      </div>
-      <el-button type="primary" plain @click="add">
-        <v-icon start>mdi-plus</v-icon>
-        Add expense
-      </el-button>
-    </div>
-
-    <el-empty v-if="!draft.length" description="No expenses declared" />
+    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
 
     <!-- One card per declared expense -->
     <article
@@ -26,38 +14,15 @@
       </div>
 
       <div class="field-grid">
-        <el-form-item label="Shared household expense">
-          <FormField
-            :model-value="item.is_household"
-            :property="field('Expense', 'is_household', 'Shared household expense', 'checkbox')"
-            :form="item"
-            @update:model-value="set(index, 'is_household', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item v-if="!item.is_household" label="Responsible applicant" required>
-          <el-select
-            :model-value="item.application_party_id"
-            placeholder="Select applicant"
-            @update:model-value="set(index, 'application_party_id', $event)"
-          >
-            <el-option
-              v-for="option in applicationPartyOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-
         <!--
           Options are ExpenseType records filtered by the parent to the
           selected loan category. Grouped when the types define a group.
         -->
-        <el-form-item label="Expense type" required>
+        <el-form-item label="What is it for?" required :error="need(item.expense_type)">
           <el-select
             :model-value="item.expense_type"
-            placeholder="Select expense type"
+            placeholder="Choose one"
+            filterable
             @update:model-value="set(index, 'expense_type', $event)"
           >
             <!-- Keeps a no-longer-applicable value readable instead of showing its ID -->
@@ -93,38 +58,67 @@
             </template>
           </el-select>
           <small v-if="isInapplicable(item)" class="helper invalid">
-            This expense doesn't apply to a {{ loanCategoryLabel }}. Choose
-            another type or remove it.
+            This doesn't apply to a {{ loanCategoryLabel }}. Choose something
+            else or remove it.
           </small>
         </el-form-item>
 
-        <el-form-item label="Expense name">
-          <FormField
-            :model-value="item.expense_name"
-            :property="field('Expense', 'expense_name', 'Expense name', 'input')"
-            :form="item"
-            @update:model-value="set(index, 'expense_name', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item label="Amount (EC$)" required>
+        <el-form-item label="How much? (EC$)" required :error="need(item.amount)">
           <FormField
             :model-value="item.amount"
-            :property="field('Expense', 'amount', 'Amount (EC$)', 'number')"
+            :property="field('Expense', 'amount', 'How much? (EC$)', 'number')"
             :form="item"
             @update:model-value="set(index, 'amount', $event)"
           />
         </el-form-item>
 
-        <el-form-item label="Frequency">
+        <el-form-item label="How often?">
           <FormField
             :model-value="item.frequency"
-            :property="field('Expense', 'frequency', 'Frequency', 'select')"
+            :property="field('Expense', 'frequency', 'How often?', 'select')"
             :form="item"
             @update:model-value="set(index, 'frequency', $event)"
           />
         </el-form-item>
+
+        <!--
+          Only asked when someone else is borrowing too. The form decides the
+          choices (the household or this application's borrowers), so it's
+          an el-select.
+        -->
+        <el-form-item v-if="hasOthers" label="Who pays it?" required :error="item.is_household ? '' : need(item.application_party_id)">
+          <el-select
+            :model-value="item.is_household ? householdValue : item.application_party_id"
+            placeholder="Choose one"
+            @update:model-value="setPayer(index, $event)"
+          >
+            <el-option label="Shared by the household" :value="householdValue" />
+            <el-option
+              v-for="option in applicationPartyOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
       </div>
+
+      <el-button
+        v-if="!item.expense_name && !nameFor[item.client_key]"
+        text
+        type="primary"
+        @click="nameFor[item.client_key] = true"
+      >
+        + Give it a name
+      </el-button>
+      <el-form-item v-else label="Name">
+        <FormField
+          :model-value="item.expense_name"
+          :property="field('Expense', 'expense_name', 'Name', 'input')"
+          :form="item"
+          @update:model-value="set(index, 'expense_name', $event)"
+        />
+      </el-form-item>
 
       <!-- Required documents for this expense; uploads unlock once it's complete -->
       <AdaptiveLoanDocumentRequirements
@@ -138,12 +132,17 @@
       />
     </article>
 
+    <el-button type="primary" plain size="large" @click="add">
+      <v-icon start>mdi-plus</v-icon>
+      Add {{ draft.length ? 'another bill' : 'a bill' }}
+    </el-button>
+
     <!-- Worked out from the insurance on collateral; can't be edited here -->
     <section v-if="projectedExpenses.length" class="context">
-      <h3>Projected insurance</h3>
+      <h3>Insurance we've added for you</h3>
       <p class="helper">
-        Worked out from the insurance on your collateral. To change it, edit the
-        insurance on the Assets step.
+        This is the insurance you told us about on the thing securing the loan.
+        To change it, go back to "Things you own".
       </p>
       <div
         v-for="item in projectedExpenses"
@@ -181,6 +180,16 @@ export default {
     modelValue: {
       type: Array,
       default: () => [],
+    },
+    /** True when someone else is borrowing too, so "Who pays it?" is asked. */
+    hasOthers: {
+      type: Boolean,
+      default: false,
+    },
+    /** After a failed Next, shows "this is needed" under empty required boxes. */
+    showErrors: {
+      type: Boolean,
+      default: false,
     },
     /** Projected insurance: { asset_key, name, monthly }, read-only. */
     projectedExpenses: {
@@ -246,10 +255,37 @@ export default {
     return {
       // Local working copy; synced back to the parent on every change.
       draft: this.copy(this.modelValue),
+      // Shows the optional name, by the expense's client key.
+      nameFor: {},
+      // The "Shared by the household" choice in "Who pays it?".
+      householdValue: '__household__',
     };
   },
 
+  mounted() {
+    // They said they have bills, so start with one to fill in.
+    if (!this.draft.length) this.add();
+    // With only one borrower, every bill is theirs.
+    if (!this.hasOthers && this.soleLink) {
+      let changed = false;
+      this.draft.forEach((item) => {
+        if (!item.is_household && !item.application_party_id) {
+          item.application_party_id = this.soleLink;
+          changed = true;
+        }
+      });
+      if (changed) this.notify();
+    }
+  },
+
   computed: {
+    /** The only borrower's ApplicationParty ID, when there's just one. */
+    soleLink() {
+      return this.applicationPartyOptions.length === 1
+        ? this.applicationPartyOptions[0].value
+        : '';
+    },
+
     /** IDs of types the applicant may currently choose. */
     allowedTypeIds() {
       return new Set(this.expenseTypeOptions.map((option) => option.value));
@@ -335,6 +371,25 @@ export default {
       const type = this.expenseTypes.find((entry) => this.typeId(entry) === id);
       if (type && type.user_selectable === false) return false;
       return true;
+    },
+
+    /** "This is needed" under an empty required box, after a failed Next. */
+    need(value) {
+      if (!this.showErrors) return '';
+      return value === null || value === undefined || value === '' ? 'This is needed' : '';
+    },
+
+    /** Sets who pays a bill: one borrower, or shared by the household. */
+    setPayer(index, value) {
+      const item = this.draft[index];
+      if (value === this.householdValue) {
+        item.is_household = true;
+        item.application_party_id = '';
+      } else {
+        item.is_household = false;
+        item.application_party_id = value;
+      }
+      this.notify();
     },
 
     title(item, index) {
@@ -426,7 +481,7 @@ export default {
       this.draft.push({
         client_key: this.key('expense'),
         id: null,
-        application_party_id: '',
+        application_party_id: this.hasOthers ? '' : this.soleLink,
         expense_name: '',
         expense_type: '',
         amount: null,

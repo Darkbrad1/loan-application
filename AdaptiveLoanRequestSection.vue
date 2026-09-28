@@ -1,7 +1,8 @@
 <template>
     <section>
+        <template v-if="show('main')">
         <div class="field-grid">
-            <el-form-item label="Requested amount (EC$)" required>
+            <el-form-item label="How much would you like to borrow? (EC$)" required :error="need(draft.requested_loan_amount)">
                 <FormField
                     :model-value="draft.requested_loan_amount"
                     :property="fields.requested_loan_amount"
@@ -9,11 +10,11 @@
                     @update:model-value="set('requested_loan_amount', $event)"
                 />
                 <small v-if="selectedProduct" class="helper">
-                    Allowed: {{ money(amountMinimum) }} to {{ money(amountMaximum) }}
+                    Between {{ money(amountMinimum) }} and {{ money(amountMaximum) }}.
                 </small>
             </el-form-item>
 
-            <el-form-item label="Term (months)" required>
+            <el-form-item label="How many months to pay it back?" required :error="need(draft.requested_loan_term)">
                 <FormField
                     :model-value="draft.requested_loan_term"
                     :property="fields.requested_loan_term"
@@ -21,11 +22,11 @@
                     @update:model-value="set('requested_loan_term', $event)"
                 />
                 <small v-if="selectedProduct" class="helper">
-                    Allowed: {{ termMinimum }} to {{ termMaximum }} months
+                    Between {{ termMinimum }} and {{ termMaximum }} months ({{ yearsLabel(termMinimum) }} to {{ yearsLabel(termMaximum) }}).
                 </small>
             </el-form-item>
 
-            <el-form-item label="Repayment frequency">
+            <el-form-item label="How often would you like to pay?">
                 <FormField
                     :model-value="draft.repayment_frequency"
                     :property="fields.repayment_frequency"
@@ -35,17 +36,20 @@
             </el-form-item>
         </div>
 
-        <el-form-item label="Purpose of the loan" required>
+        <el-form-item label="What is the loan for?" required :error="need(draft.loan_purpose)">
             <FormField
                 :model-value="draft.loan_purpose"
                 :property="fields.loan_purpose"
                 :form="draft"
                 @update:model-value="set('loan_purpose', $event)"
             />
+            <small class="helper">A sentence is enough, for example "To buy a used car for work".</small>
         </el-form-item>
+        </template>
+
+        <template v-if="show('details')">
 
         <section v-if="loanCategory === 'auto'" class="context">
-            <h3>Vehicle details</h3>
             <div class="field-grid">
                 <el-form-item label="Make">
                     <FormField
@@ -99,7 +103,6 @@
         </section>
 
         <section v-if="loanCategory === 'home'" class="context">
-            <h3>Property details</h3>
             <el-form-item label="Property address">
                 <FormField
                     :model-value="draft.property_address"
@@ -149,7 +152,7 @@
           or property being bought is added on the Assets step as collateral.
         -->
         <section v-if="isPurchaseCategory" class="context">
-            <h3>{{ loanCategory === 'auto' ? 'Buying the vehicle' : 'Buying the property' }}</h3>
+            <h3>Are you buying it?</h3>
             <p class="helper">
                 Leave the purchase price blank if you're not buying (for example, a
                 refinance). With a price, we'll add the
@@ -177,6 +180,7 @@
                     v-if="Number(draft.down_payment_amount) > 0"
                     label="Where is the down payment coming from?"
                     required
+                    :error="need(draft.source_of_funds)"
                 >
                     <FormField
                         :model-value="draft.source_of_funds"
@@ -221,9 +225,8 @@
 
         <!-- The business is saved as its own Party record -->
         <section v-if="loanCategory === 'business'" class="context">
-            <h3>Business details</h3>
             <div class="field-grid">
-                <el-form-item label="Business name" required>
+                <el-form-item label="Business name" required :error="need(draft.business_name)">
                     <FormField
                         :model-value="draft.business_name"
                         :property="fields.business_name"
@@ -265,6 +268,7 @@
                 </el-form-item>
             </div>
         </section>
+        </template>
     </section>
 </template>
 
@@ -324,6 +328,10 @@ export default {
         applicationProps: { type: Array, default: () => [] },
         /** Saturn's property definitions, keyed by resource name. */
         resourceProps: { type: Object, default: () => ({}) },
+        /** Which short screen to show: "main" (amount) or "details"; "" shows both. */
+        screen: { type: String, default: "" },
+        /** After a failed Next, shows "this is needed" under empty required boxes. */
+        showErrors: { type: Boolean, default: false },
         amountMinimum: { type: Number, default: 0 },
         amountMaximum: { type: Number, default: 999999999 },
         termMinimum: { type: Number, default: 1 },
@@ -438,6 +446,25 @@ export default {
                     type: kind === "textarea" ? "textarea" : "input",
                 },
             };
+        },
+
+        /** True when this part is on screen. */
+        show(part) {
+            return !this.screen || this.screen === part;
+        },
+
+        /** "This is needed" under an empty required box, after a failed Next. */
+        need(value) {
+            if (!this.showErrors) return "";
+            return value === null || value === undefined || value === ""
+                ? "This is needed"
+                : "";
+        },
+
+        /** Months as years, e.g. 60 -> "5 years". */
+        yearsLabel(months) {
+            const years = Math.round((Number(months) / 12) * 10) / 10;
+            return `${years} ${years === 1 ? "year" : "years"}`;
         },
 
         money(value) {

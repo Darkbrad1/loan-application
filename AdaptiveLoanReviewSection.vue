@@ -1,15 +1,14 @@
 <template>
   <section class="review">
     <p class="review-intro">
-      Check everything below before you submit. Use "Edit" to go back and change
-      a section.
+      Please check everything below. If something is wrong, tap "Change" to fix it.
     </p>
 
     <article v-for="section in summary" :key="section.title" class="review-section">
       <header class="review-header">
         <h3>{{ section.title }}</h3>
         <el-button v-if="section.step" text type="primary" @click="$emit('edit-step', section.step)">
-          Edit
+          Change
         </el-button>
       </header>
 
@@ -22,7 +21,7 @@
       </div>
     </article>
 
-    <p v-if="!requiresCollateral" class="helper">This loan doesn't need collateral.</p>
+    <p class="helper">When everything looks right, tap "Send my application" below.</p>
   </section>
 </template>
 

@@ -1,18 +1,6 @@
 <template>
   <section>
-    <!-- Section header with add button -->
-    <div class="collection-header">
-      <div>
-        <h3>Liabilities</h3>
-        <p>Responsibility is allocated to saved ApplicationParty records.</p>
-      </div>
-      <el-button type="primary" plain @click="add">
-        <v-icon start>mdi-plus</v-icon>
-        Add liability
-      </el-button>
-    </div>
-
-    <el-empty v-if="!draft.length" description="No liabilities declared" />
+    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
 
     <!-- One card per declared liability -->
     <article
@@ -21,25 +9,26 @@
       class="item-card"
     >
       <div class="item-title">
-        <strong>{{ item.creditor_name || `Liability ${index + 1}` }}</strong>
+        <strong>{{ item.creditor_name || `Debt ${index + 1}` }}</strong>
         <el-button text type="danger" @click="remove(index)">Remove</el-button>
       </div>
 
       <div class="field-grid">
-        <el-form-item label="Creditor" required>
+        <el-form-item label="Who do you owe?" required :error="need(item.creditor_name)">
           <FormField
             :model-value="item.creditor_name"
             :property="field('Liability', 'creditor_name', 'Creditor', 'input')"
             :form="item"
             @update:model-value="set(index, 'creditor_name', $event)"
           />
+          <small class="helper">The bank, credit union, shop, or person.</small>
         </el-form-item>
 
         <!-- Options come from LiabilityType records; value is the record ID -->
-        <el-form-item label="Liability type" required>
+        <el-form-item label="What kind of debt is it?" required :error="need(item.liability_type)">
           <el-select
             :model-value="item.liability_type"
-            placeholder="Select liability type"
+            placeholder="Choose one"
             @update:model-value="set(index, 'liability_type', $event)"
           >
             <el-option
@@ -57,7 +46,7 @@
           </small>
         </el-form-item>
 
-        <el-form-item label="Outstanding balance (EC$)" required>
+        <el-form-item label="How much do you still owe? (EC$)" required :error="need(item.outstanding_balance)">
           <FormField
             :model-value="item.outstanding_balance"
             :property="field('Liability', 'outstanding_balance', 'Outstanding balance (EC$)', 'number')"
@@ -71,6 +60,7 @@
           v-if="isRevolving(item)"
           label="Credit limit (EC$)"
           required
+          :error="need(item.credit_limit)"
         >
           <FormField
             :model-value="item.credit_limit"
@@ -78,9 +68,10 @@
             :form="item"
             @update:model-value="set(index, 'credit_limit', $event)"
           />
+          <small class="helper">The most you're allowed to owe on it.</small>
         </el-form-item>
 
-        <el-form-item label="Payment amount (EC$)" required>
+        <el-form-item label="How much do you pay? (EC$)" required :error="need(item.payment_amount)">
           <FormField
             :model-value="item.payment_amount"
             :property="field('Liability', 'payment_amount', 'Payment amount (EC$)', 'number')"
@@ -89,7 +80,7 @@
           />
         </el-form-item>
 
-        <el-form-item label="Payment frequency">
+        <el-form-item label="How often do you pay?">
           <FormField
             :model-value="item.payment_frequency"
             :property="field('Liability', 'payment_frequency', 'Payment frequency', 'select')"
@@ -104,40 +95,40 @@
         -->
         <p v-if="isRevolving(item)" class="assessed-note">
           <template v-if="assessed(item) !== null">
-            Assessed monthly repayment: {{ money(assessed(item)) }}
-            ({{ percentLabel(rateFor(item)) }} of the credit limit)
+            We'll count {{ money(assessed(item)) }} a month for this
+            ({{ percentLabel(rateFor(item)) }} of the credit limit).
           </template>
           <template v-else>
-            Enter the credit limit. Repayment will be assessed at
-            {{ percentLabel(rateFor(item)) }} of the limit.
+            We'll count {{ percentLabel(rateFor(item)) }} of the credit limit
+            as your monthly payment.
           </template>
         </p>
       </div>
 
       <div class="field-grid">
-        <el-form-item label="Will this loan pay it off?">
+        <el-form-item label="Will the new loan pay this off?">
           <FormField
             :model-value="item.is_to_be_paid_off"
-            :property="field('Liability', 'is_to_be_paid_off', 'Will this loan pay it off?', 'checkbox')"
+            :property="field('Liability', 'is_to_be_paid_off', 'Will the new loan pay this off?', 'checkbox')"
             :form="item"
             @update:model-value="set(index, 'is_to_be_paid_off', $event)"
           />
         </el-form-item>
 
-        <el-form-item label="Is it secured on one of your assets?">
+        <el-form-item label="Is something you own held against it? (For example, a car loan on your car.)">
           <FormField
             :model-value="item.is_secured"
-            :property="field('Liability', 'is_secured', 'Is it secured on one of your assets?', 'checkbox')"
+            :property="field('Liability', 'is_secured', 'Is something you own held against it?', 'checkbox')"
             :form="item"
             @update:model-value="set(index, 'is_secured', $event)"
           />
         </el-form-item>
 
         <!-- The form decides the choices (this application's assets), so it's an el-select -->
-        <el-form-item v-if="item.is_secured" label="Secured on" required>
+        <el-form-item v-if="item.is_secured" label="Which thing?" required :error="need(item.secured_asset_ref)">
           <el-select
             :model-value="item.secured_asset_ref"
-            placeholder="Select the asset"
+            placeholder="Choose one"
             @update:model-value="set(index, 'secured_asset_ref', $event)"
           >
             <el-option
@@ -148,12 +139,20 @@
             />
           </el-select>
           <small v-if="!assetOptions.length" class="helper invalid">
-            Add the asset on the Assets step first.
+            Add it under "Things you own" first.
           </small>
         </el-form-item>
       </div>
 
-      <el-form-item label="Notes (unusual terms, payment arrangements, and so on)">
+      <el-button
+        v-if="!item.description && !notesFor[item.client_key]"
+        text
+        type="primary"
+        @click="notesFor[item.client_key] = true"
+      >
+        + Add a note (for example, unusual payment terms)
+      </el-button>
+      <el-form-item v-else label="Note">
         <FormField
           :model-value="item.description"
           :property="field('Liability', 'description', 'Notes', 'textarea')"
@@ -167,9 +166,12 @@
         :model-value="item.responsibilities"
         :options="applicationPartyOptions"
         reference-key="application_party_id"
-        title="Responsibility"
-        select-label="Responsible applicant"
-        total-label="Responsibility total"
+        simple
+        :default-value="primaryLinkId"
+        title="Who pays it?"
+        select-label="Person"
+        total-label="Shares add up to"
+        me-label="You pay this."
         responsibility-type="Borrower"
         @update:model-value="set(index, 'responsibilities', $event)"
       />
@@ -185,6 +187,11 @@
         @file-rejected="$emit('file-rejected', $event)"
       />
     </article>
+
+    <el-button type="primary" plain size="large" @click="add">
+      <v-icon start>mdi-plus</v-icon>
+      Add {{ draft.length ? 'another debt' : 'a debt' }}
+    </el-button>
   </section>
 </template>
 
@@ -208,6 +215,16 @@
  */
 export default {
   props: {
+    /** The primary applicant's ApplicationParty ID: "Just me" for who pays. */
+    primaryLinkId: {
+      type: String,
+      default: '',
+    },
+    /** After a failed Next, shows "this is needed" under empty required boxes. */
+    showErrors: {
+      type: Boolean,
+      default: false,
+    },
     /** The application's assets as { value: client key, label } choices. */
     assetOptions: {
       type: Array,
@@ -275,7 +292,14 @@ export default {
     return {
       // Local working copy; synced back to the parent on every change.
       draft: this.copy(this.modelValue),
+      // Shows the optional note, by the liability's client key.
+      notesFor: {},
     };
+  },
+
+  mounted() {
+    // They said they owe money, so start with one to fill in.
+    if (!this.draft.length) this.add();
   },
 
   created() {
@@ -318,6 +342,12 @@ export default {
     /** Dropdown options for a field, or [] when none were loaded. */
     lookup(fieldName) {
       return this.lookups[fieldName] || [];
+    },
+
+    /** "This is needed" under an empty required box, after a failed Next. */
+    need(value) {
+      if (!this.showErrors) return '';
+      return value === null || value === undefined || value === '' ? 'This is needed' : '';
     },
 
     /** Normalizes an ID reference (raw ID or record object). */
@@ -468,7 +498,7 @@ export default {
           {
             client_key: this.key('resp'),
             id: null,
-            application_party_id: '',
+            application_party_id: this.primaryLinkId,
             percentage: 100,
             responsibility_type: 'Borrower',
           },

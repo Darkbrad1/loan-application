@@ -1,29 +1,9 @@
 <template>
   <div class="applicant-editor">
-    <!-- Third Party Owner: owns collateral but isn't borrowing, so only a few details -->
-    <template v-if="isThirdPartyOwner">
-      <p class="helper">
-        A Third Party Owner owns all or part of an asset offered as collateral,
-        but isn't borrowing. We only need their name, relationship to you, and
-        contact details.
-      </p>
+    <!-- ===== Someone who co-owns what secures the loan, but isn't borrowing ===== -->
+    <template v-if="show('owner')">
       <div class="field-grid">
-        <el-form-item v-if="showRole" label="Role" required>
-          <el-select
-            :model-value="draft.role"
-            placeholder="Select role"
-            @update:model-value="set('role', $event)"
-          >
-            <el-option
-              v-for="option in roleOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="Owner is a" required>
+        <el-form-item label="Is this a person or a business?" required>
           <el-select
             :model-value="draft.kind || 'PERSON'"
             @update:model-value="set('kind', $event)"
@@ -37,7 +17,12 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item v-if="draft.kind === 'ORGANIZATION'" label="Business name" required>
+        <el-form-item
+          v-if="draft.kind === 'ORGANIZATION'"
+          label="Business name"
+          required
+          :error="need(draft.business_name)"
+        >
           <FormField
             :model-value="draft.business_name"
             :property="field('Party', 'business_name', 'Business name', 'input')"
@@ -47,7 +32,7 @@
         </el-form-item>
 
         <template v-else>
-          <el-form-item label="First name" required>
+          <el-form-item label="First name" required :error="need(draft.first_name)">
             <FormField
               :model-value="draft.first_name"
               :property="field('Party', 'first_name', 'First name', 'input')"
@@ -55,8 +40,7 @@
               @update:model-value="set('first_name', $event)"
             />
           </el-form-item>
-
-          <el-form-item label="Last name" required>
+          <el-form-item label="Last name" required :error="need(draft.last_name)">
             <FormField
               :model-value="draft.last_name"
               :property="field('Party', 'last_name', 'Last name', 'input')"
@@ -66,25 +50,25 @@
           </el-form-item>
         </template>
 
-        <el-form-item label="Relationship to the primary applicant" required>
+        <el-form-item label="How are they related to you?" required :error="need(draft.relationship_to_applicant)">
           <FormField
             :model-value="draft.relationship_to_applicant"
-            :property="field('ApplicationParty', 'relationship_to_applicant', 'Relationship to the primary applicant', 'select')"
+            :property="field('ApplicationParty', 'relationship_to_applicant', 'How are they related to you?', 'select')"
             :form="draft"
             @update:model-value="set('relationship_to_applicant', $event)"
           />
         </el-form-item>
 
-        <el-form-item label="Phone" required>
+        <el-form-item label="Phone number" required :error="need(draft.phone)">
           <FormField
             :model-value="draft.phone"
-            :property="field('Party', 'phone', 'Phone', 'input')"
+            :property="field('Party', 'phone', 'Phone number', 'input')"
             :form="draft"
             @update:model-value="set('phone', $event)"
           />
         </el-form-item>
 
-        <el-form-item label="Email">
+        <el-form-item label="Email (if they have one)">
           <FormField
             :model-value="draft.email"
             :property="field('Party', 'email', 'Email', 'input')"
@@ -95,25 +79,10 @@
       </div>
     </template>
 
-    <template v-else>
-      <!-- Personal details -->
+    <!-- ===== About: name and contact ===== -->
+    <template v-if="show('about')">
       <div class="field-grid">
-        <el-form-item v-if="showRole" label="Role" required>
-          <el-select
-            :model-value="draft.role"
-            placeholder="Select role"
-            @update:model-value="set('role', $event)"
-          >
-            <el-option
-              v-for="option in roleOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="First name" required>
+        <el-form-item label="First name" required :error="need(draft.first_name)">
           <FormField
             :model-value="draft.first_name"
             :property="field('Party', 'first_name', 'First name', 'input')"
@@ -121,8 +90,7 @@
             @update:model-value="set('first_name', $event)"
           />
         </el-form-item>
-
-        <el-form-item label="Last name" required>
+        <el-form-item label="Last name" required :error="need(draft.last_name)">
           <FormField
             :model-value="draft.last_name"
             :property="field('Party', 'last_name', 'Last name', 'input')"
@@ -130,8 +98,15 @@
             @update:model-value="set('last_name', $event)"
           />
         </el-form-item>
-
-        <el-form-item label="Email" required>
+        <el-form-item label="Phone number" required :error="need(draft.phone)">
+          <FormField
+            :model-value="draft.phone"
+            :property="field('Party', 'phone', 'Phone number', 'input')"
+            :form="draft"
+            @update:model-value="set('phone', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Email" required :error="need(draft.email)">
           <FormField
             :model-value="draft.email"
             :property="field('Party', 'email', 'Email', 'input')"
@@ -139,17 +114,7 @@
             @update:model-value="set('email', $event)"
           />
         </el-form-item>
-
-        <el-form-item label="Phone" required>
-          <FormField
-            :model-value="draft.phone"
-            :property="field('Party', 'phone', 'Phone', 'input')"
-            :form="draft"
-            @update:model-value="set('phone', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item label="Date of birth" required>
+        <el-form-item label="Date of birth" required :error="need(draft.date_of_birth)">
           <FormField
             :model-value="draft.date_of_birth"
             :property="field('Party', 'date_of_birth', 'Date of birth', 'date')"
@@ -157,7 +122,6 @@
             @update:model-value="set('date_of_birth', $event, 'date')"
           />
         </el-form-item>
-
         <el-form-item label="Marital status">
           <FormField
             :model-value="draft.marital_status"
@@ -166,454 +130,458 @@
             @update:model-value="set('marital_status', $event)"
           />
         </el-form-item>
+      </div>
+    </template>
 
-        <el-form-item label="NIS number" required>
+    <!-- ===== Home: address, housing, dependants ===== -->
+    <template v-if="show('home')">
+      <el-form-item label="Home address" required :error="need(draft.address)">
+        <FormField
+          :model-value="draft.address"
+          :property="field('Party', 'address', 'Home address', 'textarea')"
+          :form="draft"
+          @update:model-value="set('address', $event)"
+        />
+        <small class="helper">House number, street, and village or town.</small>
+      </el-form-item>
+      <div class="field-grid">
+        <el-form-item label="Country" required :error="need(draft.country)">
           <FormField
-            :model-value="draft.nis_number"
-            :property="field('Party', 'nis_number', 'NIS number', 'input')"
+            :model-value="draft.country"
+            :property="field('Party', 'country', 'Country', 'select')"
             :form="draft"
-            @update:model-value="set('nis_number', $event)"
+            @update:model-value="set('country', $event)"
+          />
+        </el-form-item>
+        <el-form-item v-if="inGrenada" label="Parish" required :error="need(draft.parish)">
+          <FormField
+            :model-value="draft.parish"
+            :property="field('Party', 'parish', 'Parish', 'select')"
+            :form="draft"
+            @update:model-value="set('parish', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="How many years have you lived there?" required :error="need(draft.years_at_address)">
+          <FormField
+            :model-value="draft.years_at_address"
+            :property="field('Party', 'years_at_address', 'Years at this address', 'number')"
+            :form="draft"
+            @update:model-value="set('years_at_address', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Do you own or rent your home?" required :error="need(draft.housing_status)">
+          <FormField
+            :model-value="draft.housing_status"
+            :property="field('ApplicationParty', 'housing_status', 'Housing', 'select')"
+            :form="draft"
+            @update:model-value="set('housing_status', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="How many people depend on you for money?" required :error="need(draft.number_of_dependants)">
+          <FormField
+            :model-value="draft.number_of_dependants"
+            :property="field('ApplicationParty', 'number_of_dependants', 'Dependants', 'number')"
+            :form="draft"
+            @update:model-value="set('number_of_dependants', $event)"
+          />
+          <small class="helper">For example children. Enter 0 if none.</small>
+        </el-form-item>
+      </div>
+
+      <!-- Previous address: only under 2 years at this one -->
+      <template v-if="needsPreviousAddress">
+        <p class="subheading">You've lived there less than 2 years. Where did you live before?</p>
+        <el-form-item label="Previous address" required :error="need(draft.previous_address)">
+          <FormField
+            :model-value="draft.previous_address"
+            :property="field('Party', 'previous_address', 'Previous address', 'textarea')"
+            :form="draft"
+            @update:model-value="set('previous_address', $event)"
+          />
+        </el-form-item>
+        <div class="field-grid">
+          <el-form-item label="Previous country">
+            <FormField
+              :model-value="draft.previous_country"
+              :property="field('Party', 'previous_country', 'Previous country', 'select')"
+              :form="draft"
+              @update:model-value="set('previous_country', $event)"
+            />
+          </el-form-item>
+          <el-form-item v-if="previousInGrenada" label="Previous parish">
+            <FormField
+              :model-value="draft.previous_parish"
+              :property="field('Party', 'previous_parish', 'Previous parish', 'select')"
+              :form="draft"
+              @update:model-value="set('previous_parish', $event)"
+            />
+          </el-form-item>
+        </div>
+      </template>
+
+      <!-- Optional extras, hidden until asked for -->
+      <el-button v-if="!showMore && !draft.mailing_address" text type="primary" @click="showMore = true">
+        + My mail goes to a different address
+      </el-button>
+      <el-form-item v-else label="Mailing address">
+        <FormField
+          :model-value="draft.mailing_address"
+          :property="field('Party', 'mailing_address', 'Mailing address', 'textarea')"
+          :form="draft"
+          @update:model-value="set('mailing_address', $event)"
+        />
+      </el-form-item>
+    </template>
+
+    <!-- ===== Membership and citizenship ===== -->
+    <template v-if="show('membership')">
+      <el-form-item label="Are you a member of the credit union?">
+        <div class="choice-row">
+          <el-button
+            size="large"
+            :type="draft.is_member ? 'primary' : ''"
+            @click="set('is_member', true)"
+          >
+            Yes, I'm a member
+          </el-button>
+          <el-button
+            size="large"
+            :type="!draft.is_member ? 'primary' : ''"
+            @click="set('is_member', false)"
+          >
+            Not yet
+          </el-button>
+        </div>
+      </el-form-item>
+      <el-form-item v-if="draft.is_member" label="Member number" required :error="need(draft.member_number)">
+        <FormField
+          :model-value="draft.member_number"
+          :property="field('Party', 'member_number', 'Member number', 'input')"
+          :form="draft"
+          @update:model-value="set('member_number', $event)"
+        />
+      </el-form-item>
+      <p v-else class="helper">That's fine. You can still apply, and we'll help you join.</p>
+
+      <div class="field-grid">
+        <el-form-item label="Citizen of which country?" required :error="need(draft.citizenship)">
+          <FormField
+            :model-value="draft.citizenship"
+            :property="field('Party', 'citizenship', 'Citizenship', 'select')"
+            :form="draft"
+            @update:model-value="set('citizenship', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Residency status" required :error="need(draft.residency_status)">
+          <FormField
+            :model-value="draft.residency_status"
+            :property="field('Party', 'residency_status', 'Residency status', 'select')"
+            :form="draft"
+            @update:model-value="set('residency_status', $event)"
           />
         </el-form-item>
       </div>
 
-      <!-- Membership, citizenship, and tax (anti-money-laundering) -->
-      <section class="context">
-        <h3>Membership and residency</h3>
+      <el-button v-if="!showMore && !draft.tin" text type="primary" @click="showMore = true">
+        + Add a tax number (TIN)
+      </el-button>
+      <el-form-item v-else label="Tax number (TIN)">
+        <FormField
+          :model-value="draft.tin"
+          :property="field('Party', 'tin', 'Tax number (TIN)', 'input')"
+          :form="draft"
+          @update:model-value="set('tin', $event)"
+        />
+      </el-form-item>
+    </template>
+
+    <!-- ===== NIS number, photo ID, and their documents ===== -->
+    <template v-if="show('ids')">
+      <el-form-item label="NIS number" required :error="need(draft.nis_number)">
+        <FormField
+          :model-value="draft.nis_number"
+          :property="field('Party', 'nis_number', 'NIS number', 'input')"
+          :form="draft"
+          @update:model-value="set('nis_number', $event)"
+        />
+        <small class="helper">It's printed on your NIS card.</small>
+      </el-form-item>
+
+      <article
+        v-for="(row, index) in draft.identifications"
+        :key="row.client_key"
+        class="item-card"
+      >
+        <div class="item-title">
+          <strong>{{ identificationTitle(row, index) }}</strong>
+          <div>
+            <el-tag v-if="row.is_primary && draft.identifications.length > 1" type="success" size="small">Main ID</el-tag>
+            <el-button
+              v-else-if="draft.identifications.length > 1"
+              text
+              @click="setPrimary(index)"
+            >
+              Make this my main ID
+            </el-button>
+            <el-button
+              v-if="draft.identifications.length > 1"
+              text
+              type="danger"
+              @click="removeIdentification(index)"
+            >
+              Remove
+            </el-button>
+          </div>
+        </div>
+
         <div class="field-grid">
-          <el-form-item label="I'm a member of the credit union">
+          <el-form-item label="Type of ID" required :error="need(row.identification_type)">
             <FormField
-              :model-value="draft.is_member"
-              :property="field('Party', 'is_member', 'I\'m a member of the credit union', 'checkbox')"
-              :form="draft"
-              @update:model-value="set('is_member', $event)"
+              :model-value="row.identification_type"
+              :property="field('PartyIdentification', 'identification_type', 'Type of ID', 'select')"
+              :form="row"
+              @update:model-value="setIdentification(index, 'identification_type', $event)"
             />
           </el-form-item>
-
-          <el-form-item v-if="draft.is_member" label="Member number" required>
+          <el-form-item label="ID number" required :error="need(row.identification_number)">
             <FormField
-              :model-value="draft.member_number"
-              :property="field('Party', 'member_number', 'Member number', 'input')"
-              :form="draft"
-              @update:model-value="set('member_number', $event)"
+              :model-value="row.identification_number"
+              :property="field('PartyIdentification', 'identification_number', 'ID number', 'input')"
+              :form="row"
+              @update:model-value="setIdentification(index, 'identification_number', $event)"
             />
           </el-form-item>
-
-          <el-form-item label="Citizenship" required>
+          <el-form-item label="Expiry date">
             <FormField
-              :model-value="draft.citizenship"
-              :property="field('Party', 'citizenship', 'Citizenship', 'select')"
-              :form="draft"
-              @update:model-value="set('citizenship', $event)"
+              :model-value="row.expiry_date"
+              :property="field('PartyIdentification', 'expiry_date', 'Expiry date', 'date')"
+              :form="row"
+              @update:model-value="setIdentification(index, 'expiry_date', $event, 'date')"
+            />
+            <small v-if="isExpired(row)" class="helper invalid">
+              This ID has expired. Please use one that's still valid.
+            </small>
+          </el-form-item>
+        </div>
+
+        <!-- Less common details, hidden until asked for -->
+        <el-button v-if="!moreFor[row.client_key]" text type="primary" @click="moreFor[row.client_key] = true">
+          + Add issue date and country
+        </el-button>
+        <div v-else class="field-grid">
+          <el-form-item label="Issuing country">
+            <FormField
+              :model-value="row.issuing_country"
+              :property="field('PartyIdentification', 'issuing_country', 'Issuing country', 'select')"
+              :form="row"
+              @update:model-value="setIdentification(index, 'issuing_country', $event)"
             />
           </el-form-item>
-
-          <el-form-item label="Residency status" required>
+          <el-form-item label="Issue date">
             <FormField
-              :model-value="draft.residency_status"
-              :property="field('Party', 'residency_status', 'Residency status', 'select')"
-              :form="draft"
-              @update:model-value="set('residency_status', $event)"
-            />
-          </el-form-item>
-
-          <el-form-item label="Tax ID (TIN)">
-            <FormField
-              :model-value="draft.tin"
-              :property="field('Party', 'tin', 'Tax ID (TIN)', 'input')"
-              :form="draft"
-              @update:model-value="set('tin', $event)"
+              :model-value="row.issue_date"
+              :property="field('PartyIdentification', 'issue_date', 'Issue date', 'date')"
+              :form="row"
+              @update:model-value="setIdentification(index, 'issue_date', $event, 'date')"
             />
           </el-form-item>
         </div>
-        <p v-if="!draft.is_member" class="helper">
-          Not a member yet? You can still apply. We'll contact you about joining.
-        </p>
-      </section>
 
-      <!-- Home address, split into street, parish, and country -->
-      <section class="context">
-        <h3>Home address</h3>
-        <el-form-item label="Street address" required>
+        <!-- Photo or scan of this ID, if the credit union asks for one -->
+        <AdaptiveLoanDocumentRequirements
+          title="Photo of this ID"
+          :scope="documentScopes[`identification:${row.client_key}`]"
+          :uploading-key="uploadingKey"
+          :disabled="documentsDisabled"
+          @stage-file="$emit('stage-file', $event)"
+          @remove-file="$emit('remove-file', $event)"
+          @request-file-upload="$emit('request-file-upload', $event)"
+          @file-rejected="$emit('file-rejected', $event)"
+        />
+      </article>
+
+      <el-button plain @click="addIdentification">
+        <v-icon start>mdi-plus</v-icon>
+        Add another ID
+      </el-button>
+      <p class="helper">{{ identificationHint }}</p>
+
+      <!-- Documents everyone gives, like the NIS card -->
+      <AdaptiveLoanDocumentRequirements
+        title="Your documents"
+        :scope="documentScopes[`applicant:${draft.client_key}`]"
+        :uploading-key="uploadingKey"
+        :disabled="documentsDisabled"
+        @stage-file="$emit('stage-file', $event)"
+        @remove-file="$emit('remove-file', $event)"
+        @request-file-upload="$emit('request-file-upload', $event)"
+        @file-rejected="$emit('file-rejected', $event)"
+      />
+    </template>
+
+    <!-- ===== Work ===== -->
+    <template v-if="show('job')">
+      <div class="field-grid">
+        <el-form-item label="What is your work situation?" required :error="need(draft.employment_status)">
           <FormField
-            :model-value="draft.address"
-            :property="field('Party', 'address', 'Street address', 'textarea')"
+            :model-value="draft.employment_status"
+            :property="field('ApplicationParty', 'employment_status', 'Work situation', 'select')"
             :form="draft"
-            @update:model-value="set('address', $event)"
+            @update:model-value="set('employment_status', $event)"
           />
         </el-form-item>
+
+        <template v-if="showEmploymentDetails">
+          <el-form-item label="Type of job" required :error="need(draft.employment_type)">
+            <FormField
+              :model-value="draft.employment_type"
+              :property="field('ApplicationParty', 'employment_type', 'Type of job', 'select')"
+              :form="draft"
+              @update:model-value="set('employment_type', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Employer or business name">
+            <FormField
+              :model-value="draft.employer_name"
+              :property="field('ApplicationParty', 'employer_name', 'Employer', 'input')"
+              :form="draft"
+              @update:model-value="set('employer_name', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Job title">
+            <FormField
+              :model-value="draft.job_title"
+              :property="field('ApplicationParty', 'job_title', 'Job title', 'input')"
+              :form="draft"
+              @update:model-value="set('job_title', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="When did you start this job?" required :error="need(draft.employment_start_date)">
+            <FormField
+              :model-value="draft.employment_start_date"
+              :property="field('ApplicationParty', 'employment_start_date', 'Start date', 'date')"
+              :form="draft"
+              @update:model-value="set('employment_start_date', $event, 'date')"
+            />
+          </el-form-item>
+        </template>
+      </div>
+
+      <!-- Previous job: only under 2 years in this one -->
+      <template v-if="needsPreviousEmployment">
+        <p class="subheading">You started less than 2 years ago. Where did you work before?</p>
         <div class="field-grid">
-          <el-form-item label="Country" required>
+          <el-form-item label="Previous employer" required :error="need(draft.previous_employer_name)">
             <FormField
-              :model-value="draft.country"
-              :property="field('Party', 'country', 'Country', 'select')"
+              :model-value="draft.previous_employer_name"
+              :property="field('ApplicationParty', 'previous_employer_name', 'Previous employer', 'input')"
               :form="draft"
-              @update:model-value="set('country', $event)"
+              @update:model-value="set('previous_employer_name', $event)"
             />
           </el-form-item>
-
-          <!-- Parish only applies to addresses in Grenada -->
-          <el-form-item v-if="inGrenada" label="Parish" required>
+          <el-form-item label="Job title there">
             <FormField
-              :model-value="draft.parish"
-              :property="field('Party', 'parish', 'Parish', 'select')"
+              :model-value="draft.previous_job_title"
+              :property="field('ApplicationParty', 'previous_job_title', 'Previous job title', 'input')"
               :form="draft"
-              @update:model-value="set('parish', $event)"
+              @update:model-value="set('previous_job_title', $event)"
             />
           </el-form-item>
-
-          <el-form-item label="Years at this address" required>
+          <el-form-item label="How many years there?">
             <FormField
-              :model-value="draft.years_at_address"
-              :property="field('Party', 'years_at_address', 'Years at this address', 'number')"
+              :model-value="draft.previous_employment_years"
+              :property="field('ApplicationParty', 'previous_employment_years', 'Years there', 'number')"
               :form="draft"
-              @update:model-value="set('years_at_address', $event)"
-            />
-          </el-form-item>
-
-          <el-form-item label="Housing" required>
-            <FormField
-              :model-value="draft.housing_status"
-              :property="field('ApplicationParty', 'housing_status', 'Housing', 'select')"
-              :form="draft"
-              @update:model-value="set('housing_status', $event)"
-            />
-          </el-form-item>
-
-          <el-form-item label="Number of dependants" required>
-            <FormField
-              :model-value="draft.number_of_dependants"
-              :property="field('ApplicationParty', 'number_of_dependants', 'Number of dependants', 'number')"
-              :form="draft"
-              @update:model-value="set('number_of_dependants', $event)"
+              @update:model-value="set('previous_employment_years', $event)"
             />
           </el-form-item>
         </div>
-        <p class="helper">
-          Enter rent as an expense and a mortgage as a liability, on their own steps.
-        </p>
+      </template>
+    </template>
 
-        <!-- Previous address: only under 2 years at this one -->
-        <template v-if="needsPreviousAddress">
-          <h4 class="subheading">Previous address</h4>
-          <el-form-item label="Previous street address" required>
-            <FormField
-              :model-value="draft.previous_address"
-              :property="field('Party', 'previous_address', 'Previous street address', 'textarea')"
-              :form="draft"
-              @update:model-value="set('previous_address', $event)"
-            />
-          </el-form-item>
-          <div class="field-grid">
-            <el-form-item label="Previous country">
-              <FormField
-                :model-value="draft.previous_country"
-                :property="field('Party', 'previous_country', 'Previous country', 'select')"
-                :form="draft"
-                @update:model-value="set('previous_country', $event)"
-              />
-            </el-form-item>
-            <el-form-item v-if="previousInGrenada" label="Previous parish">
-              <FormField
-                :model-value="draft.previous_parish"
-                :property="field('Party', 'previous_parish', 'Previous parish', 'select')"
-                :form="draft"
-                @update:model-value="set('previous_parish', $event)"
-              />
-            </el-form-item>
-          </div>
-        </template>
-
-        <el-form-item label="Mailing address (only if different)">
+    <!-- ===== Pay, other income, and (guarantors) the guarantee ===== -->
+    <template v-if="show('pay')">
+      <div class="field-grid">
+        <el-form-item label="Pay before tax (EC$)" required :error="need(draft.gross_pay)">
           <FormField
-            :model-value="draft.mailing_address"
-            :property="field('Party', 'mailing_address', 'Mailing address (only if different)', 'textarea')"
+            :model-value="draft.gross_pay"
+            :property="field('ApplicationParty', 'gross_pay', 'Pay before tax (EC$)', 'number')"
             :form="draft"
-            @update:model-value="set('mailing_address', $event)"
+            @update:model-value="set('gross_pay', $event)"
+          />
+          <small class="helper">The amount on your payslip before anything is taken off. Enter 0 if none.</small>
+        </el-form-item>
+        <el-form-item label="How often are you paid?" :required="Number(draft.gross_pay) > 0" :error="Number(draft.gross_pay) > 0 ? need(draft.pay_frequency) : ''">
+          <FormField
+            :model-value="draft.pay_frequency"
+            :property="field('ApplicationParty', 'pay_frequency', 'How often are you paid?', 'select')"
+            :form="draft"
+            @update:model-value="set('pay_frequency', $event)"
           />
         </el-form-item>
-      </section>
-
-      <!-- Identification: one or more PartyIdentification records -->
-      <section class="context">
-        <div class="collection-header">
-          <div>
-            <h3>Identification</h3>
-            <p>{{ identificationHint }}</p>
-          </div>
-          <el-button type="primary" plain @click="addIdentification">
-            <v-icon start>mdi-plus</v-icon>
-            Add identification
-          </el-button>
-        </div>
-
-        <article
-          v-for="(row, index) in draft.identifications"
-          :key="row.client_key"
-          class="item-card"
-        >
-          <div class="item-title">
-            <strong>{{ identificationTitle(row, index) }}</strong>
-            <div>
-              <el-tag v-if="row.is_primary" type="success" size="small">Primary</el-tag>
-              <el-button v-else text @click="setPrimary(index)">Make primary</el-button>
-              <el-button
-                v-if="draft.identifications.length > 1"
-                text
-                type="danger"
-                @click="removeIdentification(index)"
-              >
-                Remove
-              </el-button>
-            </div>
-          </div>
-
-          <div class="field-grid">
-            <!--
-              Uses Saturn's own PartyIdentification.identification_type
-              setup. Using a type twice is caught when the applicant continues.
-            -->
-            <el-form-item label="Identification type" required>
-              <FormField
-                :model-value="row.identification_type"
-                :property="field('PartyIdentification', 'identification_type', 'Identification type', 'select')"
-                :form="row"
-                @update:model-value="setIdentification(index, 'identification_type', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Identification number" required>
-              <FormField
-                :model-value="row.identification_number"
-                :property="field('PartyIdentification', 'identification_number', 'Identification number', 'input')"
-                :form="row"
-                @update:model-value="setIdentification(index, 'identification_number', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Issuing country">
-              <FormField
-                :model-value="row.issuing_country"
-                :property="field('PartyIdentification', 'issuing_country', 'Issuing country', 'select')"
-                :form="row"
-                @update:model-value="setIdentification(index, 'issuing_country', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Issue date">
-              <FormField
-                :model-value="row.issue_date"
-                :property="field('PartyIdentification', 'issue_date', 'Issue date', 'date')"
-                :form="row"
-                @update:model-value="setIdentification(index, 'issue_date', $event, 'date')"
-              />
-            </el-form-item>
-
-            <el-form-item label="Expiry date">
-              <FormField
-                :model-value="row.expiry_date"
-                :property="field('PartyIdentification', 'expiry_date', 'Expiry date', 'date')"
-                :form="row"
-                @update:model-value="setIdentification(index, 'expiry_date', $event, 'date')"
-              />
-              <small v-if="isExpired(row)" class="helper invalid">
-                This identification has expired. Replace it with a current one.
-              </small>
-            </el-form-item>
-          </div>
-
-          <!-- Scan of this identification, if the credit union requires one -->
-          <AdaptiveLoanDocumentRequirements
-            title="Identification scan"
-            :scope="documentScopes[`identification:${row.client_key}`]"
-            :uploading-key="uploadingKey"
-            :disabled="documentsDisabled"
-            @stage-file="$emit('stage-file', $event)"
-            @remove-file="$emit('remove-file', $event)"
-            @request-file-upload="$emit('request-file-upload', $event)"
-            @file-rejected="$emit('file-rejected', $event)"
+        <el-form-item v-if="isSelfEmployed" label="Business sales in a year (EC$)">
+          <FormField
+            :model-value="draft.annual_revenue"
+            :property="field('ApplicationParty', 'annual_revenue', 'Business sales in a year', 'number')"
+            :form="draft"
+            @update:model-value="set('annual_revenue', $event)"
           />
-        </article>
-      </section>
+        </el-form-item>
+      </div>
 
-      <!-- Employment and income -->
-      <section class="context">
-        <h3>Employment and income</h3>
-        <div class="field-grid">
-          <el-form-item label="Employment status" required>
-            <FormField
-              :model-value="draft.employment_status"
-              :property="field('ApplicationParty', 'employment_status', 'Employment status', 'select')"
-              :form="draft"
-              @update:model-value="set('employment_status', $event)"
-            />
-          </el-form-item>
-
-          <template v-if="showEmploymentDetails">
-            <el-form-item label="Employment type" required>
-              <FormField
-                :model-value="draft.employment_type"
-                :property="field('ApplicationParty', 'employment_type', 'Employment type', 'select')"
-                :form="draft"
-                @update:model-value="set('employment_type', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Employer / business">
-              <FormField
-                :model-value="draft.employer_name"
-                :property="field('ApplicationParty', 'employer_name', 'Employer / business', 'input')"
-                :form="draft"
-                @update:model-value="set('employer_name', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Job title">
-              <FormField
-                :model-value="draft.job_title"
-                :property="field('ApplicationParty', 'job_title', 'Job title', 'input')"
-                :form="draft"
-                @update:model-value="set('job_title', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Start date" required>
-              <FormField
-                :model-value="draft.employment_start_date"
-                :property="field('ApplicationParty', 'employment_start_date', 'Start date', 'date')"
-                :form="draft"
-                @update:model-value="set('employment_start_date', $event, 'date')"
-              />
-            </el-form-item>
-          </template>
-
-          <el-form-item label="Gross pay (EC$, before deductions)" required>
-            <FormField
-              :model-value="draft.gross_pay"
-              :property="field('ApplicationParty', 'gross_pay', 'Gross pay (EC$, before deductions)', 'number')"
-              :form="draft"
-              @update:model-value="set('gross_pay', $event)"
-            />
-          </el-form-item>
-
-          <el-form-item label="Paid how often?" :required="Number(draft.gross_pay) > 0">
-            <FormField
-              :model-value="draft.pay_frequency"
-              :property="field('ApplicationParty', 'pay_frequency', 'Paid how often?', 'select')"
-              :form="draft"
-              @update:model-value="set('pay_frequency', $event)"
-            />
-          </el-form-item>
-
-          <el-form-item v-if="isSelfEmployed" label="Annual business revenue (EC$)">
-            <FormField
-              :model-value="draft.annual_revenue"
-              :property="field('ApplicationParty', 'annual_revenue', 'Annual business revenue (EC$)', 'number')"
-              :form="draft"
-              @update:model-value="set('annual_revenue', $event)"
-            />
-          </el-form-item>
+      <!-- NIS and income tax are worked out, not entered -->
+      <div v-if="showDeductions" class="deduction-summary">
+        <div class="deduction-row">
+          <span>Pay each month, before tax</span>
+          <strong>{{ money(deductions.gross) }}</strong>
         </div>
-
-        <!-- Previous job: only under 2 years in the current one -->
-        <template v-if="needsPreviousEmployment">
-          <h4 class="subheading">Previous job</h4>
-          <div class="field-grid">
-            <el-form-item label="Previous employer" required>
-              <FormField
-                :model-value="draft.previous_employer_name"
-                :property="field('ApplicationParty', 'previous_employer_name', 'Previous employer', 'input')"
-                :form="draft"
-                @update:model-value="set('previous_employer_name', $event)"
-              />
-            </el-form-item>
-            <el-form-item label="Previous job title">
-              <FormField
-                :model-value="draft.previous_job_title"
-                :property="field('ApplicationParty', 'previous_job_title', 'Previous job title', 'input')"
-                :form="draft"
-                @update:model-value="set('previous_job_title', $event)"
-              />
-            </el-form-item>
-            <el-form-item label="Years there">
-              <FormField
-                :model-value="draft.previous_employment_years"
-                :property="field('ApplicationParty', 'previous_employment_years', 'Years there', 'number')"
-                :form="draft"
-                @update:model-value="set('previous_employment_years', $event)"
-              />
-            </el-form-item>
-          </div>
-        </template>
-
-        <!-- NIS and income tax are calculated by the parent form, not entered -->
-        <div v-if="showDeductions" class="deduction-summary">
-          <div class="deduction-row">
-            <span>Gross monthly income</span>
-            <strong>{{ money(deductions.gross) }}</strong>
-          </div>
-          <div class="deduction-row">
-            <span>
-              Estimated NIS
-              <small>{{ deductions.nisBasis }}</small>
-            </span>
-            <strong>{{ money(deductions.nis) }}</strong>
-          </div>
-          <div class="deduction-row">
-            <span>Estimated income tax (PAYE)</span>
-            <strong>{{ money(deductions.incomeTax) }}</strong>
-          </div>
-          <div class="deduction-row net">
-            <span>Estimated net monthly income</span>
-            <strong>{{ money(deductions.net) }}</strong>
-          </div>
-          <small>
-            Calculated from your gross pay using current NIS and income tax
-            rates. Your payslip may differ.
-          </small>
+        <div class="deduction-row">
+          <span>NIS (estimated)</span>
+          <strong>- {{ money(deductions.nis) }}</strong>
         </div>
-      </section>
+        <div class="deduction-row">
+          <span>Income tax (estimated)</span>
+          <strong>- {{ money(deductions.incomeTax) }}</strong>
+        </div>
+        <div class="deduction-row net">
+          <span>Take-home pay each month (estimated)</span>
+          <strong>{{ money(deductions.net) }}</strong>
+        </div>
+      </div>
 
-      <!-- Other income: IncomeSource records -->
-      <section class="context">
-        <div class="collection-header">
-          <div>
-            <h3>Other income</h3>
-            <p>For example rental income, a pension, remittances, or a second job.</p>
-          </div>
-          <el-button type="primary" plain @click="addIncome">
-            <v-icon start>mdi-plus</v-icon>
-            Add income
+      <!-- Other income: asked as Yes/No first -->
+      <el-form-item label="Do you get money from anywhere else?">
+        <div class="choice-row">
+          <el-button size="large" :type="hasOtherIncome === true ? 'primary' : ''" @click="setOtherIncome(true)">
+            Yes
+          </el-button>
+          <el-button size="large" :type="hasOtherIncome === false ? 'primary' : ''" @click="setOtherIncome(false)">
+            No
           </el-button>
         </div>
+        <small class="helper">For example rent from a property, a pension, money sent from abroad, or a second job.</small>
+      </el-form-item>
 
+      <template v-if="hasOtherIncome">
         <article
           v-for="(income, index) in draft.incomes"
           :key="income.client_key"
           class="item-card"
         >
           <div class="item-title">
-            <strong>{{ lookupLabel('income_type', income.income_type) || `Income ${index + 1}` }}</strong>
+            <strong>{{ lookupLabel('income_type', income.income_type) || `Other money ${index + 1}` }}</strong>
             <el-button text type="danger" @click="removeIncome(index)">Remove</el-button>
           </div>
           <div class="field-grid">
-            <el-form-item label="Type of income" required>
+            <el-form-item label="Where does it come from?" required :error="need(income.income_type)">
               <FormField
                 :model-value="income.income_type"
-                :property="field('IncomeSource', 'income_type', 'Type of income', 'select')"
+                :property="field('IncomeSource', 'income_type', 'Where does it come from?', 'select')"
                 :form="income"
                 @update:model-value="setIncome(index, 'income_type', $event)"
               />
             </el-form-item>
-            <el-form-item label="Description">
-              <FormField
-                :model-value="income.description"
-                :property="field('IncomeSource', 'description', 'Description', 'input')"
-                :form="income"
-                @update:model-value="setIncome(index, 'description', $event)"
-              />
-            </el-form-item>
-            <el-form-item label="Amount (EC$)" required>
+            <el-form-item label="Amount (EC$)" required :error="need(income.amount)">
               <FormField
                 :model-value="income.amount"
                 :property="field('IncomeSource', 'amount', 'Amount (EC$)', 'number')"
@@ -621,7 +589,7 @@
                 @update:model-value="setIncome(index, 'amount', $event)"
               />
             </el-form-item>
-            <el-form-item label="How often?" required>
+            <el-form-item label="How often?" required :error="need(income.frequency)">
               <FormField
                 :model-value="income.frequency"
                 :property="field('IncomeSource', 'frequency', 'How often?', 'select')"
@@ -631,9 +599,8 @@
             </el-form-item>
           </div>
 
-          <!-- Proof of this income, if the credit union requires it -->
           <AdaptiveLoanDocumentRequirements
-            title="Proof of income"
+            title="Proof of this money"
             :scope="documentScopes[`income:${income.client_key}`]"
             :uploading-key="uploadingKey"
             :disabled="documentsDisabled"
@@ -643,21 +610,25 @@
             @file-rejected="$emit('file-rejected', $event)"
           />
         </article>
-      </section>
+        <el-button plain @click="addIncome">
+          <v-icon start>mdi-plus</v-icon>
+          Add {{ draft.incomes.length ? 'more' : 'where it comes from' }}
+        </el-button>
+      </template>
 
       <!-- Guarantors: the guarantee they're giving -->
-      <section v-if="isGuarantor" class="context">
-        <h3>Guarantee</h3>
+      <template v-if="isGuarantor">
+        <p class="subheading">The guarantee</p>
         <div class="field-grid">
-          <el-form-item label="Guarantee type" required>
+          <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
             <FormField
               :model-value="draft.guarantee_type"
-              :property="field('ApplicationParty', 'guarantee_type', 'Guarantee type', 'select')"
+              :property="field('ApplicationParty', 'guarantee_type', 'Type of guarantee', 'select')"
               :form="draft"
               @update:model-value="set('guarantee_type', $event)"
             />
           </el-form-item>
-          <el-form-item label="Amount guaranteed (EC$)" required>
+          <el-form-item label="Amount guaranteed (EC$)" required :error="need(draft.guarantee_amount)">
             <FormField
               :model-value="draft.guarantee_amount"
               :property="field('ApplicationParty', 'guarantee_amount', 'Amount guaranteed (EC$)', 'number')"
@@ -666,91 +637,70 @@
             />
           </el-form-item>
         </div>
-      </section>
+      </template>
+    </template>
 
-      <!-- Declarations (a "yes" needs an explanation) -->
-      <section class="context">
-        <h3>Declarations</h3>
-        <el-form-item label="Are you, or are you closely related to, a senior public official (a politically exposed person)?">
-          <FormField
-            :model-value="draft.is_pep"
-            :property="field('ApplicationParty', 'is_pep', 'Politically exposed person', 'checkbox')"
-            :form="draft"
-            @update:model-value="set('is_pep', $event)"
-          />
-        </el-form-item>
-        <el-form-item v-if="draft.is_pep" label="Please explain (position and relationship)" required>
-          <FormField
-            :model-value="draft.pep_details"
-            :property="field('ApplicationParty', 'pep_details', 'Please explain', 'textarea')"
-            :form="draft"
-            @update:model-value="set('pep_details', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Have you ever been declared bankrupt?">
-          <FormField
-            :model-value="draft.declared_bankruptcy"
-            :property="field('ApplicationParty', 'declared_bankruptcy', 'Bankruptcy', 'checkbox')"
-            :form="draft"
-            @update:model-value="set('declared_bankruptcy', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Are there any court judgments against you?">
-          <FormField
-            :model-value="draft.declared_judgments"
-            :property="field('ApplicationParty', 'declared_judgments', 'Court judgments', 'checkbox')"
-            :form="draft"
-            @update:model-value="set('declared_judgments', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Are you behind on any loan or bill payments?">
-          <FormField
-            :model-value="draft.declared_arrears"
-            :property="field('ApplicationParty', 'declared_arrears', 'Arrears', 'checkbox')"
-            :form="draft"
-            @update:model-value="set('declared_arrears', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Do you have loan applications pending anywhere else?">
-          <FormField
-            :model-value="draft.declared_other_applications"
-            :property="field('ApplicationParty', 'declared_other_applications', 'Other applications', 'checkbox')"
-            :form="draft"
-            @update:model-value="set('declared_other_applications', $event)"
-          />
-        </el-form-item>
-        <el-form-item v-if="anyDeclaration" label="Please explain each &quot;yes&quot; answer" required>
-          <FormField
-            :model-value="draft.declaration_details"
-            :property="field('ApplicationParty', 'declaration_details', 'Please explain', 'textarea')"
-            :form="draft"
-            @update:model-value="set('declaration_details', $event)"
-          />
-        </el-form-item>
-      </section>
+    <!-- ===== Declarations: Yes/No questions ===== -->
+    <template v-if="show('declarations')">
+      <div v-for="question in declarationQuestions" :key="question.key" class="yes-no">
+        <p class="yes-no-question">{{ question.text }}</p>
+        <div class="choice-row">
+          <el-button :type="draft[question.key] === true ? 'primary' : ''" @click="set(question.key, true)">Yes</el-button>
+          <el-button :type="draft[question.key] === false ? 'primary' : ''" @click="set(question.key, false)">No</el-button>
+        </div>
+      </div>
 
+      <el-form-item
+        v-if="draft.is_pep"
+        label="Please tell us the position and who holds it"
+        required
+        :error="need(draft.pep_details)"
+      >
+        <FormField
+          :model-value="draft.pep_details"
+          :property="field('ApplicationParty', 'pep_details', 'Please explain', 'textarea')"
+          :form="draft"
+          @update:model-value="set('pep_details', $event)"
+        />
+      </el-form-item>
+      <el-form-item
+        v-if="anyDeclaration"
+        label="Please explain each &quot;Yes&quot; answer"
+        required
+        :error="need(draft.declaration_details)"
+      >
+        <FormField
+          :model-value="draft.declaration_details"
+          :property="field('ApplicationParty', 'declaration_details', 'Please explain', 'textarea')"
+          :form="draft"
+          @update:model-value="set('declaration_details', $event)"
+        />
+      </el-form-item>
+    </template>
+
+    <!-- ===== Agreement ===== -->
+    <template v-if="show('consent')">
       <div class="consents">
-        <strong>Declarations and consent</strong>
-        <el-form-item label="I confirm the information is true and complete.">
+        <el-form-item label="Everything I've told you is true and complete.">
           <FormField
             :model-value="draft.consent_accuracy_confirmation"
-            :property="field('ApplicationParty', 'consent_accuracy_confirmation', 'I confirm the information is true and complete.', 'checkbox')"
+            :property="field('ApplicationParty', 'consent_accuracy_confirmation', 'I agree', 'checkbox')"
             :form="draft"
             @update:model-value="set('consent_accuracy_confirmation', $event)"
           />
         </el-form-item>
-        <el-form-item label="I authorize a credit check.">
+        <el-form-item label="You may check my credit history.">
           <FormField
             :model-value="draft.consent_credit_check"
-            :property="field('ApplicationParty', 'consent_credit_check', 'I authorize a credit check.', 'checkbox')"
+            :property="field('ApplicationParty', 'consent_credit_check', 'I agree', 'checkbox')"
             :form="draft"
             @update:model-value="set('consent_credit_check', $event)"
           />
         </el-form-item>
-        <el-form-item label="I agree to privacy and data-processing terms.">
+        <el-form-item label="You may use my information to process this application, as your privacy terms explain.">
           <FormField
             :model-value="draft.consent_data_processing"
-            :property="field('ApplicationParty', 'consent_data_processing', 'I agree to privacy and data-processing terms.', 'checkbox')"
+            :property="field('ApplicationParty', 'consent_data_processing', 'I agree', 'checkbox')"
             :form="draft"
             @update:model-value="set('consent_data_processing', $event)"
           />
@@ -767,6 +717,12 @@
  * statutory deductions calculated by the parent), and consent. Edits a
  * deep-cloned draft and emits a fresh copy on every change.
  *
+ * The form shows one short screen at a time, so the `screen` prop picks
+ * which part to show: about, home, membership, ids, job, pay,
+ * declarations, consent, or owner (the Third Party Owner's short form).
+ * These match APPLICANT_PARTS in the main form. With no screen, every
+ * part is shown. Optional details stay hidden behind "+ Add ..." links.
+ *
  * A Third Party Owner (owns collateral but isn't borrowing) gets a short
  * form instead: person or business, name, relationship, phone, and email.
  *
@@ -781,6 +737,21 @@ export default {
     modelValue: {
       type: Object,
       default: () => ({}),
+    },
+    /** Which part to show (see above); "" shows everything. */
+    screen: {
+      type: String,
+      default: '',
+    },
+    /** True for the person filling in the form (not someone they added). */
+    isPrimary: {
+      type: Boolean,
+      default: true,
+    },
+    /** After a failed Next, shows "this is needed" under empty required boxes. */
+    showErrors: {
+      type: Boolean,
+      default: false,
     },
     lookups: {
       type: Object,
@@ -836,6 +807,12 @@ export default {
   data() {
     return {
       draft: this.copy(this.modelValue),
+      // Shows the optional extras (mailing address, tax number).
+      showMore: false,
+      // Shows an ID's issue date and country, by the ID's client key.
+      moreFor: {},
+      // "Do you get money from anywhere else?": yes if there's any already.
+      hasOtherIncome: (this.modelValue.incomes || []).length ? true : null,
       ownerKindOptions: [
         { label: 'Person', value: 'PERSON' },
         { label: 'Business', value: 'ORGANIZATION' },
@@ -849,6 +826,23 @@ export default {
   },
 
   computed: {
+    /** The Yes/No questions on the declarations screen. */
+    declarationQuestions() {
+      return [
+        {
+          key: 'is_pep',
+          text: 'Do you hold, or are you close family of someone who holds, a senior public position (for example a minister, judge, or senior officer)?',
+        },
+        { key: 'declared_bankruptcy', text: 'Have you ever been declared bankrupt?' },
+        { key: 'declared_judgments', text: 'Has a court ever ordered you to pay a debt?' },
+        { key: 'declared_arrears', text: 'Are you behind on any loan or bill payments right now?' },
+        {
+          key: 'declared_other_applications',
+          text: 'Have you applied for any other loans that are still being decided?',
+        },
+      ];
+    },
+
     /** Matches THIRD_PARTY_OWNER_ROLE in the main form. */
     isThirdPartyOwner() {
       return String(this.draft.role || '').trim().toLowerCase() === 'third party owner';
@@ -927,6 +921,33 @@ export default {
   },
 
   methods: {
+    /** True when this part of the details is on screen. */
+    show(part) {
+      if (this.screen) return this.screen === part;
+      if (part === 'owner') return this.isThirdPartyOwner;
+      return !this.isThirdPartyOwner;
+    },
+
+    /** "This is needed" under an empty required box, after a failed Next. */
+    need(value) {
+      if (!this.showErrors) return '';
+      const empty = value === null || value === undefined || value === '';
+      return empty ? 'This is needed' : '';
+    },
+
+    /** Answers "Do you get money from anywhere else?". No clears the list. */
+    setOtherIncome(value) {
+      this.hasOtherIncome = value;
+      if (value && !this.draft.incomes.length) {
+        this.addIncome();
+        return;
+      }
+      if (!value && this.draft.incomes.length) {
+        this.draft.incomes = [];
+        this.notify();
+      }
+    },
+
     copy(value) {
       const copy = JSON.parse(JSON.stringify(value || {}));
       if (!Array.isArray(copy.identifications)) copy.identifications = [];
@@ -1118,3 +1139,31 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.choice-row :deep(.el-button) {
+  min-width: 120px;
+  margin: 0;
+}
+
+.subheading {
+  margin: 20px 0 8px;
+  font-weight: 600;
+}
+
+.yes-no {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.yes-no-question {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+</style>
