@@ -30,16 +30,16 @@
                     </div>
                     <strong>{{ companyName }}</strong>
                 </div>
-                <div class="header-actions flex items-center gap-4">
+                <div class="header-actions">
                     <!-- Testing only: fills each step with sample data -->
-                    <label v-if="testModeAvailable" class="test-switch flex items-center gap-2">
+                    <label v-if="testModeAvailable" class="test-switch">
                         <el-switch
                             :model-value="testMode"
                             @update:model-value="toggleTestMode"
                         />
                         <span>Test mode</span>
                     </label>
-                    <label v-if="testMode" class="test-switch flex items-center gap-2">
+                    <label v-if="testMode" class="test-switch">
                         <el-switch
                             :model-value="testKeepDraft"
                             @update:model-value="toggleTestKeepDraft"
@@ -50,9 +50,9 @@
                 </div>
             </header>
 
-            <div class="layout flex justify-center gap-6">
+            <div class="layout">
                 <!-- Left rail: the main parts of the form (hidden on phones) -->
-                <aside class="path hidden md:block">
+                <aside class="path">
                     <p class="eyebrow">Your application</p>
                     <ol>
                         <li
@@ -101,12 +101,11 @@
 
                     <el-form label-position="top" class="card" @submit.prevent>
                         <!-- A Yes/No question. "No" skips the section after it. -->
-                        <div v-if="currentScreen.kind === 'gate'" class="gate flex flex-wrap gap-4">
+                        <div v-if="currentScreen.kind === 'gate'" class="gate">
                             <button
                                 type="button"
-                                class="gate-option flex items-center justify-center gap-3 p-6 border-2 rounded-lg text-2xl font-bold"
-                                :class="answers[currentScreen.answer] === true ? 'selected border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white'"
-                                style="flex: 1 1 200px; min-height: 88px"
+                                class="gate-option"
+                                :class="{ selected: answers[currentScreen.answer] === true }"
                                 @click="answer(currentScreen.answer, true)"
                             >
                                 <v-icon>mdi-check-circle-outline</v-icon>
@@ -114,9 +113,8 @@
                             </button>
                             <button
                                 type="button"
-                                class="gate-option flex items-center justify-center gap-3 p-6 border-2 rounded-lg text-2xl font-bold"
-                                :class="answers[currentScreen.answer] === false ? 'selected border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white'"
-                                style="flex: 1 1 200px; min-height: 88px"
+                                class="gate-option"
+                                :class="{ selected: answers[currentScreen.answer] === false }"
                                 @click="answer(currentScreen.answer, false)"
                             >
                                 <v-icon>mdi-close-circle-outline</v-icon>
@@ -124,7 +122,7 @@
                             </button>
                             <p
                                 v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
-                                class="gate-warning w-full font-semibold text-orange-700"
+                                class="gate-warning"
                             >
                                 {{ gateWarning(currentScreen.answer) }}
                             </p>
@@ -297,7 +295,7 @@
                             @edit-step="goToStep"
                         />
 
-                        <footer class="form-footer flex items-center justify-between gap-3 mt-6 pt-5 border-t">
+                        <footer class="form-footer">
                             <span v-if="isFirstScreen"></span>
                             <el-button
                                 v-else
@@ -330,7 +328,7 @@
                         </footer>
                     </el-form>
 
-                    <p v-if="formData.id" class="save-note flex items-center gap-2 mt-3 text-sm">
+                    <p v-if="formData.id" class="save-note">
                         <v-icon size="small">mdi-content-save-check-outline</v-icon>
                         Your answers are saved as you go.
                     </p>
@@ -6425,7 +6423,7 @@ export default {
     gap: 6px;
     margin: var(--sp-3) 0 0;
     color: var(--muted);
-    font-size: var(--fs-xs);
+    font-size: 14px;
 }
 
 /* Big Yes / No buttons */
@@ -6442,7 +6440,9 @@ export default {
     gap: 10px;
     flex: 1 1 200px;
     min-height: 88px;
-    border: 2px solid var(--border);
+    padding: var(--sp-5);
+    color: var(--ink);
+    border: 2px solid #cbd5e1;
     border-radius: var(--r-xl);
     background: var(--surface);
     font-size: 22px;
@@ -6460,8 +6460,13 @@ export default {
     color: var(--brand);
 }
 
+.gate-option .v-icon {
+    font-size: 28px;
+}
+
 .gate-warning {
     flex: 1 1 100%;
+    width: 100%;
     margin: 0;
     color: #b54708;
     font-weight: 600;
@@ -6682,6 +6687,7 @@ export default {
 
 :deep(.helper) {
     display: block;
+    width: 100%;
     margin-top: var(--sp-1);
     font-size: var(--fs-xs);
 }

@@ -1,36 +1,36 @@
 <template>
-  <section class="review flex flex-col gap-4">
+  <section class="review">
     <article
       v-for="section in summary"
       :key="section.title"
-      class="check-section p-4 border rounded-lg bg-white"
+      class="check-section"
     >
-      <header class="flex items-center justify-between gap-3 pb-2 border-b">
-        <h3 class="text-lg font-semibold m-0">{{ section.title }}</h3>
+      <header class="check-header">
+        <h3 class="check-title">{{ section.title }}</h3>
         <el-button v-if="section.step" type="primary" plain @click="$emit('edit-step', section.step)">
           Change
         </el-button>
       </header>
 
-      <div v-for="(item, index) in section.items" :key="index" class="check-item pt-3">
+      <div v-for="(item, index) in section.items" :key="index" class="check-item">
         <p
           v-if="section.items.length > 1 || item.heading !== section.title"
-          class="font-semibold mb-1"
+          class="check-heading"
         >
           {{ item.heading }}
         </p>
         <div
           v-for="row in item.rows"
           :key="row[0]"
-          class="check-row flex justify-between gap-4 py-1 border-b"
+          class="check-row"
         >
-          <span class="text-gray-600">{{ row[0] }}</span>
-          <span class="font-medium text-right">{{ row[1] }}</span>
+          <span class="check-label">{{ row[0] }}</span>
+          <span class="check-value">{{ row[1] }}</span>
         </div>
       </div>
     </article>
 
-    <p class="text-base">When everything looks right, tap "Send my application" below.</p>
+    <p class="check-footer">When everything looks right, tap "Send my application" below.</p>
   </section>
 </template>
 
@@ -70,7 +70,64 @@ export default {
 </script>
 
 <style scoped>
-/* Layout uses Tailwind classes in the template (Saturn doesn't always apply
-   component styles). The old "review-row" class names are avoided because the
-   main form still styles those as dark blocks. */
+/* Class names avoid the old "review-row"/"review-block", which the main form
+   styled as dark blocks. */
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.check-section {
+  padding: 16px;
+  border: 1px solid #dfe7ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.check-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dfe7ec;
+}
+
+.check-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.check-item {
+  padding-top: 12px;
+}
+
+.check-heading {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.check-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.check-label {
+  color: #64748b;
+}
+
+.check-value {
+  font-weight: 500;
+  text-align: right;
+}
+
+.check-footer {
+  margin: 0;
+  font-size: 16px;
+}
 </style>

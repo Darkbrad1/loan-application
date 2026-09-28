@@ -28,7 +28,7 @@
               :value="option.value"
             />
           </el-select>
-          <small v-if="roleHelp(person.role)" class="helper block w-full mt-1">{{ roleHelp(person.role) }}</small>
+          <small v-if="roleHelp(person.role)" class="helper">{{ roleHelp(person.role) }}</small>
         </el-form-item>
 
         <div class="field-grid">
@@ -55,7 +55,7 @@
         <v-icon start>mdi-account-plus</v-icon>
         Add {{ parties.length ? 'another person' : 'a person' }}
       </el-button>
-      <p class="helper block w-full mt-4 note">
+      <p class="helper note">
         Only the people on your application can own the things you list later.
         If someone else co-owns something that secures the loan, add them here.
       </p>
@@ -71,7 +71,7 @@
         <div class="item-title">
           <strong>{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
         </div>
-        <p class="helper block w-full mt-1">
+        <p class="helper">
           {{
             row.reference_type === 'Next of kin'
               ? 'Your closest family member, like a spouse, parent, or adult child.'
@@ -266,7 +266,7 @@ export default {
 </script>
 
 <style scoped>
-.note {
+.helper.note {
   margin-top: 16px;
 }
 </style>

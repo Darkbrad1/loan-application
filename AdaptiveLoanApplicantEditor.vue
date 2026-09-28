@@ -142,7 +142,7 @@
           :form="draft"
           @update:model-value="set('address', $event)"
         />
-        <small class="helper block w-full mt-1">House number, street, and village or town.</small>
+        <small class="helper">House number, street, and village or town.</small>
       </el-form-item>
       <div class="field-grid">
         <el-form-item label="Country" required :error="need(draft.country)">
@@ -184,13 +184,13 @@
             :form="draft"
             @update:model-value="set('number_of_dependants', $event)"
           />
-          <small class="helper block w-full mt-1">For example children. Enter 0 if none.</small>
+          <small class="helper">For example children. Enter 0 if none.</small>
         </el-form-item>
       </div>
 
       <!-- Previous address: only under 2 years at this one -->
       <template v-if="needsPreviousAddress">
-        <p class="subheading mt-5 mb-2 font-semibold">You've lived there less than 2 years. Where did you live before?</p>
+        <p class="subheading">You've lived there less than 2 years. Where did you live before?</p>
         <el-form-item label="Previous address" required :error="need(draft.previous_address)">
           <FormField
             :model-value="draft.previous_address"
@@ -236,7 +236,7 @@
     <!-- ===== Membership and citizenship ===== -->
     <template v-if="show('membership')">
       <el-form-item label="Are you a member of the credit union?">
-        <div class="choice-row flex flex-wrap gap-3">
+        <div class="choice-row">
           <el-button
             size="large"
             :type="draft.is_member ? 'primary' : ''"
@@ -261,7 +261,7 @@
           @update:model-value="set('member_number', $event)"
         />
       </el-form-item>
-      <p v-else class="helper block w-full mt-1">That's fine. You can still apply, and we'll help you join.</p>
+      <p v-else class="helper">That's fine. You can still apply, and we'll help you join.</p>
 
       <div class="field-grid">
         <el-form-item label="Citizen of which country?" required :error="need(draft.citizenship)">
@@ -304,7 +304,7 @@
           :form="draft"
           @update:model-value="set('nis_number', $event)"
         />
-        <small class="helper block w-full mt-1">It's printed on your NIS card.</small>
+        <small class="helper">It's printed on your NIS card.</small>
       </el-form-item>
 
       <article
@@ -358,7 +358,7 @@
               :form="row"
               @update:model-value="setIdentification(index, 'expiry_date', $event, 'date')"
             />
-            <small v-if="isExpired(row)" class="helper block w-full mt-1 invalid">
+            <small v-if="isExpired(row)" class="helper invalid">
               This ID has expired. Please use one that's still valid.
             </small>
           </el-form-item>
@@ -404,7 +404,7 @@
         <v-icon start>mdi-plus</v-icon>
         Add another ID
       </el-button>
-      <p class="helper block w-full mt-1">{{ identificationHint }}</p>
+      <p class="helper">{{ identificationHint }}</p>
 
       <!-- Documents everyone gives, like the NIS card -->
       <AdaptiveLoanDocumentRequirements
@@ -469,7 +469,7 @@
 
       <!-- Previous job: only under 2 years in this one -->
       <template v-if="needsPreviousEmployment">
-        <p class="subheading mt-5 mb-2 font-semibold">You started less than 2 years ago. Where did you work before?</p>
+        <p class="subheading">You started less than 2 years ago. Where did you work before?</p>
         <div class="field-grid">
           <el-form-item label="Previous employer" required :error="need(draft.previous_employer_name)">
             <FormField
@@ -509,7 +509,7 @@
             :form="draft"
             @update:model-value="set('gross_pay', $event)"
           />
-          <small class="helper block w-full mt-1">The amount on your payslip before anything is taken off. Enter 0 if none.</small>
+          <small class="helper">The amount on your payslip before anything is taken off. Enter 0 if none.</small>
         </el-form-item>
         <el-form-item label="How often are you paid?" :required="Number(draft.gross_pay) > 0" :error="Number(draft.gross_pay) > 0 ? need(draft.pay_frequency) : ''">
           <FormField
@@ -530,20 +530,20 @@
       </div>
 
       <!-- NIS and income tax are worked out, not entered -->
-      <div v-if="showDeductions" class="deduction-summary flex flex-col gap-2 p-4 mb-4 rounded-lg border bg-gray-50">
-        <div class="deduction-row flex justify-between gap-4">
+      <div v-if="showDeductions" class="deduction-summary">
+        <div class="deduction-row">
           <span>Pay each month, before tax</span>
           <strong>{{ money(deductions.gross) }}</strong>
         </div>
-        <div class="deduction-row flex justify-between gap-4">
+        <div class="deduction-row">
           <span>NIS (estimated)</span>
           <strong>- {{ money(deductions.nis) }}</strong>
         </div>
-        <div class="deduction-row flex justify-between gap-4">
+        <div class="deduction-row">
           <span>Income tax (estimated)</span>
           <strong>- {{ money(deductions.incomeTax) }}</strong>
         </div>
-        <div class="deduction-row net flex justify-between gap-4 pt-2 border-t font-semibold">
+        <div class="deduction-row net">
           <span>Take-home pay each month (estimated)</span>
           <strong>{{ money(deductions.net) }}</strong>
         </div>
@@ -551,7 +551,7 @@
 
       <!-- Other income: asked as Yes/No first -->
       <el-form-item label="Do you get money from anywhere else?">
-        <div class="choice-row flex flex-wrap gap-3">
+        <div class="choice-row">
           <el-button size="large" :type="hasOtherIncome === true ? 'primary' : ''" @click="setOtherIncome(true)">
             Yes
           </el-button>
@@ -559,7 +559,7 @@
             No
           </el-button>
         </div>
-        <small class="helper block w-full mt-1">For example rent from a property, a pension, money sent from abroad, or a second job.</small>
+        <small class="helper">For example rent from a property, a pension, money sent from abroad, or a second job.</small>
       </el-form-item>
 
       <template v-if="hasOtherIncome">
@@ -618,7 +618,7 @@
 
       <!-- Guarantors: the guarantee they're giving -->
       <template v-if="isGuarantor">
-        <p class="subheading mt-5 mb-2 font-semibold">The guarantee</p>
+        <p class="subheading">The guarantee</p>
         <div class="field-grid">
           <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
             <FormField
@@ -642,9 +642,9 @@
 
     <!-- ===== Declarations: Yes/No questions ===== -->
     <template v-if="show('declarations')">
-      <div v-for="question in declarationQuestions" :key="question.key" class="yes-no py-3 border-b">
-        <p class="yes-no-question mb-2 text-base">{{ question.text }}</p>
-        <div class="choice-row flex flex-wrap gap-3">
+      <div v-for="question in declarationQuestions" :key="question.key" class="yes-no">
+        <p class="yes-no-question">{{ question.text }}</p>
+        <div class="choice-row">
           <el-button size="large" :type="draft[question.key] === true ? 'primary' : ''" @click="set(question.key, true)">Yes</el-button>
           <el-button size="large" :type="draft[question.key] === false ? 'primary' : ''" @click="set(question.key, false)">No</el-button>
         </div>
@@ -680,7 +680,7 @@
 
     <!-- ===== Agreement ===== -->
     <template v-if="show('consent')">
-      <div class="consents flex flex-col gap-2">
+      <div class="consents">
         <el-form-item label="Everything I've told you is true and complete.">
           <el-checkbox
             size="large"
@@ -1161,12 +1161,41 @@ export default {
 }
 
 .yes-no {
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 12px 0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .yes-no-question {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-size: 16px;
+}
+
+.deduction-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.deduction-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.deduction-row.net {
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+.consents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 </style>

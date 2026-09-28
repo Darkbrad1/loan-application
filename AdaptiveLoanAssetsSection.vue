@@ -1,6 +1,6 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper block w-full mt-1 empty-note">Nothing added yet.</p>
+    <p v-if="!draft.length" class="helper empty-note">Nothing added yet.</p>
 
     <!-- One card per declared asset -->
     <article
@@ -18,11 +18,11 @@
       </div>
 
       <!-- The vehicle or property being bought comes from "Your request" -->
-      <div v-if="asset.is_purchase" class="purchase-summary mb-3">
+      <div v-if="asset.is_purchase" class="purchase-summary">
         <p>
           You're buying this for {{ money(asset.declared_value) }}.
         </p>
-        <p class="helper block w-full mt-1">
+        <p class="helper">
           To change it, go back to "The loan you need". Below, tell us who will
           own it and how it will be insured.
         </p>
@@ -36,7 +36,7 @@
             :form="asset"
             @update:model-value="set(index, 'name', $event)"
           />
-          <small class="helper block w-full mt-1">For example "My house in Grand Anse" or "2018 Honda Fit".</small>
+          <small class="helper">For example "My house in Grand Anse" or "2018 Honda Fit".</small>
         </el-form-item>
 
         <el-form-item label="Type" required :error="need(asset.asset_type)">
@@ -111,7 +111,7 @@
         type="warning"
         :closable="false"
         show-icon
-        class="lien-note mt-2 mb-3"
+        class="lien-note"
         :title="`You still owe money on this: ${liens[asset.client_key].join('; ')}`"
       />
 
@@ -136,7 +136,7 @@
         total-label="Shares add up to"
         @update:model-value="set(index, 'owners', $event)"
       />
-      <small v-if="ownedOnlyByThirdParty(asset)" class="helper block w-full mt-1">
+      <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
         Someone who isn't borrowing owns all of this, so it can only be listed
         if it secures the loan.
       </small>
@@ -155,7 +155,7 @@
       <!-- Collateral: only for loans that need it -->
       <section v-if="requiresCollateral" class="context">
         <!-- The asset being bought is always the collateral -->
-        <p v-if="asset.is_purchase" class="helper block w-full mt-1">
+        <p v-if="asset.is_purchase" class="helper">
           This secures the loan. Tell us how it's insured below; a quote is fine for now.
         </p>
         <el-form-item v-else label="Use this to secure the loan">
@@ -168,8 +168,8 @@
         </el-form-item>
 
         <template v-if="asset.collateral.enabled">
-          <h4 class="subheading mt-4 mb-2 font-semibold">How is it insured?</h4>
-          <p class="helper block w-full mt-1">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
+          <h4 class="subheading">How is it insured?</h4>
+          <p class="helper">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
           <div class="field-grid">
             <el-form-item label="Type of insurance" required :error="need(asset.collateral.insurance.type)">
               <FormField

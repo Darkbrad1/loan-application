@@ -1,9 +1,9 @@
 <template>
   <div class="allocation">
-    <strong class="allocation-title block mt-4 mb-2">{{ title }}</strong>
+    <strong class="allocation-title">{{ title }}</strong>
 
     <!-- Simple mode: most people choose "Just me" and never see percentages -->
-    <div v-if="simple && options.length > 1" class="choice-row flex flex-wrap gap-3 mb-3">
+    <div v-if="simple && options.length > 1" class="choice-row">
       <el-button size="large" :type="mode === 'me' ? 'primary' : ''" @click="justMe">
         Just me
       </el-button>
@@ -11,10 +11,10 @@
         {{ sharedLabel }}
       </el-button>
     </div>
-    <p v-else-if="simple" class="helper block w-full mt-1">{{ meLabel }}</p>
+    <p v-else-if="simple" class="helper">{{ meLabel }}</p>
 
     <template v-if="!simple || mode === 'shared'">
-      <p v-if="simple" class="helper block w-full mt-1">
+      <p v-if="simple" class="helper">
         Choose each person and their share. The shares must add up to 100%.
       </p>
       <div

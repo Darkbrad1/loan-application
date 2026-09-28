@@ -1,6 +1,6 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper block w-full mt-1">Nothing added yet.</p>
+    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
 
     <!-- One card per declared expense -->
     <article
@@ -57,7 +57,7 @@
               />
             </template>
           </el-select>
-          <small v-if="isInapplicable(item)" class="helper block w-full mt-1 invalid">
+          <small v-if="isInapplicable(item)" class="helper invalid">
             This doesn't apply to a {{ loanCategoryLabel }}. Choose something
             else or remove it.
           </small>
@@ -140,14 +140,14 @@
     <!-- Worked out from the insurance on collateral; can't be edited here -->
     <section v-if="projectedExpenses.length" class="context">
       <h3>Insurance we've added for you</h3>
-      <p class="helper block w-full mt-1">
+      <p class="helper">
         This is the insurance you told us about on the thing securing the loan.
         To change it, go back to "Things you own".
       </p>
       <div
         v-for="item in projectedExpenses"
         :key="item.asset_key"
-        class="projected-row flex justify-between gap-3 py-1"
+        class="projected-row"
       >
         <span>{{ item.name }}</span>
         <strong>{{ money(item.monthly) }} a month</strong>
@@ -505,6 +505,6 @@ export default {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 </style>

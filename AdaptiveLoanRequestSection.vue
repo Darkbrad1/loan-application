@@ -9,7 +9,7 @@
                     :form="draft"
                     @update:model-value="set('requested_loan_amount', $event)"
                 />
-                <small v-if="selectedProduct" class="helper block w-full mt-1">
+                <small v-if="selectedProduct" class="helper">
                     Between {{ money(amountMinimum) }} and {{ money(amountMaximum) }}.
                 </small>
             </el-form-item>
@@ -21,7 +21,7 @@
                     :form="draft"
                     @update:model-value="set('requested_loan_term', $event)"
                 />
-                <small v-if="selectedProduct" class="helper block w-full mt-1">
+                <small v-if="selectedProduct" class="helper">
                     Between {{ termMinimum }} and {{ termMaximum }} months ({{ yearsLabel(termMinimum) }} to {{ yearsLabel(termMaximum) }}).
                 </small>
             </el-form-item>
@@ -43,7 +43,7 @@
                 :form="draft"
                 @update:model-value="set('loan_purpose', $event)"
             />
-            <small class="helper block w-full mt-1">A sentence is enough, for example "To buy a used car for work".</small>
+            <small class="helper">A sentence is enough, for example "To buy a used car for work".</small>
         </el-form-item>
         </template>
 
@@ -153,7 +153,7 @@
         -->
         <section v-if="isPurchaseCategory" class="context">
             <h3>Are you buying it?</h3>
-            <p class="helper block w-full mt-1">
+            <p class="helper">
                 Leave the purchase price blank if you're not buying (for example, a
                 refinance). With a price, we'll add the
                 {{ loanCategory === 'auto' ? 'vehicle' : 'property' }} to your assets
@@ -218,7 +218,7 @@
                     @update:model-value="set('source_of_funds_details', $event)"
                 />
             </el-form-item>
-            <p v-if="loanToValue !== null" class="helper block w-full mt-1">
+            <p v-if="loanToValue !== null" class="helper">
                 The loan is {{ loanToValue }}% of the purchase price.
             </p>
         </section>
