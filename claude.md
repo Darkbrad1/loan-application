@@ -208,6 +208,8 @@ The developer then added the fields for membership, other income, monthly equiva
 - **Don't use the spread operator (`...`)** anywhere in Saturn code: it fails at runtime ("Spread syntax requires ...iterable[Symbol.iterator] to be a function"). Use `concat`, `slice()`, `Object.assign`, and `Array.from(new Set(...))` instead. To be safe, also avoid destructuring by position (`const [a] = list`, `for (const [i, x] of list.entries())`); use indexes instead.
 - **Don't give `FormField` its own option list** (`lookup_type: "values"`); it doesn't work in Saturn. Use Saturn's definition of the property, or an `el-select`.
 - **A dropdown showing `[object Object]`** means its options are records or objects, not text. Check that the field points at the right property (a list of choices, not a link to other records). `options()` now always turns labels and values into plain text.
+- **Saturn can reply to `create` with a failure instead of throwing** (e.g. `{"status":"FAILURE","type":"single","message":{}}`), so there's no record ID. `upsert()` looks for the ID in several places (`createdIdOf()`), and otherwise throws with Saturn's reply; the failed save's message and the console (`[Loan form] …`) show which resource failed and why. This first showed up creating Reference records.
+- **Failed saves are logged:** `saveDraft()` shows the real reason in the alert and logs it to the console. Don't swallow errors without logging them.
 - **When a Saturn error mentions a missing name, log the object first** (e.g. `console.log(composables)`) to see its real shape before guessing.
 - **Dates:** compare `YYYY-MM-DD` strings. `new Date().toISOString()` is UTC, which is 4 hours ahead of Grenada, so "today" is wrong after 8pm. Prefer a local date.
 

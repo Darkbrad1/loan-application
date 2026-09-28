@@ -4307,20 +4307,90 @@ export default {
             };
         },
 
-        /** Creates or updates a resource record and returns its ID. */
+        /**
+         * Creates or updates a resource record and returns its ID. A failure
+         * is logged to the console with the resource, the data sent, and
+         * the server's reply, and rethrown with the resource's name, so a
+         * failed save says which record it was.
+         */
         async upsert(resourceName, id, payload) {
             const resource = new Resource(this, resourceName);
+            const action = id ? "updating" : "creating";
 
-            if (id) {
-                await resource.update(this.toId(id), payload);
-                return this.toId(id);
-            }
+            try {
+                if (id) {
+                    await resource.update(this.toId(id), payload);
+                    return this.toId(id);
+                }
 
-            const createdId = this.toId(await resource.create(payload));
-            if (!createdId) {
-                throw Error(`${resourceName} did not return a record ID.`);
+                const result = await resource.create(payload);
+                const createdId = this.createdIdOf(result);
+                if (!createdId) {
+                    // Saturn can reply with a failure instead of throwing,
+                    // e.g. { status: "FAILURE", message: ... }.
+                    console.error(
+                        `[Loan form] ${resourceName} was not created. Saturn replied:`,
+                        result,
+                    );
+                    const failed =
+                        String(result?.status || "").toUpperCase() === "FAILURE";
+                    throw Error(
+                        failed
+                            ? `Saturn refused it: ${this.errorText({ data: result })}`
+                            : `the server didn't return a record ID (reply: ${JSON.stringify(result ?? null).slice(0, 300)})`,
+                    );
+                }
+                return createdId;
+            } catch (error) {
+                console.error(
+                    `[Loan form] Failed ${action} ${resourceName}`,
+                    { id: this.toId(id), payload, error },
+                );
+                const failure = Error(
+                    `${resourceName} (${action}): ${this.errorText(error)}`,
+                );
+                failure.cause = error;
+                throw failure;
             }
-            return createdId;
+        },
+
+        /**
+         * The ID of a record Saturn just created. Replies come in a few
+         * shapes, so this checks the usual places: id, data.id,
+         * data.data.id, record.id, resource.id, result.id, and _id.
+         */
+        createdIdOf(result) {
+            if (!result) return null;
+            if (typeof result !== "object") return result;
+            const candidates = [
+                result,
+                result.data,
+                result.data?.data,
+                result.record,
+                result.resource,
+                result.result,
+            ];
+            for (const candidate of candidates) {
+                if (!candidate || typeof candidate !== "object") continue;
+                const id = candidate.id || candidate._id;
+                if (id && typeof id !== "object") return id;
+            }
+            return null;
+        },
+
+        /** The most useful message in an error, including the server's reply. */
+        errorText(error) {
+            if (!error) return "unknown error";
+            const reply = error.response?.data ?? error.data;
+            if (reply) {
+                const message = reply.message ?? reply.error ?? reply;
+                const text =
+                    typeof message === "string" ? message : JSON.stringify(message);
+                if (text && text !== "{}") return text;
+                // An empty message: show the whole reply instead.
+                return JSON.stringify(reply).slice(0, 300);
+            }
+            return error.message || JSON.stringify(error).slice(0, 300);
         },
 
         /**
@@ -4914,7 +4984,12 @@ export default {
                 // Keep track of everything known so far, including records
                 // created before the failure, so none are orphaned.
                 this.rememberPersistedIds(this.persistedIds);
-                this.warn("The draft could not be saved.", "error");
+                // Show and log the real reason, so it can be tracked down.
+                console.error("[Loan form] The draft could not be saved:", error);
+                this.warn(
+                    `The draft could not be saved. ${this.errorText(error)}`,
+                    "error",
+                );
                 throw error;
             } finally {
                 this.savingDraft = false;
