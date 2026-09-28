@@ -7,12 +7,12 @@
         :key="loan.id"
         type="button"
         role="radio"
-        class="loan-card flex items-center gap-4 px-5 py-4 rounded-lg text-left" style="flex:1 1 240px;min-height:88px;border-width:2px;border-style:solid;cursor:pointer;color:#111827"
-        :style="(loanCategory === loan.id) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+        class="loan-card flex items-center gap-4 px-5 py-4 rounded-lg text-left"
+        :style="['flex:1 1 240px;min-height:88px;border-width:2px;border-style:solid;cursor:pointer;color:#111827', (loanCategory === loan.id) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
         :aria-checked="loanCategory === loan.id"
         @click="$emit('select-category', loan.id)"
       >
-        <span class="loan-icon flex items-center justify-center rounded-lg" style="width:52px;height:52px;flex:0 0 auto" :style="(loanCategory === loan.id) ? 'background:var(--brand);color:var(--brand-ink)' : 'background:var(--brand-tint);color:var(--brand-text)'"><v-icon size="28">{{ loan.icon }}</v-icon></span>
+        <span class="loan-icon flex items-center justify-center rounded-lg" :style="['width:52px;height:52px;flex:0 0 auto', (loanCategory === loan.id) ? 'background:var(--brand);color:var(--brand-ink)' : 'background:var(--brand-tint);color:var(--brand-text)']"><v-icon size="28">{{ loan.icon }}</v-icon></span>
         <span>
           <b class="card-title block text-lg font-bold">{{ loan.title }}</b>
           <small class="card-note block text-sm text-gray-600">{{ loan.note }}</small>
@@ -31,12 +31,12 @@
           :key="product.id"
           type="button"
           role="radio"
-          class="choice product-card flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-          :style="(loanTypeId === product.id) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+          class="choice product-card flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+          :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (loanTypeId === product.id) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
           :aria-checked="loanTypeId === product.id"
           @click="$emit('select-product', product.id)"
         >
-          <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(loanTypeId === product.id) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+          <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (loanTypeId === product.id) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
           <span>
             <b class="card-title block text-lg font-bold">{{ product.name }}</b>
             <small v-if="rangeText(product)" class="card-note block text-sm text-gray-600">{{ rangeText(product) }}</small>

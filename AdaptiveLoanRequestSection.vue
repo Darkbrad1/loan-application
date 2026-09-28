@@ -27,12 +27,12 @@
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-              :style="(draft.repayment_frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.repayment_frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
               :aria-checked="draft.repayment_frequency === option.value"
               @click="set('repayment_frequency', option.value)"
             >
-              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.repayment_frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.repayment_frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -93,12 +93,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(draft.vehicle_condition === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.vehicle_condition === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="draft.vehicle_condition === option.value"
                 @click="set('vehicle_condition', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.vehicle_condition === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.vehicle_condition === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -149,12 +149,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(draft.property_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.property_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="draft.property_type === option.value"
                 @click="set('property_type', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.property_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.property_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -232,12 +232,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(draft.source_of_funds === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.source_of_funds === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="draft.source_of_funds === option.value"
                 @click="set('source_of_funds', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.source_of_funds === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.source_of_funds === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -267,12 +267,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(draft.seller_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.seller_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="draft.seller_type === option.value"
                 @click="set('seller_type', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.seller_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.seller_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -317,12 +317,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(draft.business_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (draft.business_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="draft.business_type === option.value"
                 @click="set('business_type', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.business_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (draft.business_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>

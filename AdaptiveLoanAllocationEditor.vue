@@ -9,12 +9,12 @@
         :key="option.value"
         type="button"
         role="radio"
-        class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-        :style="(mode === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+        class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+        :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (mode === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
         :aria-checked="mode === option.value"
         @click="option.value === 'me' ? justMe() : shared()"
       >
-        <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(mode === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+        <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (mode === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
         <span>{{ option.label }}</span>
       </button>
     </div>

@@ -1,7 +1,7 @@
 <template>
-    <main class="adaptive-form min-h-screen text-gray-900" style="background:#f4f6f8;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5" :style="brandStyle">
+    <main class="adaptive-form min-h-screen text-gray-900" :style="['background:#f4f6f8;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5', brandStyle]">
         <!-- Header: the logo, name, and colours come from the system configuration -->
-        <header class="topbar bg-white" style="border-top:4px solid var(--brand);border-bottom:1px solid #e5e7eb">
+        <header class="topbar" style="background:var(--brand);color:var(--brand-ink)">
             <div class="topbar-inner flex items-center justify-between gap-4 px-5 py-2" style="max-width:960px;min-height:68px;margin:0 auto">
                 <div class="brand flex items-center gap-3" style="min-width:0">
                     <img v-if="companyLogo" :src="companyLogo" :alt="companyName" class="brand-logo block rounded" style="max-width:150px;max-height:44px;object-fit:contain;background:var(--logo-bg)" />
@@ -9,11 +9,11 @@
                 </div>
                 <div class="topbar-side flex items-center justify-end gap-3">
                     <!-- Testing only: fills each step with sample data -->
-                    <label v-if="testModeAvailable" class="test-toggle flex items-center gap-2 px-3 rounded-full text-xs text-gray-600" style="border:1px dashed #d1d5db;cursor:pointer">
+                    <label v-if="testModeAvailable" class="test-toggle flex items-center gap-2 px-3 rounded-full text-xs" style="border:1px dashed currentColor;cursor:pointer;opacity:0.85">
                         <el-switch :model-value="testMode" size="small" @update:model-value="toggleTestMode" />
                         <span class="hidden md:inline">Test mode</span>
                     </label>
-                    <label v-if="testMode" class="test-toggle flex items-center gap-2 px-3 rounded-full text-xs text-gray-600" style="border:1px dashed #d1d5db;cursor:pointer">
+                    <label v-if="testMode" class="test-toggle flex items-center gap-2 px-3 rounded-full text-xs" style="border:1px dashed currentColor;cursor:pointer;opacity:0.85">
                         <el-switch :model-value="testKeepDraft" size="small" @update:model-value="toggleTestKeepDraft" />
                         <span class="hidden md:inline">Remember draft</span>
                     </label>
@@ -100,12 +100,12 @@
                         :key="option.label"
                         type="button"
                         role="radio"
-                        class="gate-option flex items-center gap-4 w-full px-5 py-4 rounded-lg text-xl font-semibold text-left" style="min-height:68px;border-width:2px;border-style:solid;cursor:pointer;color:#111827"
-                        :style="(answers[currentScreen.answer] === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                        class="gate-option flex items-center gap-4 w-full px-5 py-4 rounded-lg text-xl font-semibold text-left"
+                        :style="['min-height:68px;border-width:2px;border-style:solid;cursor:pointer;color:#111827', (answers[currentScreen.answer] === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                         :aria-checked="answers[currentScreen.answer] === option.value"
                         @click="answer(currentScreen.answer, option.value)"
                     >
-                        <span class="radio-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(answers[currentScreen.answer] === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="18">{{ option.icon }}</v-icon></span>
+                        <span class="radio-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (answers[currentScreen.answer] === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="18">{{ option.icon }}</v-icon></span>
                         <span>{{ option.label }}</span>
                     </button>
                     <p

@@ -4,8 +4,8 @@
     <article
       v-for="(item, index) in draft"
       :key="item.client_key"
-      class="item-card mb-4 p-5 bg-white rounded-lg" style="border-width:2px;border-style:solid"
-      :style="isOpen(item) ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)' : (!isOpen(item) && showErrors && missing(item)) ? 'border-color:#b91c1c' : 'border-color:#e5e7eb'"
+      class="item-card mb-4 p-5 bg-white rounded-lg"
+      :style="['border-width:2px;border-style:solid', isOpen(item) ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)' : (!isOpen(item) && showErrors && missing(item)) ? 'border-color:#b91c1c' : 'border-color:#e5e7eb']"
     >
       <div class="item-head flex flex-wrap items-center gap-3" :style="isOpen(item) ? 'margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb' : ''">
         <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-receipt-text-outline</v-icon></span>
@@ -13,9 +13,15 @@
           <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ title(item, index) }}</strong>
           <span v-if="!isOpen(item) && missing(item)" class="needs block text-sm font-semibold text-red-700">Some details are missing</span>
           <span v-else class="item-sub block text-sm text-gray-600">{{ summaryOf(item) }}</span>
+          <span
+            v-if="!isOpen(item) && docsNeeded(`expense:${item.client_key}`)"
+            class="item-sub block text-sm font-semibold text-orange-700"
+          >
+            {{ docsNeeded(`expense:${item.client_key}`) }} {{ docsNeeded(`expense:${item.client_key}`) === 1 ? 'document' : 'documents' }} to upload
+          </span>
         </div>
         <div class="item-actions flex gap-1" style="margin-left:auto">
-          <button v-if="!isOpen(item)" type="button" class="link-btn px-3 py-2 rounded text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer" @click="openItem(item)">Change</button>
+          <button v-if="!isOpen(item)" type="button" class="link-btn px-3 py-2 rounded text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer" @click="openItem(item)">{{ docsNeeded(`expense:${item.client_key}`) ? 'Upload documents' : 'Change' }}</button>
           <button type="button" class="link-btn danger px-3 py-2 rounded text-base font-semibold text-red-700" style="background:transparent;border:0;cursor:pointer" @click="remove(index)">Remove</button>
         </div>
       </div>
@@ -79,12 +85,12 @@
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-                :style="(item.frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (item.frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="item.frequency === option.value"
                 @click="set(index, 'frequency', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(item.frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (item.frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -107,12 +113,12 @@
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
-              :style="((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
               :aria-checked="(item.is_household ? householdValue : item.application_party_id) === option.value"
               @click="setPayer(index, option.value)"
             >
-              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -360,6 +366,24 @@ export default {
   },
 
   methods: {
+    /**
+     * The answers for a question as tappable cards, when Saturn's list is
+     * short (2 to 7 answers). Otherwise null, and Saturn's dropdown is used.
+     */
+    choices(key) {
+      const options = this.lookups[key] || [];
+      return options.length >= 2 && options.length <= 7 ? options : null;
+    },
+
+    /** How many documents for these scopes still need uploading. */
+    docsNeeded() {
+      return Array.from(arguments).reduce((count, key) => {
+        const scope = this.documentScopes[key];
+        if (!scope) return count;
+        return count + scope.requirements.filter((row) => row.status !== 'uploaded').length;
+      }, 0);
+    },
+
     /** Deep-clones an array so edits never mutate the parent's state. */
     copy(value) {
       return JSON.parse(JSON.stringify(value || []));
