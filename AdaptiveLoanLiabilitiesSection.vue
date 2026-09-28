@@ -1,6 +1,6 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
+    <p v-if="!draft.length" class="helper block w-full mt-1">Nothing added yet.</p>
 
     <!-- One card per declared liability -->
     <article
@@ -21,7 +21,7 @@
             :form="item"
             @update:model-value="set(index, 'creditor_name', $event)"
           />
-          <small class="helper">The bank, credit union, shop, or person.</small>
+          <small class="helper block w-full mt-1">The bank, credit union, shop, or person.</small>
         </el-form-item>
 
         <!-- Options come from LiabilityType records; value is the record ID -->
@@ -40,7 +40,7 @@
           </el-select>
           <small
             v-if="item.liability_type && !typeOf(item)"
-            class="helper invalid"
+            class="helper block w-full mt-1 invalid"
           >
             This type is no longer available. Choose another.
           </small>
@@ -68,7 +68,7 @@
             :form="item"
             @update:model-value="set(index, 'credit_limit', $event)"
           />
-          <small class="helper">The most you're allowed to owe on it.</small>
+          <small class="helper block w-full mt-1">The most you're allowed to owe on it.</small>
         </el-form-item>
 
         <el-form-item label="How much do you pay? (EC$)" required :error="need(item.payment_amount)">
@@ -138,7 +138,7 @@
               :value="option.value"
             />
           </el-select>
-          <small v-if="!assetOptions.length" class="helper invalid">
+          <small v-if="!assetOptions.length" class="helper block w-full mt-1 invalid">
             Add it under "Things you own" first.
           </small>
         </el-form-item>

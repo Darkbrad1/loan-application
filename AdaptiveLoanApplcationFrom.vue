@@ -30,16 +30,16 @@
                     </div>
                     <strong>{{ companyName }}</strong>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions flex items-center gap-4">
                     <!-- Testing only: fills each step with sample data -->
-                    <label v-if="testModeAvailable" class="test-switch">
+                    <label v-if="testModeAvailable" class="test-switch flex items-center gap-2">
                         <el-switch
                             :model-value="testMode"
                             @update:model-value="toggleTestMode"
                         />
                         <span>Test mode</span>
                     </label>
-                    <label v-if="testMode" class="test-switch">
+                    <label v-if="testMode" class="test-switch flex items-center gap-2">
                         <el-switch
                             :model-value="testKeepDraft"
                             @update:model-value="toggleTestKeepDraft"
@@ -50,9 +50,9 @@
                 </div>
             </header>
 
-            <div class="layout">
+            <div class="layout flex justify-center gap-6">
                 <!-- Left rail: the main parts of the form (hidden on phones) -->
-                <aside class="path">
+                <aside class="path hidden md:block">
                     <p class="eyebrow">Your application</p>
                     <ol>
                         <li
@@ -101,11 +101,12 @@
 
                     <el-form label-position="top" class="card" @submit.prevent>
                         <!-- A Yes/No question. "No" skips the section after it. -->
-                        <div v-if="currentScreen.kind === 'gate'" class="gate">
+                        <div v-if="currentScreen.kind === 'gate'" class="gate flex flex-wrap gap-4">
                             <button
                                 type="button"
-                                class="gate-option"
-                                :class="{ selected: answers[currentScreen.answer] === true }"
+                                class="gate-option flex items-center justify-center gap-3 p-6 border-2 rounded-lg text-2xl font-bold"
+                                :class="answers[currentScreen.answer] === true ? 'selected border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white'"
+                                style="flex: 1 1 200px; min-height: 88px"
                                 @click="answer(currentScreen.answer, true)"
                             >
                                 <v-icon>mdi-check-circle-outline</v-icon>
@@ -113,8 +114,9 @@
                             </button>
                             <button
                                 type="button"
-                                class="gate-option"
-                                :class="{ selected: answers[currentScreen.answer] === false }"
+                                class="gate-option flex items-center justify-center gap-3 p-6 border-2 rounded-lg text-2xl font-bold"
+                                :class="answers[currentScreen.answer] === false ? 'selected border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white'"
+                                style="flex: 1 1 200px; min-height: 88px"
                                 @click="answer(currentScreen.answer, false)"
                             >
                                 <v-icon>mdi-close-circle-outline</v-icon>
@@ -122,7 +124,7 @@
                             </button>
                             <p
                                 v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
-                                class="gate-warning"
+                                class="gate-warning w-full font-semibold text-orange-700"
                             >
                                 {{ gateWarning(currentScreen.answer) }}
                             </p>
@@ -295,10 +297,12 @@
                             @edit-step="goToStep"
                         />
 
-                        <footer class="form-footer">
+                        <footer class="form-footer flex items-center justify-between gap-3 mt-6 pt-5 border-t">
+                            <span v-if="isFirstScreen"></span>
                             <el-button
+                                v-else
                                 size="large"
-                                :disabled="isFirstScreen || saving"
+                                :disabled="saving"
                                 @click="back"
                             >
                                 <v-icon start>mdi-arrow-left</v-icon>
@@ -326,7 +330,7 @@
                         </footer>
                     </el-form>
 
-                    <p v-if="formData.id" class="save-note">
+                    <p v-if="formData.id" class="save-note flex items-center gap-2 mt-3 text-sm">
                         <v-icon size="small">mdi-content-save-check-outline</v-icon>
                         Your answers are saved as you go.
                     </p>
@@ -6253,8 +6257,9 @@ export default {
 }
 
 .brand-logo {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 112px;
     height: 52px;
     padding: var(--sp-1);
@@ -6271,8 +6276,8 @@ export default {
 }
 
 .layout {
-    display: grid;
-    grid-template-columns: 220px minmax(0, 720px);
+    display: flex;
+    align-items: flex-start;
     justify-content: center;
     gap: 24px;
     max-width: 1280px;
@@ -6288,6 +6293,7 @@ export default {
 }
 
 .path {
+    flex: 0 0 220px;
     max-height: calc(100vh - 40px);
     overflow: auto;
 }
@@ -6318,8 +6324,9 @@ export default {
 }
 
 .path li > span {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 28px;
     height: 28px;
     flex: 0 0 auto;
@@ -6399,6 +6406,12 @@ export default {
 
 /* ---- Short screens: easy to read and tap ---- */
 
+.workspace {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 720px;
+}
+
 .progress-label {
     margin: 0 0 var(--sp-2);
     color: var(--muted);
@@ -6417,8 +6430,8 @@ export default {
 
 /* Big Yes / No buttons */
 .gate {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-4);
 }
 
@@ -6427,6 +6440,7 @@ export default {
     align-items: center;
     justify-content: center;
     gap: 10px;
+    flex: 1 1 200px;
     min-height: 88px;
     border: 2px solid var(--border);
     border-radius: var(--r-xl);
@@ -6442,12 +6456,12 @@ export default {
 
 .gate-option.selected {
     border-color: var(--brand);
-    background: color-mix(in srgb, var(--brand) 10%, white);
+    background: var(--brand-soft);
     color: var(--brand);
 }
 
 .gate-warning {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
     margin: 0;
     color: #b54708;
     font-weight: 600;
@@ -6558,8 +6572,9 @@ export default {
 }
 
 .receipt-icon {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 64px;
     height: 64px;
     margin: 0 auto var(--sp-4);
@@ -6589,9 +6604,13 @@ export default {
 /* ---- Shared child-component layout ---- */
 
 :deep(.loan-grid) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-3);
+}
+
+:deep(.loan-grid button) {
+    flex: 1 1 240px;
 }
 
 :deep(.loan-grid button) {
@@ -6632,9 +6651,20 @@ export default {
 }
 
 :deep(.field-grid) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 var(--sp-4);
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-4);
+}
+
+/* Two boxes side by side; each drops to its own line on phones */
+:deep(.field-grid > *) {
+    flex: 0 1 calc(50% - var(--sp-4) / 2);
+    min-width: 0;
+}
+
+/* Helper text always sits on its own line under the box */
+:deep(.el-form-item__content .helper) {
+    flex: 1 1 100%;
 }
 
 :deep(.context),
@@ -6658,7 +6688,7 @@ export default {
 
 /* Assessed repayment note under a revolving liability's credit limit */
 :deep(.assessed-note) {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
     margin: calc(var(--sp-2) * -1) 0 var(--sp-4);
     padding: var(--sp-2) var(--sp-3);
     color: var(--info);
@@ -6677,7 +6707,8 @@ export default {
 }
 
 :deep(.consents) {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-2);
     margin-top: var(--sp-4);
     padding: var(--sp-4);
@@ -6720,10 +6751,18 @@ export default {
 }
 
 :deep(.allocation-row) {
-    display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(120px, 0.7fr) 36px;
+    display: flex;
     gap: var(--sp-3);
-    align-items: end;
+    align-items: flex-end;
+}
+
+:deep(.allocation-row > :first-child) {
+    flex: 1 1 60%;
+    min-width: 0;
+}
+
+:deep(.allocation-row > :nth-child(2)) {
+    flex: 0 1 140px;
 }
 
 :deep(.total) {
@@ -6738,35 +6777,6 @@ export default {
 
 :deep(.invalid) {
     color: var(--danger);
-}
-
-:deep(.review-block) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1px;
-    overflow: hidden;
-    border-radius: var(--r-lg);
-}
-
-:deep(.review-row) {
-    padding: var(--sp-4);
-    color: #fff;
-    background: var(--brand);
-}
-
-:deep(.review-row span),
-:deep(.review-row strong) {
-    display: block;
-}
-
-:deep(.review-row span) {
-    font-size: var(--fs-xs);
-    opacity: 0.72;
-}
-
-:deep(.review-row strong) {
-    margin-top: var(--sp-1);
-    font-size: var(--fs-md);
 }
 
 /* ---- Document upload section ---- */
@@ -6874,8 +6884,9 @@ export default {
 }
 
 :deep(.document-section .tab-icon) {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 28px;
     height: 28px;
     flex: 0 0 auto;
@@ -6977,7 +6988,8 @@ export default {
 }
 
 :deep(.document-section .requirement-list) {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-3);
 }
 
@@ -7011,8 +7023,9 @@ export default {
 }
 
 :deep(.document-section .document-mark) {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 38px;
     height: 38px;
     flex: 0 0 auto;
@@ -7127,8 +7140,9 @@ export default {
 }
 
 :deep(.document-section .staged-icon) {
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 34px;
     height: 34px;
     flex: 0 0 auto;
@@ -7319,8 +7333,8 @@ export default {
 
 :deep(.el-form-item__label) {
     color: var(--ink-2);
-    font-size: var(--fs-sm) !important;
-    font-weight: 700;
+    font-size: 15px !important;
+    font-weight: 600;
 }
 
 :deep(.el-button--primary) {
@@ -7328,11 +7342,14 @@ export default {
     --el-button-border-color: var(--accent);
     --el-button-hover-bg-color: var(--accent);
     --el-button-hover-border-color: var(--accent);
+    --el-button-text-color: #fff;
+    --el-button-hover-text-color: #fff;
+    font-weight: 600;
 }
 
 @media (max-width: 1100px) {
-    .layout {
-        grid-template-columns: 200px minmax(0, 1fr);
+    .path {
+        flex-basis: 200px;
     }
 
     .form-footer :deep(.el-button) {
@@ -7358,11 +7375,13 @@ export default {
         padding: var(--sp-5);
     }
 
-    :deep(.field-grid),
-    :deep(.loan-grid),
-    :deep(.review-block),
+    :deep(.field-grid > *),
+    :deep(.loan-grid button) {
+        flex-basis: 100%;
+    }
+
     :deep(.allocation-row) {
-        grid-template-columns: 1fr;
+        flex-wrap: wrap;
     }
 
     .app-header {
