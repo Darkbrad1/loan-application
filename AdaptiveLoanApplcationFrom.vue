@@ -4334,10 +4334,21 @@ export default {
                     );
                     const failed =
                         String(result?.status || "").toUpperCase() === "FAILURE";
+                    if (failed) {
+                        throw Error(
+                            `Saturn refused it: ${this.errorText({ data: result })}`,
+                        );
+                    }
+                    // No reply at all: Saturn didn't send the request, which
+                    // happens when it doesn't know the resource name or the
+                    // user isn't allowed to create it.
+                    if (result === undefined || result === null) {
+                        throw Error(
+                            `Saturn didn't send the request. Check that a resource named exactly "${resourceName}" exists and is published, and that your role can create ${resourceName} records.`,
+                        );
+                    }
                     throw Error(
-                        failed
-                            ? `Saturn refused it: ${this.errorText({ data: result })}`
-                            : `the server didn't return a record ID (reply: ${JSON.stringify(result ?? null).slice(0, 300)})`,
+                        `the server didn't return a record ID (reply: ${JSON.stringify(result).slice(0, 300)})`,
                     );
                 }
                 return createdId;
