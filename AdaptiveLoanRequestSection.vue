@@ -8,7 +8,7 @@
           :form="draft"
           @update:model-value="set('requested_loan_amount', $event)"
         />
-        <small v-if="selectedProduct" class="helper">You can borrow from {{ money(amountMinimum) }} to {{ money(amountMaximum) }}.</small>
+        <small v-if="selectedProduct" class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">You can borrow from {{ money(amountMinimum) }} to {{ money(amountMaximum) }}.</small>
       </el-form-item>
       <el-form-item label="How many months do you need to pay it back?" required :error="need(draft.requested_loan_term)">
         <FormField
@@ -17,22 +17,22 @@
           :form="draft"
           @update:model-value="set('requested_loan_term', $event)"
         />
-        <small v-if="selectedProduct" class="helper">From {{ termMinimum }} to {{ termMaximum }} months (up to {{ yearsLabel(termMaximum) }}).</small>
+        <small v-if="selectedProduct" class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">From {{ termMinimum }} to {{ termMaximum }} months (up to {{ yearsLabel(termMaximum) }}).</small>
       </el-form-item>
       <el-form-item label="How often would you like to pay?">
         <template v-if="choices('repayment_frequency')">
-          <div class="choice-list inline" role="radiogroup">
+          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('repayment_frequency')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.repayment_frequency === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.repayment_frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.repayment_frequency === option.value"
               @click="set('repayment_frequency', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.repayment_frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -53,14 +53,14 @@
           :form="draft"
           @update:model-value="set('loan_purpose', $event)"
         />
-        <small class="helper">A sentence is enough, for example &quot;To buy a used car for work&quot;.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">A sentence is enough, for example &quot;To buy a used car for work&quot;.</small>
       </el-form-item>
     </template>
 
     <template v-if="show('details')">
       <template v-if="loanCategory === 'auto'">
-        <div class="field-grid">
-          <el-form-item label="Make">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Make">
             <FormField
               :model-value="draft.vehicle_make"
               :property="fields.vehicle_make"
@@ -68,7 +68,7 @@
               @update:model-value="set('vehicle_make', $event)"
             />
           </el-form-item>
-          <el-form-item label="Model">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Model">
             <FormField
               :model-value="draft.vehicle_model"
               :property="fields.vehicle_model"
@@ -76,7 +76,7 @@
               @update:model-value="set('vehicle_model', $event)"
             />
           </el-form-item>
-          <el-form-item label="Year">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Year">
             <FormField
               :model-value="draft.vehicle_year"
               :property="fields.vehicle_year"
@@ -87,18 +87,18 @@
         </div>
         <el-form-item label="Is it new or used?">
           <template v-if="choices('vehicle_condition')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('vehicle_condition')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.vehicle_condition === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.vehicle_condition === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.vehicle_condition === option.value"
                 @click="set('vehicle_condition', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.vehicle_condition === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -112,8 +112,8 @@
             />
           </template>
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Registration number (if it has one)">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Registration number (if it has one)">
             <FormField
               :model-value="draft.vehicle_registration_number"
               :property="fields.vehicle_registration_number"
@@ -121,7 +121,7 @@
               @update:model-value="set('vehicle_registration_number', $event)"
             />
           </el-form-item>
-          <el-form-item label="Chassis number (VIN)">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Chassis number (VIN)">
             <FormField
               :model-value="draft.vehicle_chassis_number"
               :property="fields.vehicle_chassis_number"
@@ -143,18 +143,18 @@
         </el-form-item>
         <el-form-item label="What kind of property is it?">
           <template v-if="choices('property_type')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('property_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.property_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.property_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.property_type === option.value"
                 @click="set('property_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.property_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -175,10 +175,10 @@
             :form="draft"
             @update:model-value="set('property_value', $event)"
           />
-          <small class="helper">Your best guess is fine.</small>
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Your best guess is fine.</small>
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Block and parcel">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Block and parcel">
             <FormField
               :model-value="draft.property_block_and_parcel"
               :property="fields.property_block_and_parcel"
@@ -186,7 +186,7 @@
               @update:model-value="set('property_block_and_parcel', $event)"
             />
           </el-form-item>
-          <el-form-item label="Deed number">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Deed number">
             <FormField
               :model-value="draft.property_deed_number"
               :property="fields.property_deed_number"
@@ -202,12 +202,12 @@
         or property being bought is added on the Assets step as collateral.
       -->
       <template v-if="isPurchaseCategory">
-        <p class="subheading">Are you buying it?</p>
-        <p class="hint">
+        <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">Are you buying it?</p>
+        <p class="hint mt-2 text-base text-gray-600">
           If you're not buying it (for example, you're refinancing), leave the price empty.
         </p>
-        <div class="field-grid">
-          <el-form-item label="Price (EC$)">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Price (EC$)">
             <FormField
               :model-value="draft.purchase_price"
               :property="fields.purchase_price"
@@ -215,7 +215,7 @@
               @update:model-value="set('purchase_price', $event)"
             />
           </el-form-item>
-          <el-form-item label="Your down payment (EC$)">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Your down payment (EC$)">
             <FormField
               :model-value="draft.down_payment_amount"
               :property="fields.down_payment_amount"
@@ -226,18 +226,18 @@
         </div>
         <el-form-item label="Where is the down payment coming from?" required :error="need(draft.source_of_funds)" v-if="Number(draft.down_payment_amount) > 0">
           <template v-if="choices('source_of_funds')">
-            <div class="choice-list" role="radiogroup">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('source_of_funds')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.source_of_funds === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.source_of_funds === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.source_of_funds === option.value"
                 @click="set('source_of_funds', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.source_of_funds === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -261,18 +261,18 @@
         </el-form-item>
         <el-form-item label="Who are you buying it from?">
           <template v-if="choices('seller_type')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('seller_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.seller_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.seller_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.seller_type === option.value"
                 @click="set('seller_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.seller_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -294,7 +294,7 @@
             @update:model-value="set('seller_name', $event)"
           />
         </el-form-item>
-        <p v-if="loanToValue !== null" class="soft-box info">
+        <p v-if="loanToValue !== null" class="soft-box info mb-5 p-4 rounded-lg bg-blue-50 text-blue-800">
           The loan is {{ loanToValue }}% of the price.
         </p>
       </template>
@@ -311,18 +311,18 @@
         </el-form-item>
         <el-form-item label="Type of business">
           <template v-if="choices('business_type')">
-            <div class="choice-list" role="radiogroup">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('business_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.business_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.business_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.business_type === option.value"
                 @click="set('business_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.business_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -336,8 +336,8 @@
             />
           </template>
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Registration number">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Registration number">
             <FormField
               :model-value="draft.business_registration_number"
               :property="fields.business_registration_number"
@@ -345,7 +345,7 @@
               @update:model-value="set('business_registration_number', $event)"
             />
           </el-form-item>
-          <el-form-item label="Date it started">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Date it started">
             <FormField
               :model-value="draft.business_incorporation_date"
               :property="fields.business_incorporation_date"
@@ -353,7 +353,7 @@
               @update:model-value="set('business_incorporation_date', $event, 'date')"
             />
           </el-form-item>
-          <el-form-item label="Number of employees">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Number of employees">
             <FormField
               :model-value="draft.business_employee_count"
               :property="fields.business_employee_count"
@@ -582,5 +582,9 @@ export default {
 </script>
 
 <style scoped>
-/* Styled in the main form's stylesheet (.choice, .field-grid, .soft-box). */
+/*
+ * No styles here on purpose: Saturn doesn't apply <style> blocks reliably.
+ * Everything is styled in the template with Tailwind classes, plus inline
+ * styles for the brand colours (CSS variables set on the form) and exact sizes.
+ */
 </style>

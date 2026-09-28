@@ -1,6 +1,6 @@
 <template>
-  <div class="allocation">
-    <p class="question">{{ title }}</p>
+  <div class="allocation mt-2 mb-5">
+    <p class="question mb-3 text-base font-semibold" style="color:#111827">{{ title }}</p>
 
     <!-- Simple mode: most people choose "Just me" and never see percentages -->
     <div v-if="simple && options.length > 1" class="choice-list inline" role="radiogroup">
@@ -9,25 +9,25 @@
         :key="option.value"
         type="button"
         role="radio"
-        class="choice"
-        :class="{ selected: mode === option.value }"
+        class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+        :style="(mode === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
         :aria-checked="mode === option.value"
         @click="option.value === 'me' ? justMe() : shared()"
       >
-        <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+        <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(mode === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
         <span>{{ option.label }}</span>
       </button>
     </div>
-    <p v-else-if="simple" class="hint">{{ meLabel }}</p>
+    <p v-else-if="simple" class="hint mt-2 text-base text-gray-600">{{ meLabel }}</p>
 
     <template v-if="!simple || mode === 'shared'">
-      <p v-if="simple" class="hint">
+      <p v-if="simple" class="hint mt-2 text-base text-gray-600">
         Choose each person and their share. The shares must add up to 100%.
       </p>
       <div
         v-for="(row, index) in draft"
         :key="row.client_key || index"
-        class="allocation-row"
+        class="allocation-row flex flex-wrap items-end gap-3"
       >
         <el-form-item :label="selectLabel" required>
           <el-select
@@ -54,16 +54,16 @@
         </el-form-item>
 
         <el-form-item v-if="draft.length > 1" label=" ">
-          <button type="button" class="link-btn danger" @click="removeRow(index)">Remove</button>
+          <button type="button" class="link-btn danger px-3 py-2 rounded text-base font-semibold text-red-700" style="background:transparent;border:0;cursor:pointer" @click="removeRow(index)">Remove</button>
         </el-form-item>
       </div>
 
-      <button type="button" class="more-link" @click="addRow">
+      <button type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="addRow">
         <v-icon size="20">mdi-plus</v-icon>
         Add another person
       </button>
 
-      <p :class="total === 100 ? 'total valid' : 'total invalid'">
+      <p class="total mt-2 text-base font-bold" :class="total === 100 ? 'text-green-700' : 'text-red-700'">
         {{ totalLabel }}: {{ total }}%
       </p>
     </template>
@@ -246,5 +246,9 @@ export default {
 </script>
 
 <style scoped>
-/* Styled in the main form's stylesheet (.allocation, .choice, .allocation-row). */
+/*
+ * No styles here on purpose: Saturn doesn't apply <style> blocks reliably.
+ * Everything is styled in the template with Tailwind classes, plus inline
+ * styles for the brand colours (CSS variables set on the form) and exact sizes.
+ */
 </style>

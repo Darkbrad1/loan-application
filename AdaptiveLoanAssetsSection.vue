@@ -4,30 +4,30 @@
     <article
       v-for="(asset, index) in draft"
       :key="asset.client_key"
-      class="item-card"
-      :class="{ open: isOpen(asset), 'needs-work': !isOpen(asset) && showErrors && missing(asset) }"
+      class="item-card mb-4 p-5 bg-white rounded-lg" style="border-width:2px;border-style:solid"
+      :style="isOpen(asset) ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)' : (!isOpen(asset) && showErrors && missing(asset)) ? 'border-color:#b91c1c' : 'border-color:#e5e7eb'"
     >
-      <div class="item-head">
-        <span class="item-icon"><v-icon>{{ iconFor(asset) }}</v-icon></span>
-        <div class="item-text">
-          <strong>{{ asset.name || `Item ${index + 1}` }}</strong>
-          <span v-if="!isOpen(asset) && missing(asset)" class="needs">Some details are missing</span>
-          <span v-else>{{ summaryOf(asset) }}</span>
+      <div class="item-head flex flex-wrap items-center gap-3" :style="isOpen(asset) ? 'margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb' : ''">
+        <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>{{ iconFor(asset) }}</v-icon></span>
+        <div class="item-text" style="flex:1 1 160px;min-width:0">
+          <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ asset.name || `Item ${index + 1}` }}</strong>
+          <span v-if="!isOpen(asset) && missing(asset)" class="needs block text-sm font-semibold text-red-700">Some details are missing</span>
+          <span v-else class="item-sub block text-sm text-gray-600">{{ summaryOf(asset) }}</span>
         </div>
-        <div class="item-actions">
-          <button v-if="!isOpen(asset)" type="button" class="link-btn" @click="openItem(asset)">Change</button>
-          <button v-if="!asset.is_purchase" type="button" class="link-btn danger" @click="remove(index)">Remove</button>
+        <div class="item-actions flex gap-1" style="margin-left:auto">
+          <button v-if="!isOpen(asset)" type="button" class="link-btn px-3 py-2 rounded text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer" @click="openItem(asset)">Change</button>
+          <button v-if="!asset.is_purchase" type="button" class="link-btn danger px-3 py-2 rounded text-base font-semibold text-red-700" style="background:transparent;border:0;cursor:pointer" @click="remove(index)">Remove</button>
         </div>
       </div>
 
       <template v-if="isOpen(asset)">
-        <div v-if="asset.is_purchase || isCollateral(asset)" class="item-tags">
-          <span v-if="asset.is_purchase" class="tag"><v-icon size="14">mdi-cart-outline</v-icon> Buying with this loan</span>
-          <span v-if="isCollateral(asset)" class="tag"><v-icon size="14">mdi-shield-check-outline</v-icon> Secures the loan</span>
+        <div v-if="asset.is_purchase || isCollateral(asset)" class="item-tags flex flex-wrap gap-2 mb-4">
+          <span v-if="asset.is_purchase" class="tag inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold" style="background:var(--brand-tint);color:var(--brand-text)"><v-icon size="14">mdi-cart-outline</v-icon> Buying with this loan</span>
+          <span v-if="isCollateral(asset)" class="tag inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold" style="background:var(--brand-tint);color:var(--brand-text)"><v-icon size="14">mdi-shield-check-outline</v-icon> Secures the loan</span>
         </div>
 
         <!-- The vehicle or property being bought comes from "The loan you need" -->
-        <p v-if="asset.is_purchase" class="soft-box">
+        <p v-if="asset.is_purchase" class="soft-box mb-5 p-4 rounded-lg bg-gray-100">
           You're buying this for <strong>{{ money(asset.declared_value) }}</strong>.
           To change the price, go back to "The loan you need".
         </p>
@@ -40,22 +40,22 @@
               :form="asset"
               @update:model-value="set(index, 'name', $event)"
             />
-            <small class="helper">For example &quot;My house in Grand Anse&quot; or &quot;2018 Honda Fit&quot;.</small>
+            <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example &quot;My house in Grand Anse&quot; or &quot;2018 Honda Fit&quot;.</small>
           </el-form-item>
           <el-form-item label="What kind of thing is it?" required :error="need(asset.asset_type)">
             <template v-if="choices('asset_type')">
-              <div class="choice-list inline" role="radiogroup">
+              <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
                 <button
                   v-for="option in choices('asset_type')"
                   :key="String(option.value)"
                   type="button"
                   role="radio"
-                  class="choice"
-                  :class="{ selected: asset.asset_type === option.value }"
+                  class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                  :style="(asset.asset_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                   :aria-checked="asset.asset_type === option.value"
                   @click="set(index, 'asset_type', option.value)"
                 >
-                  <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                  <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(asset.asset_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                   <span>{{ option.label }}</span>
                 </button>
               </div>
@@ -76,10 +76,10 @@
               :form="asset"
               @update:model-value="set(index, 'declared_value', $event)"
             />
-            <small class="helper">Your best guess is fine.</small>
+            <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Your best guess is fine.</small>
           </el-form-item>
-          <div v-if="isVehicle(asset)" class="field-grid">
-            <el-form-item label="Registration number">
+          <div v-if="isVehicle(asset)" class="field-grid flex flex-wrap" style="column-gap:16px">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Registration number">
               <FormField
                 :model-value="asset.registration_number"
                 :property="field('Asset', 'registration_number', 'Registration number', 'input')"
@@ -87,7 +87,7 @@
                 @update:model-value="set(index, 'registration_number', $event)"
               />
             </el-form-item>
-            <el-form-item label="Chassis number (VIN)">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Chassis number (VIN)">
               <FormField
                 :model-value="asset.chassis_number"
                 :property="field('Asset', 'chassis_number', 'Chassis number (VIN)', 'input')"
@@ -96,8 +96,8 @@
               />
             </el-form-item>
           </div>
-          <div v-if="isProperty(asset)" class="field-grid">
-            <el-form-item label="Block and parcel">
+          <div v-if="isProperty(asset)" class="field-grid flex flex-wrap" style="column-gap:16px">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Block and parcel">
               <FormField
                 :model-value="asset.block_and_parcel"
                 :property="field('Asset', 'block_and_parcel', 'Block and parcel', 'input')"
@@ -105,7 +105,7 @@
                 @update:model-value="set(index, 'block_and_parcel', $event)"
               />
             </el-form-item>
-            <el-form-item label="Deed number">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Deed number">
               <FormField
                 :model-value="asset.deed_number"
                 :property="field('Asset', 'deed_number', 'Deed number', 'input')"
@@ -122,14 +122,14 @@
               @update:model-value="set(index, 'description', $event)"
             />
           </el-form-item>
-          <button v-else type="button" class="more-link" @click="moreFor[asset.client_key] = true">
+          <button v-else type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="moreFor[asset.client_key] = true">
             <v-icon size="20">mdi-plus</v-icon>
             Add a description
           </button>
         </template>
 
         <!-- Existing loans secured on this (from "Money you owe") -->
-        <p v-if="(liens[asset.client_key] || []).length" class="soft-box warn">
+        <p v-if="(liens[asset.client_key] || []).length" class="soft-box warn mb-5 p-4 rounded-lg bg-orange-50 text-orange-800">
           You still owe money on this: {{ liens[asset.client_key].join('; ') }}
         </p>
 
@@ -145,51 +145,51 @@
           total-label="Shares add up to"
           @update:model-value="set(index, 'owners', $event)"
         />
-        <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
+        <small v-if="ownedOnlyByThirdParty(asset)" class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">
           Someone who isn't borrowing owns all of this, so it can only be listed
           if it secures the loan.
         </small>
 
         <!-- Collateral: only for loans that need it -->
         <template v-if="requiresCollateral">
-          <p v-if="asset.is_purchase" class="soft-box info">
+          <p v-if="asset.is_purchase" class="soft-box info mb-5 p-4 rounded-lg bg-blue-50 text-blue-800">
             This secures the loan. Tell us how it's insured below; a quote is fine for now.
           </p>
           <el-form-item label="Use this to secure the loan?" v-else>
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: Boolean(asset.collateral.enabled) === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(Boolean(asset.collateral.enabled) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="Boolean(asset.collateral.enabled) === option.value"
                 @click="setCollateral(index, 'enabled', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(Boolean(asset.collateral.enabled) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
           </el-form-item>
 
           <template v-if="asset.collateral.enabled">
-            <p class="subheading">How is it insured?</p>
-            <p class="hint">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
+            <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">How is it insured?</p>
+            <p class="hint mt-2 text-base text-gray-600">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
             <el-form-item label="Do you have a policy, or a quote?" required :error="need(asset.collateral.insurance.status)">
               <template v-if="choices('insurance_status')">
-                <div class="choice-list inline" role="radiogroup">
+                <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
                   <button
                     v-for="option in choices('insurance_status')"
                     :key="String(option.value)"
                     type="button"
                     role="radio"
-                    class="choice"
-                    :class="{ selected: asset.collateral.insurance.status === option.value }"
+                    class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                    :style="(asset.collateral.insurance.status === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                     :aria-checked="asset.collateral.insurance.status === option.value"
                     @click="setInsurance(index, 'status', option.value)"
                   >
-                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(asset.collateral.insurance.status === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                     <span>{{ option.label }}</span>
                   </button>
                 </div>
@@ -205,18 +205,18 @@
             </el-form-item>
             <el-form-item label="Type of insurance" required :error="need(asset.collateral.insurance.type)">
               <template v-if="choices('insurance_type')">
-                <div class="choice-list" role="radiogroup">
+                <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
                   <button
                     v-for="option in choices('insurance_type')"
                     :key="String(option.value)"
                     type="button"
                     role="radio"
-                    class="choice"
-                    :class="{ selected: asset.collateral.insurance.type === option.value }"
+                    class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                    :style="(asset.collateral.insurance.type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                     :aria-checked="asset.collateral.insurance.type === option.value"
                     @click="setInsurance(index, 'type', option.value)"
                   >
-                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(asset.collateral.insurance.type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                     <span>{{ option.label }}</span>
                   </button>
                 </div>
@@ -230,8 +230,8 @@
                 />
               </template>
             </el-form-item>
-            <div class="field-grid">
-              <el-form-item label="Insurance company" required :error="need(asset.collateral.insurance.provider)">
+            <div class="field-grid flex flex-wrap" style="column-gap:16px">
+              <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Insurance company" required :error="need(asset.collateral.insurance.provider)">
                 <FormField
                   :model-value="asset.collateral.insurance.provider"
                   :property="field('Collateral', 'insurance_provider', 'Insurance company', 'input')"
@@ -239,7 +239,7 @@
                   @update:model-value="setInsurance(index, 'provider', $event)"
                 />
               </el-form-item>
-              <el-form-item
+              <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0"
                 :label="isPolicy(asset) ? 'Policy number' : 'Quote number'"
                 :required="isPolicy(asset)"
                 :error="isPolicy(asset) ? need(asset.collateral.insurance.reference) : ''"
@@ -262,18 +262,18 @@
             </el-form-item>
             <el-form-item label="How often do you pay it?" required :error="need(asset.collateral.insurance.premium_frequency)">
               <template v-if="choices('insurance_premium_frequency')">
-                <div class="choice-list inline" role="radiogroup">
+                <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
                   <button
                     v-for="option in choices('insurance_premium_frequency')"
                     :key="String(option.value)"
                     type="button"
                     role="radio"
-                    class="choice"
-                    :class="{ selected: asset.collateral.insurance.premium_frequency === option.value }"
+                    class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                    :style="(asset.collateral.insurance.premium_frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                     :aria-checked="asset.collateral.insurance.premium_frequency === option.value"
                     @click="setInsurance(index, 'premium_frequency', option.value)"
                   >
-                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(asset.collateral.insurance.premium_frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                     <span>{{ option.label }}</span>
                   </button>
                 </div>
@@ -314,7 +314,7 @@
                 />
               </el-form-item>
             </template>
-            <button v-else type="button" class="more-link" @click="insuranceMore[asset.client_key] = true">
+            <button v-else type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="insuranceMore[asset.client_key] = true">
               <v-icon size="20">mdi-plus</v-icon>
               Add the amount covered and notes
             </button>
@@ -344,8 +344,8 @@
           @file-rejected="$emit('file-rejected', $event)"
         />
 
-        <div class="item-done">
-          <button type="button" class="small-btn" @click="finish(asset)">
+        <div class="item-done flex justify-end mt-2">
+          <button type="button" class="small-btn inline-flex items-center gap-2 px-5 rounded-lg text-base font-bold" style="min-height:44px;background:var(--brand);color:var(--brand-ink);border:0;cursor:pointer" @click="finish(asset)">
             <v-icon size="20">mdi-check</v-icon>
             Done
           </button>
@@ -353,7 +353,7 @@
       </template>
     </article>
 
-    <button type="button" class="add-button" @click="add">
+    <button type="button" class="add-button flex items-center justify-center gap-2 w-full bg-white rounded-lg text-lg font-semibold" style="min-height:56px;border:2px dashed #d1d5db;color:var(--brand-text);cursor:pointer" @click="add">
       <v-icon>mdi-plus</v-icon>
       Add {{ draft.length ? 'something else' : 'something you own' }}
     </button>
@@ -794,5 +794,9 @@ export default {
 </script>
 
 <style scoped>
-/* Styled in the main form's stylesheet (.item-card, .choice, .soft-box, ...). */
+/*
+ * No styles here on purpose: Saturn doesn't apply <style> blocks reliably.
+ * Everything is styled in the template with Tailwind classes, plus inline
+ * styles for the brand colours (CSS variables set on the form) and exact sizes.
+ */
 </style>

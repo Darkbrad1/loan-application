@@ -3,18 +3,18 @@
     <!-- ===== Someone who co-owns what secures the loan, but isn't borrowing ===== -->
     <template v-if="show('owner')">
       <el-form-item label="Is this a person or a business?">
-        <div class="choice-list inline" role="radiogroup">
+        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
           <button
             v-for="option in ownerKindOptions"
             :key="String(option.value)"
             type="button"
             role="radio"
-            class="choice"
-            :class="{ selected: (draft.kind || 'PERSON') === option.value }"
+            class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+            :style="((draft.kind || 'PERSON') === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
             :aria-checked="(draft.kind || 'PERSON') === option.value"
             @click="set('kind', option.value)"
           >
-            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="((draft.kind || 'PERSON') === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
             <span>{{ option.label }}</span>
           </button>
         </div>
@@ -27,8 +27,8 @@
           @update:model-value="set('business_name', $event)"
         />
       </el-form-item>
-      <div v-else class="field-grid">
-        <el-form-item label="First name" required :error="need(draft.first_name)">
+      <div v-else class="field-grid flex flex-wrap" style="column-gap:16px">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="First name" required :error="need(draft.first_name)">
           <FormField
             :model-value="draft.first_name"
             :property="field('Party', 'first_name', 'First name', 'input')"
@@ -36,7 +36,7 @@
             @update:model-value="set('first_name', $event)"
           />
         </el-form-item>
-        <el-form-item label="Last name" required :error="need(draft.last_name)">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Last name" required :error="need(draft.last_name)">
           <FormField
             :model-value="draft.last_name"
             :property="field('Party', 'last_name', 'Last name', 'input')"
@@ -47,18 +47,18 @@
       </div>
       <el-form-item label="How are they related to you?" required :error="need(draft.relationship_to_applicant)">
         <template v-if="choices('relationship_to_applicant')">
-          <div class="choice-list inline" role="radiogroup">
+          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('relationship_to_applicant')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.relationship_to_applicant === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.relationship_to_applicant === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.relationship_to_applicant === option.value"
               @click="set('relationship_to_applicant', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.relationship_to_applicant === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -72,8 +72,8 @@
           />
         </template>
       </el-form-item>
-      <div class="field-grid">
-        <el-form-item label="Phone number" required :error="need(draft.phone)">
+      <div class="field-grid flex flex-wrap" style="column-gap:16px">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Phone number" required :error="need(draft.phone)">
           <FormField
             :model-value="draft.phone"
             :property="field('Party', 'phone', 'Phone number', 'input')"
@@ -81,7 +81,7 @@
             @update:model-value="set('phone', $event)"
           />
         </el-form-item>
-        <el-form-item label="Email (if they have one)">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Email (if they have one)">
           <FormField
             :model-value="draft.email"
             :property="field('Party', 'email', 'Email (if they have one)', 'input')"
@@ -94,8 +94,8 @@
 
     <!-- ===== About: name and contact ===== -->
     <template v-if="show('about')">
-      <div class="field-grid">
-        <el-form-item label="First name" required :error="need(draft.first_name)">
+      <div class="field-grid flex flex-wrap" style="column-gap:16px">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="First name" required :error="need(draft.first_name)">
           <FormField
             :model-value="draft.first_name"
             :property="field('Party', 'first_name', 'First name', 'input')"
@@ -103,7 +103,7 @@
             @update:model-value="set('first_name', $event)"
           />
         </el-form-item>
-        <el-form-item label="Last name" required :error="need(draft.last_name)">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Last name" required :error="need(draft.last_name)">
           <FormField
             :model-value="draft.last_name"
             :property="field('Party', 'last_name', 'Last name', 'input')"
@@ -119,7 +119,7 @@
           :form="draft"
           @update:model-value="set('phone', $event)"
         />
-        <small class="helper">We'll call or text you about your application.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">We'll call or text you about your application.</small>
       </el-form-item>
       <el-form-item label="Email address" required :error="need(draft.email)">
         <FormField
@@ -139,18 +139,18 @@
       </el-form-item>
       <el-form-item label="Are you married?">
         <template v-if="choices('marital_status')">
-          <div class="choice-list inline" role="radiogroup">
+          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('marital_status')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.marital_status === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.marital_status === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.marital_status === option.value"
               @click="set('marital_status', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.marital_status === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -175,10 +175,10 @@
           :form="draft"
           @update:model-value="set('address', $event)"
         />
-        <small class="helper">House number, street, and village or town.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">House number, street, and village or town.</small>
       </el-form-item>
-      <div class="field-grid">
-        <el-form-item label="Country" required :error="need(draft.country)">
+      <div class="field-grid flex flex-wrap" style="column-gap:16px">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Country" required :error="need(draft.country)">
           <FormField
             :model-value="draft.country"
             :property="field('Party', 'country', 'Country', 'select')"
@@ -186,7 +186,7 @@
             @update:model-value="set('country', $event)"
           />
         </el-form-item>
-        <el-form-item label="Parish" required :error="need(draft.parish)" v-if="inGrenada">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Parish" required :error="need(draft.parish)" v-if="inGrenada">
           <FormField
             :model-value="draft.parish"
             :property="field('Party', 'parish', 'Parish', 'select')"
@@ -197,18 +197,18 @@
       </div>
       <el-form-item label="Do you own or rent your home?" required :error="need(draft.housing_status)">
         <template v-if="choices('housing_status')">
-          <div class="choice-list inline" role="radiogroup">
+          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('housing_status')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.housing_status === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.housing_status === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.housing_status === option.value"
               @click="set('housing_status', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.housing_status === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -222,8 +222,8 @@
           />
         </template>
       </el-form-item>
-      <div class="field-grid">
-        <el-form-item label="Years living there" required :error="need(draft.years_at_address)">
+      <div class="field-grid flex flex-wrap" style="column-gap:16px">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Years living there" required :error="need(draft.years_at_address)">
           <FormField
             :model-value="draft.years_at_address"
             :property="field('Party', 'years_at_address', 'Years living there', 'number')"
@@ -231,21 +231,21 @@
             @update:model-value="set('years_at_address', $event)"
           />
         </el-form-item>
-        <el-form-item label="People who depend on you" required :error="need(draft.number_of_dependants)">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="People who depend on you" required :error="need(draft.number_of_dependants)">
           <FormField
             :model-value="draft.number_of_dependants"
             :property="field('ApplicationParty', 'number_of_dependants', 'People who depend on you', 'number')"
             :form="draft"
             @update:model-value="set('number_of_dependants', $event)"
           />
-          <small class="helper">For example children. Enter 0 if none.</small>
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example children. Enter 0 if none.</small>
         </el-form-item>
       </div>
 
       <!-- Previous address: only under 2 years at this one -->
       <template v-if="needsPreviousAddress">
-        <p class="subheading">Where did you live before?</p>
-        <p class="hint">You've lived at your address for less than 2 years, so we need your previous one too.</p>
+        <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">Where did you live before?</p>
+        <p class="hint mt-2 text-base text-gray-600">You've lived at your address for less than 2 years, so we need your previous one too.</p>
         <el-form-item label="Previous address" required :error="need(draft.previous_address)">
           <FormField
             :model-value="draft.previous_address"
@@ -254,8 +254,8 @@
             @update:model-value="set('previous_address', $event)"
           />
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Country">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Country">
             <FormField
               :model-value="draft.previous_country"
               :property="field('Party', 'previous_country', 'Country', 'select')"
@@ -263,7 +263,7 @@
               @update:model-value="set('previous_country', $event)"
             />
           </el-form-item>
-          <el-form-item label="Parish" v-if="previousInGrenada">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Parish" v-if="previousInGrenada">
             <FormField
               :model-value="draft.previous_parish"
               :property="field('Party', 'previous_parish', 'Parish', 'select')"
@@ -275,7 +275,7 @@
       </template>
 
       <!-- Optional extra, hidden until asked for -->
-      <button v-if="!showMore && !draft.mailing_address" type="button" class="more-link" @click="showMore = true">
+      <button v-if="!showMore && !draft.mailing_address" type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="showMore = true">
         <v-icon size="20">mdi-plus</v-icon>
         My mail goes to a different address
       </button>
@@ -292,18 +292,18 @@
     <!-- ===== Membership and citizenship ===== -->
     <template v-if="show('membership')">
       <el-form-item label="Are you a member of the credit union?">
-        <div class="choice-list inline" role="radiogroup">
+        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes, I am a member' }, { value: false, label: 'Not yet' }]"
             :key="String(option.value)"
             type="button"
             role="radio"
-            class="choice"
-            :class="{ selected: Boolean(draft.is_member) === option.value }"
+            class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+            :style="(Boolean(draft.is_member) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
             :aria-checked="Boolean(draft.is_member) === option.value"
             @click="set('is_member', option.value)"
           >
-            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(Boolean(draft.is_member) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
             <span>{{ option.label }}</span>
           </button>
         </div>
@@ -315,9 +315,9 @@
           :form="draft"
           @update:model-value="set('member_number', $event)"
         />
-        <small class="helper">It's on your passbook or member card.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">It's on your passbook or member card.</small>
       </el-form-item>
-      <p v-else class="soft-box info">That's fine. You can still apply, and we'll help you join.</p>
+      <p v-else class="soft-box info mb-5 p-4 rounded-lg bg-blue-50 text-blue-800">That's fine. You can still apply, and we'll help you join.</p>
       <el-form-item label="Which country are you a citizen of?" required :error="need(draft.citizenship)">
         <FormField
           :model-value="draft.citizenship"
@@ -328,18 +328,18 @@
       </el-form-item>
       <el-form-item label="Residency status" required :error="need(draft.residency_status)">
         <template v-if="choices('residency_status')">
-          <div class="choice-list" role="radiogroup">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('residency_status')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.residency_status === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.residency_status === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.residency_status === option.value"
               @click="set('residency_status', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.residency_status === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -353,7 +353,7 @@
           />
         </template>
       </el-form-item>
-      <button v-if="!showMore && !draft.tin" type="button" class="more-link" @click="showMore = true">
+      <button v-if="!showMore && !draft.tin" type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="showMore = true">
         <v-icon size="20">mdi-plus</v-icon>
         Add a tax number (TIN)
       </button>
@@ -376,22 +376,22 @@
           :form="draft"
           @update:model-value="set('nis_number', $event)"
         />
-        <small class="helper">It's printed on your NIS card.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">It's printed on your NIS card.</small>
       </el-form-item>
 
-      <p class="subheading">Photo ID</p>
+      <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">Photo ID</p>
       <article
         v-for="(row, index) in draft.identifications"
         :key="row.client_key"
-        class="item-card open"
+        class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
-        <div class="item-head">
-          <span class="item-icon"><v-icon>mdi-card-account-details-outline</v-icon></span>
-          <div class="item-text">
-            <strong>{{ identificationTitle(row, index) }}</strong>
-            <span v-if="row.is_primary && draft.identifications.length > 1">Your main ID</span>
+        <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
+          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-card-account-details-outline</v-icon></span>
+          <div class="item-text" style="flex:1 1 160px;min-width:0">
+            <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ identificationTitle(row, index) }}</strong>
+            <span class="item-sub block text-sm text-gray-600" v-if="row.is_primary && draft.identifications.length > 1">Your main ID</span>
           </div>
-          <div class="item-actions">
+          <div class="item-actions flex gap-1" style="margin-left:auto">
             <button
               v-if="!row.is_primary && draft.identifications.length > 1"
               type="button"
@@ -412,18 +412,18 @@
         </div>
         <el-form-item label="Type of ID" required :error="need(row.identification_type)">
           <template v-if="choices('identification_type')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('identification_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: row.identification_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(row.identification_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="row.identification_type === option.value"
                 @click="setIdentification(index, 'identification_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(row.identification_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -437,8 +437,8 @@
             />
           </template>
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="ID number" required :error="need(row.identification_number)">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="ID number" required :error="need(row.identification_number)">
             <FormField
               :model-value="row.identification_number"
               :property="field('PartyIdentification', 'identification_number', 'ID number', 'input')"
@@ -446,26 +446,26 @@
               @update:model-value="setIdentification(index, 'identification_number', $event)"
             />
           </el-form-item>
-          <el-form-item label="Expiry date">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Expiry date">
             <FormField
               :model-value="row.expiry_date"
               :property="field('PartyIdentification', 'expiry_date', 'Expiry date', 'date')"
               :form="row"
               @update:model-value="setIdentification(index, 'expiry_date', $event, 'date')"
             />
-            <small v-if="isExpired(row)" class="helper invalid">
+            <small v-if="isExpired(row)" class="helper invalid block w-full mt-1 text-sm font-semibold text-red-700" style="flex:1 1 100%;line-height:1.45">
               This ID has expired. Please use one that's still valid.
             </small>
           </el-form-item>
         </div>
 
         <!-- Less common details, hidden until asked for -->
-        <button v-if="!moreFor[row.client_key]" type="button" class="more-link" @click="moreFor[row.client_key] = true">
+        <button v-if="!moreFor[row.client_key]" type="button" class="more-link inline-flex items-center gap-1 mb-5 py-1 text-base font-semibold" style="color:var(--brand-text);background:transparent;border:0;cursor:pointer;text-align:left" @click="moreFor[row.client_key] = true">
           <v-icon size="20">mdi-plus</v-icon>
           Add issue date and country
         </button>
-        <div v-else class="field-grid">
-          <el-form-item label="Issuing country">
+        <div v-else class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Issuing country">
             <FormField
               :model-value="row.issuing_country"
               :property="field('PartyIdentification', 'issuing_country', 'Issuing country', 'select')"
@@ -473,7 +473,7 @@
               @update:model-value="setIdentification(index, 'issuing_country', $event)"
             />
           </el-form-item>
-          <el-form-item label="Issue date">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Issue date">
             <FormField
               :model-value="row.issue_date"
               :property="field('PartyIdentification', 'issue_date', 'Issue date', 'date')"
@@ -496,11 +496,11 @@
         />
       </article>
 
-      <button type="button" class="add-button" @click="addIdentification">
+      <button type="button" class="add-button flex items-center justify-center gap-2 w-full bg-white rounded-lg text-lg font-semibold" style="min-height:56px;border:2px dashed #d1d5db;color:var(--brand-text);cursor:pointer" @click="addIdentification">
         <v-icon>mdi-plus</v-icon>
         Add another ID
       </button>
-      <p class="helper">{{ identificationHint }}</p>
+      <p class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">{{ identificationHint }}</p>
 
       <!-- Documents everyone gives, like the NIS card -->
       <AdaptiveLoanDocumentRequirements
@@ -519,18 +519,18 @@
     <template v-if="show('job')">
       <el-form-item label="What is your work situation?" required :error="need(draft.employment_status)">
         <template v-if="choices('employment_status')">
-          <div class="choice-list" role="radiogroup">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('employment_status')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.employment_status === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.employment_status === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.employment_status === option.value"
               @click="set('employment_status', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.employment_status === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -547,18 +547,18 @@
       <template v-if="showEmploymentDetails">
         <el-form-item label="Type of job" required :error="need(draft.employment_type)">
           <template v-if="choices('employment_type')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('employment_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.employment_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.employment_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.employment_type === option.value"
                 @click="set('employment_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.employment_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -572,8 +572,8 @@
             />
           </template>
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Employer or business name">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Employer or business name">
             <FormField
               :model-value="draft.employer_name"
               :property="field('ApplicationParty', 'employer_name', 'Employer or business name', 'input')"
@@ -581,7 +581,7 @@
               @update:model-value="set('employer_name', $event)"
             />
           </el-form-item>
-          <el-form-item label="Job title">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Job title">
             <FormField
               :model-value="draft.job_title"
               :property="field('ApplicationParty', 'job_title', 'Job title', 'input')"
@@ -602,8 +602,8 @@
 
       <!-- Previous job: only under 2 years in this one -->
       <template v-if="needsPreviousEmployment">
-        <p class="subheading">Where did you work before?</p>
-        <p class="hint">You started less than 2 years ago, so we need your previous job too.</p>
+        <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">Where did you work before?</p>
+        <p class="hint mt-2 text-base text-gray-600">You started less than 2 years ago, so we need your previous job too.</p>
         <el-form-item label="Previous employer" required :error="need(draft.previous_employer_name)">
           <FormField
             :model-value="draft.previous_employer_name"
@@ -612,8 +612,8 @@
             @update:model-value="set('previous_employer_name', $event)"
           />
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Job title there">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Job title there">
             <FormField
               :model-value="draft.previous_job_title"
               :property="field('ApplicationParty', 'previous_job_title', 'Job title there', 'input')"
@@ -621,7 +621,7 @@
               @update:model-value="set('previous_job_title', $event)"
             />
           </el-form-item>
-          <el-form-item label="Years there">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Years there">
             <FormField
               :model-value="draft.previous_employment_years"
               :property="field('ApplicationParty', 'previous_employment_years', 'Years there', 'number')"
@@ -642,22 +642,22 @@
           :form="draft"
           @update:model-value="set('gross_pay', $event)"
         />
-        <small class="helper">The amount on your payslip before anything is taken off. Enter 0 if you have no pay.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The amount on your payslip before anything is taken off. Enter 0 if you have no pay.</small>
       </el-form-item>
       <el-form-item label="How often are you paid?" v-if="Number(draft.gross_pay) > 0" required :error="need(draft.pay_frequency)">
         <template v-if="choices('pay_frequency')">
-          <div class="choice-list inline" role="radiogroup">
+          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('pay_frequency')"
               :key="String(option.value)"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: draft.pay_frequency === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(draft.pay_frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="draft.pay_frequency === option.value"
               @click="set('pay_frequency', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.pay_frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>{{ option.label }}</span>
             </button>
           </div>
@@ -681,20 +681,20 @@
       </el-form-item>
 
       <!-- NIS and income tax are worked out, not entered -->
-      <div v-if="showDeductions" class="soft-box">
-        <div class="sum-row">
+      <div v-if="showDeductions" class="soft-box mb-5 p-4 rounded-lg bg-gray-100">
+        <div class="sum-row flex justify-between gap-4 py-1">
           <span>Pay each month, before tax</span>
           <strong>{{ money(deductions.gross) }}</strong>
         </div>
-        <div class="sum-row">
+        <div class="sum-row flex justify-between gap-4 py-1">
           <span>NIS (estimate)</span>
           <strong>− {{ money(deductions.nis) }}</strong>
         </div>
-        <div class="sum-row">
+        <div class="sum-row flex justify-between gap-4 py-1">
           <span>Income tax (estimate)</span>
           <strong>− {{ money(deductions.incomeTax) }}</strong>
         </div>
-        <div class="sum-row total">
+        <div class="sum-row total flex justify-between gap-4 mt-2 pt-3 text-lg font-bold" style="border-top:2px solid #d1d5db">
           <span>Take-home pay each month</span>
           <strong>{{ money(deductions.net) }}</strong>
         </div>
@@ -702,53 +702,53 @@
 
       <!-- Other income: asked as Yes/No first -->
       <el-form-item label="Do you get money from anywhere else?">
-        <div class="choice-list inline" role="radiogroup">
+        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
             :key="String(option.value)"
             type="button"
             role="radio"
-            class="choice"
-            :class="{ selected: hasOtherIncome === option.value }"
+            class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+            :style="(hasOtherIncome === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
             :aria-checked="hasOtherIncome === option.value"
             @click="setOtherIncome(option.value)"
           >
-            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(hasOtherIncome === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
             <span>{{ option.label }}</span>
           </button>
         </div>
-        <small class="helper">For example rent, a pension, money sent from abroad, or a second job.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example rent, a pension, money sent from abroad, or a second job.</small>
       </el-form-item>
 
       <template v-if="hasOtherIncome">
         <article
           v-for="(income, index) in draft.incomes"
           :key="income.client_key"
-          class="item-card open"
+          class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
         >
-          <div class="item-head">
-            <span class="item-icon"><v-icon>mdi-cash-plus</v-icon></span>
-            <div class="item-text">
-              <strong>{{ lookupLabel('income_type', income.income_type) || `Other money ${index + 1}` }}</strong>
+          <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
+            <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-cash-plus</v-icon></span>
+            <div class="item-text" style="flex:1 1 160px;min-width:0">
+              <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ lookupLabel('income_type', income.income_type) || `Other money ${index + 1}` }}</strong>
             </div>
-            <div class="item-actions">
-              <button type="button" class="link-btn danger" @click="removeIncome(index)">Remove</button>
+            <div class="item-actions flex gap-1" style="margin-left:auto">
+              <button type="button" class="link-btn danger px-3 py-2 rounded text-base font-semibold text-red-700" style="background:transparent;border:0;cursor:pointer" @click="removeIncome(index)">Remove</button>
             </div>
           </div>
           <el-form-item label="Where does it come from?" required :error="need(income.income_type)">
             <template v-if="choices('income_type')">
-              <div class="choice-list inline" role="radiogroup">
+              <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
                 <button
                   v-for="option in choices('income_type')"
                   :key="String(option.value)"
                   type="button"
                   role="radio"
-                  class="choice"
-                  :class="{ selected: income.income_type === option.value }"
+                  class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                  :style="(income.income_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                   :aria-checked="income.income_type === option.value"
                   @click="setIncome(index, 'income_type', option.value)"
                 >
-                  <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                  <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(income.income_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                   <span>{{ option.label }}</span>
                 </button>
               </div>
@@ -762,8 +762,8 @@
               />
             </template>
           </el-form-item>
-          <div class="field-grid">
-            <el-form-item label="Amount (EC$)" required :error="need(income.amount)">
+          <div class="field-grid flex flex-wrap" style="column-gap:16px">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Amount (EC$)" required :error="need(income.amount)">
               <FormField
                 :model-value="income.amount"
                 :property="field('IncomeSource', 'amount', 'Amount (EC$)', 'number')"
@@ -771,7 +771,7 @@
                 @update:model-value="setIncome(index, 'amount', $event)"
               />
             </el-form-item>
-            <el-form-item label="How often?" required :error="need(income.frequency)">
+            <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="How often?" required :error="need(income.frequency)">
               <FormField
                 :model-value="income.frequency"
                 :property="field('IncomeSource', 'frequency', 'How often?', 'select')"
@@ -791,7 +791,7 @@
             @file-rejected="$emit('file-rejected', $event)"
           />
         </article>
-        <button type="button" class="add-button" @click="addIncome">
+        <button type="button" class="add-button flex items-center justify-center gap-2 w-full bg-white rounded-lg text-lg font-semibold" style="min-height:56px;border:2px dashed #d1d5db;color:var(--brand-text);cursor:pointer" @click="addIncome">
           <v-icon>mdi-plus</v-icon>
           Add more money you get
         </button>
@@ -799,21 +799,21 @@
 
       <!-- Guarantors: the guarantee they're giving -->
       <template v-if="isGuarantor">
-        <p class="subheading">The guarantee</p>
+        <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">The guarantee</p>
         <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
           <template v-if="choices('guarantee_type')">
-            <div class="choice-list inline" role="radiogroup">
+            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('guarantee_type')"
                 :key="String(option.value)"
                 type="button"
                 role="radio"
-                class="choice"
-                :class="{ selected: draft.guarantee_type === option.value }"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+                :style="(draft.guarantee_type === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
                 :aria-checked="draft.guarantee_type === option.value"
                 @click="set('guarantee_type', option.value)"
               >
-                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft.guarantee_type === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
                 <span>{{ option.label }}</span>
               </button>
             </div>
@@ -840,24 +840,24 @@
 
     <!-- ===== Declarations: Yes/No questions ===== -->
     <template v-if="show('declarations')">
-      <div v-for="question in declarationQuestions" :key="question.key" class="question-block">
-        <p class="question">{{ question.text }}</p>
-        <div class="choice-list inline" role="radiogroup">
+      <div v-for="question in declarationQuestions" :key="question.key" class="question-block mb-6">
+        <p class="question mb-3 text-base font-semibold" style="color:#111827">{{ question.text }}</p>
+        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
             :key="String(option.value)"
             type="button"
             role="radio"
-            class="choice"
-            :class="{ selected: draft[question.key] === option.value }"
+            class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+            :style="(draft[question.key] === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
             :aria-checked="draft[question.key] === option.value"
             @click="set(question.key, option.value)"
           >
-            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(draft[question.key] === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
             <span>{{ option.label }}</span>
           </button>
         </div>
-        <small v-if="showErrors && draft[question.key] !== true && draft[question.key] !== false" class="helper invalid">
+        <small v-if="showErrors && draft[question.key] !== true && draft[question.key] !== false" class="helper invalid block w-full mt-1 text-sm font-semibold text-red-700" style="flex:1 1 100%;line-height:1.45">
           Please choose Yes or No.
         </small>
       </div>
@@ -881,22 +881,22 @@
 
     <!-- ===== Agreement: big tick boxes ===== -->
     <template v-if="show('consent')">
-      <div class="choice-list">
+      <div class="choice-list flex flex-col gap-3 w-full">
         <button
           v-for="statement in consentStatements"
           :key="statement.key"
           type="button"
           role="checkbox"
-          class="choice"
-          :class="{ selected: Boolean(draft[statement.key]) }"
+          class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+          :style="(Boolean(draft[statement.key])) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
           :aria-checked="Boolean(draft[statement.key])"
           @click="set(statement.key, !draft[statement.key])"
         >
-          <span class="choice-mark square"><v-icon size="16">mdi-check</v-icon></span>
+          <span class="choice-mark square flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(Boolean(draft[statement.key])) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
           <span>{{ statement.text }}</span>
         </button>
       </div>
-      <small v-if="showErrors && !allConsented" class="helper invalid">Please tick every box to continue.</small>
+      <small v-if="showErrors && !allConsented" class="helper invalid block w-full mt-1 text-sm font-semibold text-red-700" style="flex:1 1 100%;line-height:1.45">Please tick every box to continue.</small>
     </template>
   </div>
 </template>
@@ -1360,5 +1360,9 @@ export default {
 </script>
 
 <style scoped>
-/* Styled in the main form's stylesheet (.choice, .item-card, .soft-box, ...). */
+/*
+ * No styles here on purpose: Saturn doesn't apply <style> blocks reliably.
+ * Everything is styled in the template with Tailwind classes, plus inline
+ * styles for the brand colours (CSS variables set on the form) and exact sizes.
+ */
 </style>

@@ -5,42 +5,42 @@
       <article
         v-for="(person, index) in parties"
         :key="person.client_key"
-        class="item-card open"
+        class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
-        <div class="item-head">
-          <span class="item-icon"><v-icon>mdi-account-outline</v-icon></span>
-          <div class="item-text">
-            <strong>{{ personName(person) || `Person ${index + 1}` }}</strong>
-            <span v-if="roleLabel(person.role)">{{ roleLabel(person.role) }}</span>
+        <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
+          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-account-outline</v-icon></span>
+          <div class="item-text" style="flex:1 1 160px;min-width:0">
+            <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ personName(person) || `Person ${index + 1}` }}</strong>
+            <span class="item-sub block text-sm text-gray-600" v-if="roleLabel(person.role)">{{ roleLabel(person.role) }}</span>
           </div>
-          <div class="item-actions">
-            <button type="button" class="link-btn danger" @click="$emit('request-remove', index)">Remove</button>
+          <div class="item-actions flex gap-1" style="margin-left:auto">
+            <button type="button" class="link-btn danger px-3 py-2 rounded text-base font-semibold text-red-700" style="background:transparent;border:0;cursor:pointer" @click="$emit('request-remove', index)">Remove</button>
           </div>
         </div>
 
         <el-form-item label="How are they involved?" required :error="need(person.role)">
-          <div class="choice-list" role="radiogroup">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in roleOptions"
               :key="option.value"
               type="button"
               role="radio"
-              class="choice"
-              :class="{ selected: person.role === option.value }"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left" style="min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35"
+              :style="(person.role === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff'"
               :aria-checked="person.role === option.value"
               @click="setPerson(index, 'role', option.value)"
             >
-              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-mark flex items-center justify-center rounded-full" style="width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid" :style="(person.role === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent'"><v-icon size="16">mdi-check</v-icon></span>
               <span>
                 {{ option.label }}
-                <small v-if="roleHelp(option.value)">{{ roleHelp(option.value) }}</small>
+                <small v-if="roleHelp(option.value)" class="choice-note block text-sm text-gray-600 font-normal">{{ roleHelp(option.value) }}</small>
               </span>
             </button>
           </div>
         </el-form-item>
 
-        <div class="field-grid">
-          <el-form-item label="First name">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="First name">
             <FormField
               :model-value="person.first_name"
               :property="field('Party', 'first_name', 'First name', 'input')"
@@ -48,7 +48,7 @@
               @update:model-value="setPerson(index, 'first_name', $event)"
             />
           </el-form-item>
-          <el-form-item label="Last name">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Last name">
             <FormField
               :model-value="person.last_name"
               :property="field('Party', 'last_name', 'Last name', 'input')"
@@ -59,11 +59,11 @@
         </div>
       </article>
 
-      <button type="button" class="add-button" @click="$emit('request-add')">
+      <button type="button" class="add-button flex items-center justify-center gap-2 w-full bg-white rounded-lg text-lg font-semibold" style="min-height:56px;border:2px dashed #d1d5db;color:var(--brand-text);cursor:pointer" @click="$emit('request-add')">
         <v-icon>mdi-account-plus-outline</v-icon>
         Add {{ parties.length ? 'another person' : 'a person' }}
       </button>
-      <p class="hint">
+      <p class="hint mt-2 text-base text-gray-600">
         If someone else co-owns something that secures the loan, add them here too.
       </p>
     </template>
@@ -73,15 +73,15 @@
       <article
         v-for="(row, index) in references"
         :key="row.client_key"
-        class="item-card open"
+        class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
-        <div class="item-head">
-          <span class="item-icon">
+        <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
+          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)">
             <v-icon>{{ row.reference_type === 'Next of kin' ? 'mdi-home-heart' : 'mdi-account-voice' }}</v-icon>
           </span>
-          <div class="item-text">
-            <strong>{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
-            <span>
+          <div class="item-text" style="flex:1 1 160px;min-width:0">
+            <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
+            <span class="item-sub block text-sm text-gray-600">
               {{
                 row.reference_type === 'Next of kin'
                   ? 'Your closest family member, like a spouse, parent, or adult child.'
@@ -106,8 +106,8 @@
             @update:model-value="setReference(index, 'relationship', $event)"
           />
         </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="Phone number" required :error="need(row.phone)">
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Phone number" required :error="need(row.phone)">
             <FormField
               :model-value="row.phone"
               :property="field('Reference', 'phone', 'Phone number', 'input')"
@@ -115,7 +115,7 @@
               @update:model-value="setReference(index, 'phone', $event)"
             />
           </el-form-item>
-          <el-form-item label="Email (if they have one)">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Email (if they have one)">
             <FormField
               :model-value="row.email"
               :property="field('Reference', 'email', 'Email (if they have one)', 'input')"
@@ -284,5 +284,9 @@ export default {
 </script>
 
 <style scoped>
-/* Styled in the main form's stylesheet (.item-card, .choice, .add-button). */
+/*
+ * No styles here on purpose: Saturn doesn't apply <style> blocks reliably.
+ * Everything is styled in the template with Tailwind classes, plus inline
+ * styles for the brand colours (CSS variables set on the form) and exact sizes.
+ */
 </style>
