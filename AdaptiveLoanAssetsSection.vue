@@ -31,12 +31,25 @@
       <div class="item-title">
         <strong>{{ asset.name || `Asset ${index + 1}` }}</strong>
         <div>
+          <el-tag v-if="asset.is_purchase" type="success" size="small">Being purchased</el-tag>
           <el-tag v-if="isCollateral(asset)" type="warning" size="small">Collateral</el-tag>
-          <el-button text type="danger" @click="remove(index)">Remove</el-button>
+          <el-button v-if="!asset.is_purchase" text type="danger" @click="remove(index)">Remove</el-button>
         </div>
       </div>
 
-      <div class="field-grid">
+      <!-- The vehicle or property being bought comes from "Your request" -->
+      <div v-if="asset.is_purchase" class="purchase-summary">
+        <p>
+          <strong>{{ lookupLabel('asset_type', asset.asset_type) || 'Asset' }}</strong>
+          valued at the purchase price, {{ money(asset.declared_value) }}.
+        </p>
+        <p class="helper">
+          To change these details, go back to the "Your request" step. Choose
+          who will own it below, and add its insurance.
+        </p>
+      </div>
+
+      <div v-else class="field-grid">
         <el-form-item label="Asset name" required>
           <FormField
             :model-value="asset.name"
@@ -72,7 +85,55 @@
             @update:model-value="set(index, 'description', $event)"
           />
         </el-form-item>
+
+        <!-- Identifiers for vehicles and for land or property -->
+        <template v-if="isVehicle(asset)">
+          <el-form-item label="Registration number">
+            <FormField
+              :model-value="asset.registration_number"
+              :property="field('Asset', 'registration_number', 'Registration number', 'input')"
+              :form="asset"
+              @update:model-value="set(index, 'registration_number', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Chassis number (VIN)">
+            <FormField
+              :model-value="asset.chassis_number"
+              :property="field('Asset', 'chassis_number', 'Chassis number (VIN)', 'input')"
+              :form="asset"
+              @update:model-value="set(index, 'chassis_number', $event)"
+            />
+          </el-form-item>
+        </template>
+        <template v-if="isProperty(asset)">
+          <el-form-item label="Block and parcel">
+            <FormField
+              :model-value="asset.block_and_parcel"
+              :property="field('Asset', 'block_and_parcel', 'Block and parcel', 'input')"
+              :form="asset"
+              @update:model-value="set(index, 'block_and_parcel', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Deed number">
+            <FormField
+              :model-value="asset.deed_number"
+              :property="field('Asset', 'deed_number', 'Deed number', 'input')"
+              :form="asset"
+              @update:model-value="set(index, 'deed_number', $event)"
+            />
+          </el-form-item>
+        </template>
       </div>
+
+      <!-- Existing loans secured on this asset (from the Liabilities step) -->
+      <el-alert
+        v-if="(liens[asset.client_key] || []).length"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="lien-note"
+        :title="`Existing loan on this asset: ${liens[asset.client_key].join('; ')}`"
+      />
 
       <!-- Ownership percentages must total 100% across saved parties -->
       <AdaptiveLoanAllocationEditor
@@ -102,7 +163,11 @@
 
       <!-- Collateral: only for loans that need it -->
       <section v-if="requiresCollateral" class="context">
-        <el-form-item label="Use this asset as collateral for this loan">
+        <!-- The asset being bought is always the collateral -->
+        <p v-if="asset.is_purchase" class="helper">
+          This is the collateral for the loan. Add its insurance below; a quote is fine for now.
+        </p>
+        <el-form-item v-else label="Use this asset as collateral for this loan">
           <FormField
             :model-value="asset.collateral.enabled"
             :property="field(null, 'enabled', 'Use this asset as collateral for this loan', 'checkbox')"
@@ -228,6 +293,12 @@
  * matching createEmptyCollateral() in the main form. The asset's own name,
  * type, and value are used for the collateral.
  *
+ * The vehicle or property a purchase loan is buying (is_purchase) is added
+ * by the main form from the "Your request" step: its details are shown,
+ * not edited, and it's always collateral. Vehicles and land or property
+ * also ask for their identifiers (registration and chassis numbers, or
+ * block and parcel and deed numbers).
+ *
  * Every input is Saturn's built-in FormField, using Saturn's own
  * definitions of the Asset and Collateral properties when they exist.
  */
@@ -237,6 +308,11 @@ export default {
     modelValue: {
       type: Array,
       default: () => [],
+    },
+    /** Existing loans secured on each asset, keyed by client key (labels). */
+    liens: {
+      type: Object,
+      default: () => ({}),
     },
     /** Select options for ownership, keyed by saved Party ID. */
     partyOptions: {
@@ -373,6 +449,32 @@ export default {
       return this.requiresCollateral && asset.collateral.enabled;
     },
 
+    /** Label of a dropdown value, falling back to the value itself. */
+    lookupLabel(fieldName, value) {
+      const option = this.lookup(fieldName).find((entry) => entry.value === value);
+      return option ? option.label : value || '';
+    },
+
+    /** Matches isVehicleType in the main form. */
+    isVehicle(asset) {
+      return /vehicle|car|auto|truck|motor/i.test(this.lookupLabel('asset_type', asset.asset_type));
+    },
+
+    /** Matches isPropertyType in the main form. */
+    isProperty(asset) {
+      return /property|land|house|home|real estate|building|lot/i.test(
+        this.lookupLabel('asset_type', asset.asset_type)
+      );
+    },
+
+    money(value) {
+      if (value === null || value === undefined || value === '') return 'not set';
+      return `EC$ ${Number(value).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    },
+
     /** True when the asset's insurance is a current policy (not a quote). */
     isPolicy(asset) {
       return String(asset.collateral.insurance.status || '').trim().toLowerCase() === 'policy';
@@ -484,6 +586,11 @@ export default {
         asset_type: '',
         description: '',
         declared_value: null,
+        registration_number: '',
+        chassis_number: '',
+        block_and_parcel: '',
+        deed_number: '',
+        is_purchase: false,
         document_ids: [],
         owners: [
           {
@@ -511,5 +618,13 @@ export default {
   margin: 16px 0 8px;
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.purchase-summary {
+  margin-bottom: 12px;
+}
+
+.lien-note {
+  margin: 8px 0 12px;
 }
 </style>

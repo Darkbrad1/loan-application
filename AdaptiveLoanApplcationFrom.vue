@@ -120,8 +120,10 @@
                             :active-tab="activePartyTab"
                             :minimum-identifications="minimumIdentifications"
                             :deductions="deductionsByApplicant"
+                            :references="formData.references"
                             @update:primary="formData.primary = $event"
                             @update:parties="formData.parties = $event"
+                            @update:references="formData.references = $event"
                             @update:active-tab="activePartyTab = $event"
                             @request-add="addApplicant"
                             @request-remove="removeApplicant"
@@ -141,6 +143,7 @@
                             :selected-product="selectedProduct"
                             :lookups="lookups"
                             :application-props="applicationProps"
+                            :resource-props="resourceProps"
                             :amount-minimum="amountMinimum"
                             :amount-maximum="amountMaximum"
                             :term-minimum="termMinimum"
@@ -154,6 +157,7 @@
                             :party-options="partyOptions"
                             :third-party-owner-ids="thirdPartyOwnerPartyIds"
                             :requires-collateral="requiresCollateral"
+                            :liens="liensByAsset"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.assets = $event"
@@ -177,6 +181,7 @@
                             :application-party-options="applicationPartyOptions"
                             :liability-types="liabilityTypes"
                             :default-revolving-rate="defaultRevolvingRate"
+                            :asset-options="assetOptions"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.liabilities = $event"
@@ -200,6 +205,7 @@
                             :expense-type-options="expenseTypeOptions"
                             :expense-types="expenseTypes"
                             :loan-category-label="loanCategoryLabel"
+                            :projected-expenses="projectedInsuranceExpenses"
                             :lookups="lookups"
                             :resource-props="resourceProps"
                             @update:model-value="formData.expenses = $event"
@@ -238,6 +244,8 @@
                             :application="formData"
                             :applicants="allApplicants"
                             :requires-collateral="requiresCollateral"
+                            :summary="reviewSummary"
+                            @edit-step="goToStep"
                         />
 
                         <footer class="form-footer">
@@ -335,14 +343,60 @@ const DEFAULT_REVOLVING_RATE = 0.03;
  * referencing a record that has already been deleted.
  */
 const TRACKED_RESOURCES = [
+    // Projected insurance expenses point at their Collateral, so expenses go first.
+    "Expense",
     "Collateral",
     "AssetOwnership",
     "LiabilityResponsibility",
-    "Expense",
+    // Liabilities can point at the asset that secures them.
     "Liability",
     "Asset",
+    "IncomeSource",
+    "Reference",
     "ApplicationParty",
 ];
+
+/**
+ * How many times a month each payment frequency happens, used to turn any
+ * amount into a monthly figure (monthly_equivalent). Keys are the standard
+ * frequency choices in Saturn, lowercased, plus a few common spellings.
+ */
+const MONTHLY_FACTORS = {
+    weekly: 52 / 12,
+    fortnightly: 26 / 12,
+    "bi-weekly": 26 / 12,
+    biweekly: 26 / 12,
+    "twice monthly": 2,
+    "semi-monthly": 2,
+    monthly: 1,
+    quarterly: 1 / 3,
+    "twice yearly": 1 / 6,
+    "semi-annually": 1 / 6,
+    yearly: 1 / 12,
+    annually: 1 / 12,
+    annual: 1 / 12,
+};
+
+/**
+ * An amount paid at some frequency, as a monthly figure (rounded to cents).
+ * Unknown or missing frequencies count as monthly. Returns null without an
+ * amount.
+ */
+const monthlyAmount = (amount, frequency) => {
+    if (amount === null || amount === undefined || amount === "") return null;
+    const key = String(frequency || "monthly").trim().toLowerCase();
+    const factor = MONTHLY_FACTORS[key] ?? 1;
+    return Math.round(Number(amount) * factor * 100) / 100;
+};
+
+/** Asset status for the vehicle or property a purchase loan is buying. */
+const PURCHASE_ASSET_STATUS = "To be purchased";
+
+/** ExpenseType code for the projected monthly cost of collateral insurance. */
+const COLLATERAL_INSURANCE_CODE = "COLLATERAL_INSURANCE";
+
+/** Applicant roles with their own meaning in the form. */
+const GUARANTOR_ROLE = "Guarantor";
 
 /**
  * Generates a unique client-side key for list rows that have no server ID yet.
@@ -440,15 +494,54 @@ const createEmptyApplicant = (role = "") => ({
     parish: "",
     country: DEFAULT_COUNTRY,
     nis_number: "",
+    // Credit union membership (non-members may apply; staff follow up)
+    is_member: false,
+    member_number: "",
+    // Anti-money-laundering questions
+    citizenship: "",
+    residency_status: "",
+    tin: "",
+    is_pep: false,
+    pep_details: "",
+    // Housing. The previous address is asked for under 2 years at this one.
+    housing_status: "",
+    years_at_address: null,
+    previous_address: "",
+    previous_parish: "",
+    previous_country: DEFAULT_COUNTRY,
+    mailing_address: "",
+    number_of_dependants: null,
     // Linked to Party.ids. saved_identification_ids is what was on the
     // server at the last save or restore, so removed IDs can be deleted.
     identifications: [createEmptyIdentification(true)],
     saved_identification_ids: [],
     employment_status: "",
+    employment_type: "",
+    employment_start_date: "",
     employer_name: "",
     job_title: "",
+    // Worked out from employment_start_date when it's saved
     years_employed: null,
+    // Pay per pay period; gross_monthly_income is worked out from these.
+    gross_pay: null,
+    pay_frequency: "",
     gross_monthly_income: null,
+    annual_revenue: null,
+    // Asked for under 2 years in the current job
+    previous_employer_name: "",
+    previous_job_title: "",
+    previous_employment_years: null,
+    // Other income (IncomeSource records, linked through income_ids)
+    incomes: [],
+    // Guarantors only
+    guarantee_type: "",
+    guarantee_amount: null,
+    // Declarations (a "yes" needs an explanation in declaration_details)
+    declared_bankruptcy: false,
+    declared_judgments: false,
+    declared_arrears: false,
+    declared_other_applications: false,
+    declaration_details: "",
     consent_accuracy_confirmation: false,
     consent_credit_check: false,
     consent_data_processing: false,
@@ -470,6 +563,8 @@ const createEmptyCollateral = () => ({
     id: null,
     description: "",
     document_ids: [],
+    // The projected monthly insurance Expense saved for this collateral
+    projected_expense_id: null,
     // Insurance policy, or a quote when there's no policy yet
     insurance: {
         type: "",
@@ -481,6 +576,29 @@ const createEmptyCollateral = () => ({
         premium_frequency: "",
         expiry_date: "",
     },
+});
+
+/** Creates an empty other-income row (an IncomeSource record). */
+const createEmptyIncome = () => ({
+    client_key: generateRowKey("income"),
+    id: null,
+    income_type: "",
+    description: "",
+    amount: null,
+    frequency: "",
+    document_ids: [],
+});
+
+/** Creates an empty reference (a Reference record) of the given type. */
+const createEmptyReference = (referenceType) => ({
+    client_key: generateRowKey("reference"),
+    id: null,
+    reference_type: referenceType,
+    name: "",
+    relationship: "",
+    phone: "",
+    email: "",
+    address: "",
 });
 
 /**
@@ -503,11 +621,27 @@ const createEmptyApplication = () => ({
     vehicle_model: "",
     vehicle_year: "",
     vehicle_condition: "",
+    // Identifies the vehicle being bought; saved on its Asset.
+    vehicle_registration_number: "",
+    vehicle_chassis_number: "",
     // Home-loan-specific fields
     property_address: "",
     property_type: "",
     property_value: null,
-    // Business-loan-specific fields
+    // Identifies the property being bought; saved on its Asset.
+    property_block_and_parcel: "",
+    property_deed_number: "",
+    // Purchase loans (auto and home). With a purchase price, the form adds
+    // the vehicle or property being bought as a collateral asset.
+    purchase_price: null,
+    down_payment_amount: null,
+    source_of_funds: "",
+    source_of_funds_details: "",
+    seller_type: "",
+    seller_name: "",
+    // Business-loan-specific fields. Saved on the business's own Party
+    // (kind ORGANIZATION), linked through Application.business_party.
+    business_party_id: null,
     business_name: "",
     business_registration_number: "",
     business_type: "",
@@ -516,6 +650,11 @@ const createEmptyApplication = () => ({
     // Nested collections
     primary: createEmptyApplicant("Primary Applicant"),
     parties: [],
+    // One personal reference and one next of kin, for the primary applicant
+    references: [
+        createEmptyReference("Personal reference"),
+        createEmptyReference("Next of kin"),
+    ],
     assets: [],
     liabilities: [],
     expenses: [],
@@ -607,6 +746,17 @@ export default {
                 insurance_status: [],
                 insurance_premium_frequency: [],
                 relationship_to_applicant: [],
+                residency_status: [],
+                housing_status: [],
+                employment_type: [],
+                pay_frequency: [],
+                guarantee_type: [],
+                income_type: [],
+                income_frequency: [],
+                reference_type: [],
+                reference_relationship: [],
+                source_of_funds: [],
+                seller_type: [],
             },
 
             // Top-level loan categories shown on step 1
@@ -774,15 +924,369 @@ export default {
                 vehicle_model: form.vehicle_model,
                 vehicle_year: form.vehicle_year,
                 vehicle_condition: form.vehicle_condition,
+                vehicle_registration_number: form.vehicle_registration_number,
+                vehicle_chassis_number: form.vehicle_chassis_number,
                 property_address: form.property_address,
                 property_type: form.property_type,
                 property_value: form.property_value,
+                property_block_and_parcel: form.property_block_and_parcel,
+                property_deed_number: form.property_deed_number,
+                purchase_price: form.purchase_price,
+                down_payment_amount: form.down_payment_amount,
+                source_of_funds: form.source_of_funds,
+                source_of_funds_details: form.source_of_funds_details,
+                seller_type: form.seller_type,
+                seller_name: form.seller_name,
                 business_name: form.business_name,
                 business_registration_number: form.business_registration_number,
                 business_type: form.business_type,
                 business_incorporation_date: form.business_incorporation_date,
                 business_employee_count: form.business_employee_count,
             };
+        },
+
+        /** Select options for the asset that secures a liability (by client key). */
+        assetOptions() {
+            return this.formData.assets.map((asset, index) => ({
+                value: asset.client_key,
+                label: asset.name || `Asset ${index + 1}`,
+            }));
+        },
+
+        /**
+         * Existing loans secured on each asset (liens), keyed by the asset's
+         * client key: a list of "Creditor (EC$ balance)" labels.
+         */
+        liensByAsset() {
+            const result = {};
+            this.formData.liabilities.forEach((liability) => {
+                if (!liability.is_secured || !liability.secured_asset_ref) return;
+                const asset = this.assetForRef(liability.secured_asset_ref);
+                if (!asset) return;
+                if (!result[asset.client_key]) result[asset.client_key] = [];
+                result[asset.client_key].push(
+                    `${liability.creditor_name || "Unnamed creditor"} (${this.money(
+                        liability.outstanding_balance,
+                    )} owing)`,
+                );
+            });
+            return result;
+        },
+
+        /** The ExpenseType for projected collateral insurance, if it's set up. */
+        collateralInsuranceType() {
+            return (
+                this.expenseTypes.find(
+                    (type) =>
+                        String(type.code || "").trim().toUpperCase() ===
+                        COLLATERAL_INSURANCE_CODE,
+                ) || null
+            );
+        },
+
+        /**
+         * The projected monthly insurance cost of each collateral asset with
+         * a premium, shown read-only on the Expenses step and saved as an
+         * Expense marked is_projected.
+         */
+        projectedInsuranceExpenses() {
+            return this.formData.assets
+                .filter(
+                    (asset) =>
+                        this.isCollateral(asset) &&
+                        Number(asset.collateral.insurance.premium) > 0,
+                )
+                .map((asset) => {
+                    const insurance = asset.collateral.insurance;
+                    return {
+                        asset_key: asset.client_key,
+                        name: `Insurance for ${asset.name || "collateral"} (projected)`,
+                        amount: Number(insurance.premium),
+                        frequency: insurance.premium_frequency || "Monthly",
+                        monthly: monthlyAmount(
+                            insurance.premium,
+                            insurance.premium_frequency,
+                        ),
+                    };
+                });
+        },
+
+        /**
+         * Monthly totals for the review step: income (gross and after
+         * estimated deductions), expenses, and liability payments.
+         * Third Party Owners aren't borrowing, so their income isn't counted.
+         */
+        monthlyTotals() {
+            const borrowers = this.allApplicants.filter(
+                (person) => !this.isThirdPartyOwner(person),
+            );
+            let grossIncome = 0;
+            let netIncome = 0;
+            borrowers.forEach((person) => {
+                const deductions = this.statutoryDeductions(person);
+                grossIncome += Number(this.grossMonthly(person)) || 0;
+                netIncome += deductions.net;
+                (person.incomes || []).forEach((income) => {
+                    const monthly = monthlyAmount(income.amount, income.frequency) || 0;
+                    grossIncome += monthly;
+                    netIncome += monthly;
+                });
+            });
+            const expenses =
+                this.formData.expenses.reduce(
+                    (sum, item) =>
+                        sum + (monthlyAmount(item.amount, item.frequency) || 0),
+                    0,
+                ) +
+                this.projectedInsuranceExpenses.reduce(
+                    (sum, item) => sum + (item.monthly || 0),
+                    0,
+                );
+            const liabilityPayments = this.formData.liabilities
+                .filter((item) => !item.is_to_be_paid_off)
+                .reduce(
+                    (sum, item) => sum + (this.liabilityMonthlyPayment(item) || 0),
+                    0,
+                );
+            return {
+                grossIncome: this.roundMoney(grossIncome),
+                netIncome: this.roundMoney(netIncome),
+                expenses: this.roundMoney(expenses),
+                liabilityPayments: this.roundMoney(liabilityPayments),
+                remaining: this.roundMoney(netIncome - expenses - liabilityPayments),
+            };
+        },
+
+        /**
+         * Everything entered, with dropdown values turned into labels, for the
+         * review step. Each section is { title, step, items }, where each
+         * item is { heading, rows: [[label, value]] }.
+         */
+        reviewSummary() {
+            const form = this.formData;
+            const money = this.money;
+            const label = this.lookupLabel;
+            const yesNo = (value) => (value ? "Yes" : "No");
+            const partyName = (partyId) => {
+                const option = this.partyOptions.find(
+                    (entry) => entry.value === this.toId(partyId),
+                );
+                return option ? option.label : "Not assigned";
+            };
+            const linkName = (linkId) => {
+                const option = this.applicationPartyOptions.find(
+                    (entry) => entry.value === this.toId(linkId),
+                );
+                return option ? option.label : "Not assigned";
+            };
+            const rows = (pairs) =>
+                pairs.filter(
+                    (pair) =>
+                        pair[1] !== "" &&
+                        pair[1] !== null &&
+                        pair[1] !== undefined &&
+                        pair[1] !== "—",
+                );
+
+            const loan = {
+                title: "Loan request",
+                step: "request",
+                items: [
+                    {
+                        heading: form.loan_name || "Loan",
+                        rows: rows([
+                            ["Amount", money(form.requested_loan_amount)],
+                            [
+                                "Term",
+                                form.requested_loan_term
+                                    ? `${form.requested_loan_term} months`
+                                    : "",
+                            ],
+                            ["Repayment frequency", form.repayment_frequency],
+                            ["Purpose", form.loan_purpose],
+                            ["Purchase price", form.purchase_price ? money(form.purchase_price) : ""],
+                            ["Down payment", form.down_payment_amount ? money(form.down_payment_amount) : ""],
+                            ["Source of down payment", form.source_of_funds],
+                            ["Seller", [form.seller_type, form.seller_name].filter(Boolean).join(": ")],
+                            ["Vehicle", [form.vehicle_year, form.vehicle_make, form.vehicle_model].filter(Boolean).join(" ")],
+                            ["Vehicle condition", form.vehicle_condition],
+                            ["Property address", form.property_address],
+                            ["Property type", form.property_type],
+                            ["Property value", form.property_value ? money(form.property_value) : ""],
+                            ["Business", form.business_name],
+                            ["Registration number", form.business_registration_number],
+                            ["Business type", form.business_type],
+                        ]),
+                    },
+                ],
+            };
+
+            const applicants = {
+                title: "Applicants",
+                step: "parties",
+                items: this.allApplicants.map((person, index) => {
+                    const heading = this.applicantLabel(
+                        person,
+                        index === 0 ? "Primary Applicant" : person.role,
+                    );
+                    if (this.isThirdPartyOwner(person)) {
+                        return {
+                            heading,
+                            rows: rows([
+                                ["Relationship", label("relationship_to_applicant", person.relationship_to_applicant)],
+                                ["Phone", person.phone],
+                                ["Email", person.email],
+                            ]),
+                        };
+                    }
+                    const deductions = this.statutoryDeductions(person);
+                    return {
+                        heading,
+                        rows: rows([
+                            ["Member", person.is_member ? `Yes (${person.member_number})` : "Not yet a member"],
+                            ["Email", person.email],
+                            ["Phone", person.phone],
+                            ["Date of birth", person.date_of_birth],
+                            ["Address", [person.address, person.parish, person.country].filter(Boolean).join(", ")],
+                            ["Housing", label("housing_status", person.housing_status)],
+                            ["Years at address", person.years_at_address],
+                            ["Dependants", person.number_of_dependants],
+                            ["Citizenship", label("country", person.citizenship)],
+                            ["Residency", label("residency_status", person.residency_status)],
+                            ["NIS number", person.nis_number],
+                            [
+                                "Identification",
+                                (person.identifications || [])
+                                    .map((row) => `${label("identification_type", row.identification_type)} ${row.identification_number}`.trim())
+                                    .join("; "),
+                            ],
+                            ["Employment", [label("employment_status", person.employment_status), label("employment_type", person.employment_type)].filter(Boolean).join(", ")],
+                            ["Employer", [person.employer_name, person.job_title].filter(Boolean).join(", ")],
+                            ["Started", person.employment_start_date],
+                            [
+                                "Gross pay",
+                                person.gross_pay !== null && person.gross_pay !== undefined
+                                    ? `${money(person.gross_pay)} ${label("pay_frequency", person.pay_frequency).toLowerCase()}`.trim()
+                                    : "",
+                            ],
+                            ["Gross monthly income", money(this.grossMonthly(person))],
+                            ["Estimated NIS and income tax", `${money(deductions.nis)} and ${money(deductions.incomeTax)} a month`],
+                            [
+                                "Other income",
+                                (person.incomes || [])
+                                    .map((income) => `${label("income_type", income.income_type)}: ${money(income.amount)} ${String(income.frequency || "").toLowerCase()}`)
+                                    .join("; "),
+                            ],
+                            ["Guarantee", person.role === GUARANTOR_ROLE ? `${label("guarantee_type", person.guarantee_type)} ${money(person.guarantee_amount)}` : ""],
+                            ["Politically exposed person", yesNo(person.is_pep)],
+                            [
+                                "Declarations",
+                                [
+                                    person.declared_bankruptcy ? "bankruptcy" : "",
+                                    person.declared_judgments ? "court judgments" : "",
+                                    person.declared_arrears ? "arrears" : "",
+                                    person.declared_other_applications ? "other applications" : "",
+                                ].filter(Boolean).join(", ") || "None",
+                            ],
+                        ]),
+                    };
+                }),
+            };
+
+            const references = {
+                title: "References",
+                step: "parties",
+                items: (form.references || []).map((row) => ({
+                    heading: `${row.reference_type}: ${row.name || "Not entered"}`,
+                    rows: rows([
+                        ["Relationship", label("reference_relationship", row.relationship)],
+                        ["Phone", row.phone],
+                        ["Email", row.email],
+                    ]),
+                })),
+            };
+
+            const assets = {
+                title: "Assets and collateral",
+                step: "assets",
+                items: form.assets.map((asset, index) => {
+                    const insurance = asset.collateral.insurance;
+                    const liens = this.liensByAsset[asset.client_key] || [];
+                    return {
+                        heading: `${asset.name || `Asset ${index + 1}`}${this.isCollateral(asset) ? " (collateral)" : ""}`,
+                        rows: rows([
+                            ["Type", label("asset_type", asset.asset_type)],
+                            ["Value", money(asset.declared_value)],
+                            ["Owners", (asset.owners || []).map((row) => `${partyName(row.party_id)} ${row.percentage}%`).join("; ")],
+                            ["Registration / chassis", [asset.registration_number, asset.chassis_number].filter(Boolean).join(" / ")],
+                            ["Block and parcel / deed", [asset.block_and_parcel, asset.deed_number].filter(Boolean).join(" / ")],
+                            ["Existing loans on it", liens.join("; ")],
+                            ["Insurance", this.isCollateral(asset) ? [insurance.status, insurance.provider, insurance.reference].filter(Boolean).join(", ") : ""],
+                            ["Premium", this.isCollateral(asset) && insurance.premium ? `${money(insurance.premium)} ${String(insurance.premium_frequency || "").toLowerCase()}` : ""],
+                        ]),
+                    };
+                }),
+            };
+
+            const liabilities = {
+                title: "Liabilities",
+                step: "liabilities",
+                items: form.liabilities.map((item, index) => ({
+                    heading: item.creditor_name || `Liability ${index + 1}`,
+                    rows: rows([
+                        ["Type", this.liabilityTypeFor(item.liability_type)?.name || ""],
+                        ["Balance", money(item.outstanding_balance)],
+                        ["Credit limit", this.isRevolvingType(item.liability_type) ? money(item.credit_limit) : ""],
+                        ["Monthly payment", money(this.liabilityMonthlyPayment(item))],
+                        ["Paid off by this loan", yesNo(item.is_to_be_paid_off)],
+                        ["Secured on", item.is_secured ? this.assetForRef(item.secured_asset_ref)?.name || "Yes" : ""],
+                        ["Responsible", (item.responsibilities || []).map((row) => `${linkName(row.application_party_id)} ${row.percentage}%`).join("; ")],
+                        ["Notes", item.description],
+                    ]),
+                })),
+            };
+
+            const expenses = {
+                title: "Expenses",
+                step: "expenses",
+                items: form.expenses
+                    .map((item, index) => ({
+                        heading: item.expense_name || this.expenseTypeName(item.expense_type) || `Expense ${index + 1}`,
+                        rows: rows([
+                            ["Amount", `${money(item.amount)} ${String(item.frequency || "").toLowerCase()}`.trim()],
+                            ["Monthly", money(monthlyAmount(item.amount, item.frequency))],
+                            ["Paid by", item.is_household ? "Shared household" : linkName(item.application_party_id)],
+                        ]),
+                    }))
+                    .concat(
+                        this.projectedInsuranceExpenses.map((item) => ({
+                            heading: item.name,
+                            rows: [["Monthly", money(item.monthly)]],
+                        })),
+                    ),
+            };
+
+            const totals = this.monthlyTotals;
+            const monthly = {
+                title: "Monthly summary",
+                step: "",
+                items: [
+                    {
+                        heading: "Estimated each month",
+                        rows: [
+                            ["Gross income", money(totals.grossIncome)],
+                            ["Income after NIS and income tax", money(totals.netIncome)],
+                            ["Expenses", money(totals.expenses)],
+                            ["Loan and credit payments (not being paid off)", money(totals.liabilityPayments)],
+                            ["Left over", money(totals.remaining)],
+                        ],
+                    },
+                ],
+            };
+
+            return [loan, applicants, references, assets, liabilities, expenses, monthly].filter(
+                (section) => section.items.length,
+            );
         },
 
         /** Estimated statutory deductions per applicant, keyed by client_key. */
@@ -872,6 +1376,23 @@ export default {
                         locked ||
                             (this.identificationRowIssue(row)
                                 ? "Complete this identification to upload a scan."
+                                : ""),
+                    );
+                });
+
+                // Proof of each other income ("income-<income type>").
+                (person.incomes || []).forEach((income, incomeIndex) => {
+                    const typeLabel = this.lookupLabel("income_type", income.income_type);
+                    add(
+                        `income:${income.client_key}`,
+                        "income",
+                        `${this.applicantName(person, index)}'s ${
+                            typeLabel || `other income ${incomeIndex + 1}`
+                        }`,
+                        this.requirementTypesFor("income", typeLabel),
+                        locked ||
+                            (this.incomeRowIssue(income)
+                                ? "Complete this income to upload proof."
                                 : ""),
                     );
                 });
@@ -1172,6 +1693,193 @@ export default {
                 rows.length > 0 &&
                 rows.every((row) => ownerIds.includes(this.toId(row.party_id)))
             );
+        },
+
+        /** True for a guarantor (full applicant form plus the guarantee). */
+        isGuarantor(person) {
+            return (
+                String(person?.role || "")
+                    .trim()
+                    .toLowerCase() === GUARANTOR_ROLE.toLowerCase()
+            );
+        },
+
+        /** The asset a reference points at: its client key or server ID. */
+        assetForRef(ref) {
+            const value = this.toId(ref);
+            if (!value) return null;
+            return (
+                this.formData.assets.find(
+                    (asset) =>
+                        asset.client_key === value || this.toId(asset.id) === value,
+                ) || null
+            );
+        },
+
+        /**
+         * A liability's monthly payment: the assessed payment for revolving
+         * credit, otherwise its payment turned into a monthly figure.
+         */
+        liabilityMonthlyPayment(liability) {
+            if (this.isRevolvingType(liability.liability_type)) {
+                return this.assessedPayment(liability);
+            }
+            return monthlyAmount(liability.payment_amount, liability.payment_frequency);
+        },
+
+        /** Whole years from a YYYY-MM-DD date until today, or null. */
+        yearsSince(date) {
+            if (!date) return null;
+            const start = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+            if (Number.isNaN(start.getTime())) return null;
+            const now = new Date();
+            let years = now.getFullYear() - start.getFullYear();
+            const anniversaryPassed =
+                now.getMonth() > start.getMonth() ||
+                (now.getMonth() === start.getMonth() &&
+                    now.getDate() >= start.getDate());
+            if (!anniversaryPassed) years--;
+            return Math.max(0, years);
+        },
+
+        /** Under 2 years in the current job, so the previous job is asked for. */
+        needsPreviousEmployment(person) {
+            const years = this.yearsSince(person.employment_start_date);
+            return (
+                this.showsEmploymentDetails(person.employment_status) &&
+                years !== null &&
+                years < 2
+            );
+        },
+
+        /** Under 2 years at the current address, so the previous one is asked for. */
+        needsPreviousAddress(person) {
+            const years = person.years_at_address;
+            return years !== null && years !== undefined && years !== "" && Number(years) < 2;
+        },
+
+        /** What's missing from one other-income row, or "". */
+        incomeRowIssue(income) {
+            if (
+                !income.income_type ||
+                income.amount === null ||
+                income.amount === undefined ||
+                !income.frequency
+            ) {
+                return "Complete the type, amount, and frequency for each other income.";
+            }
+            return "";
+        },
+
+        /** Jumps to a step by its ID (used by "Edit" on the review step). */
+        goToStep(id) {
+            const index = this.path.findIndex((item) => item.id === id);
+            if (index >= 0) this.step = index;
+        },
+
+        /** True when an asset type's label looks like a vehicle. */
+        isVehicleType(value) {
+            return /vehicle|car|auto|truck|motor/i.test(this.assetTypeLabel(value));
+        },
+
+        /** True when an asset type's label looks like land or property. */
+        isPropertyType(value) {
+            return /property|land|house|home|real estate|building|lot/i.test(
+                this.assetTypeLabel(value),
+            );
+        },
+
+        /** The asset for the vehicle or property this loan is buying, or null. */
+        purchaseAsset() {
+            return this.formData.assets.find((asset) => asset.is_purchase) || null;
+        },
+
+        /**
+         * For auto and home loans with a purchase price, keeps an asset for
+         * the vehicle or property being bought, owned 100% by the primary
+         * applicant and marked as collateral. Its name, type, value, and
+         * identifiers follow the "Your request" step. Without a purchase
+         * price (e.g. a refinance), any such asset is removed.
+         */
+        syncPurchaseAsset() {
+            const form = this.formData;
+            const isAuto = form.loan_category === "auto";
+            const isHome = form.loan_category === "home";
+            const price = Number(form.purchase_price);
+            let asset = this.purchaseAsset();
+
+            if (!(isAuto || isHome) || !(price > 0)) {
+                if (asset) {
+                    form.assets = form.assets.filter((entry) => entry !== asset);
+                }
+                return;
+            }
+
+            if (!asset) {
+                asset = {
+                    client_key: generateRowKey("asset"),
+                    id: null,
+                    is_purchase: true,
+                    name: "",
+                    asset_type: "",
+                    description: "",
+                    declared_value: null,
+                    registration_number: "",
+                    chassis_number: "",
+                    block_and_parcel: "",
+                    deed_number: "",
+                    document_ids: [],
+                    owners: [
+                        {
+                            client_key: generateRowKey("owner"),
+                            id: null,
+                            party_id: this.toId(form.primary.party_id) || "",
+                            percentage: 100,
+                        },
+                    ],
+                    collateral: createEmptyCollateral(),
+                };
+                form.assets.unshift(asset);
+            }
+
+            const typeFor = (pattern) => {
+                const option = (this.lookups.asset_type || []).find((entry) =>
+                    pattern.test(String(entry.label)),
+                );
+                return option ? option.value : asset.asset_type;
+            };
+
+            if (isAuto) {
+                Object.assign(asset, {
+                    name:
+                        [form.vehicle_year, form.vehicle_make, form.vehicle_model]
+                            .filter(Boolean)
+                            .join(" ") || "Vehicle being purchased",
+                    asset_type: typeFor(/vehicle|car|auto|motor/i),
+                    registration_number: form.vehicle_registration_number,
+                    chassis_number: form.vehicle_chassis_number,
+                    block_and_parcel: "",
+                    deed_number: "",
+                });
+            } else {
+                Object.assign(asset, {
+                    name: form.property_address || "Property being purchased",
+                    asset_type: typeFor(/property|land|house|home|real estate/i),
+                    registration_number: "",
+                    chassis_number: "",
+                    block_and_parcel: form.property_block_and_parcel,
+                    deed_number: form.property_deed_number,
+                });
+            }
+            asset.declared_value = price;
+            asset.description = "Being purchased with this loan.";
+            asset.collateral.enabled = true;
+
+            // Owned by the primary applicant until someone changes the split.
+            const primaryId = this.toId(form.primary.party_id);
+            if (primaryId && asset.owners.length === 1 && !asset.owners[0].party_id) {
+                asset.owners[0].party_id = primaryId;
+            }
         },
 
         /** Unemployed and retired applicants don't need employer details. */
@@ -1555,15 +2263,44 @@ export default {
                     country: DEFAULT_COUNTRY,
                     parish: this.testOption("parish", /george/i, "St. George"),
                     nis_number: "TEST123456",
+                    member_number: "M-TEST-001",
+                    citizenship: this.testOption("country", /grenada/i, DEFAULT_COUNTRY),
+                    residency_status: this.testOption("residency_status", /citizen/i, "Citizen"),
+                    housing_status: this.testOption("housing_status", /rent/i, "Rent"),
+                    years_at_address: 5,
+                    number_of_dependants: 1,
                     employment_status: this.testOption("employment_status", /^employed/i),
+                    employment_type: this.testOption("employment_type", /permanent/i, "Permanent"),
+                    employment_start_date: "2019-03-01",
                     employer_name: "Test Employer Ltd",
                     job_title: "Clerk",
-                    years_employed: 5,
-                    gross_monthly_income: 6000,
+                    gross_pay: 6000,
+                    pay_frequency: this.testOption("pay_frequency", /^monthly/i, "Monthly"),
                 });
+                primary.is_member = true;
                 primary.consent_accuracy_confirmation = true;
                 primary.consent_credit_check = true;
                 primary.consent_data_processing = true;
+
+                const relationship = (pattern, fallback) =>
+                    this.testOption("reference_relationship", pattern, fallback);
+                const samples = {
+                    "Personal reference": {
+                        name: "Test Reference",
+                        relationship: relationship(/friend/i, "Friend"),
+                        phone: "473-555-0101",
+                    },
+                    "Next of kin": {
+                        name: "Test Next Of Kin",
+                        relationship: relationship(/parent/i, "Parent"),
+                        phone: "473-555-0102",
+                    },
+                };
+                (form.references || []).forEach((row) => {
+                    if (samples[row.reference_type]) {
+                        this.fillBlanks(row, samples[row.reference_type]);
+                    }
+                });
 
                 if (!primary.identifications.length) {
                     primary.identifications.push(createEmptyIdentification(true));
@@ -1596,6 +2333,10 @@ export default {
                         vehicle_model: "Corolla",
                         vehicle_year: "2020",
                         vehicle_condition: this.testOption("vehicle_condition", /used/i),
+                        vehicle_chassis_number: "TESTCHASSIS0001",
+                        purchase_price: 45000,
+                        down_payment_amount: 5000,
+                        seller_name: "Test Motors Ltd",
                     });
                 }
                 if (form.loan_category === "home") {
@@ -1603,6 +2344,19 @@ export default {
                         property_address: "5 Test Road, St. George's",
                         property_type: this.testOption("property_type", /house|single/i),
                         property_value: 350000,
+                        property_block_and_parcel: "Block 1234 Parcel 56",
+                        purchase_price: 350000,
+                        down_payment_amount: 35000,
+                        seller_name: "Test Seller",
+                    });
+                }
+                if (form.loan_category === "auto" || form.loan_category === "home") {
+                    this.fillBlanks(form, {
+                        source_of_funds: this.testOption("source_of_funds", /savings/i, "Savings"),
+                        seller_type: this.testOption(
+                            "seller_type",
+                            form.loan_category === "auto" ? /dealer/i : /private/i,
+                        ),
                     });
                 }
                 if (form.loan_category === "business") {
@@ -1616,43 +2370,54 @@ export default {
                 }
             }
 
-            if (id === "assets" && !form.assets.length) {
-                const asset = {
-                    client_key: generateRowKey("asset"),
-                    id: null,
-                    name: "Test vehicle",
-                    asset_type: this.testOption("asset_type", /vehicle|car|auto/i),
-                    description: "Sample asset added in test mode.",
-                    declared_value: 45000,
-                    document_ids: [],
-                    owners: [
-                        {
-                            client_key: generateRowKey("owner"),
-                            id: null,
-                            party_id: this.toId(primary.party_id) || "",
-                            percentage: 100,
-                        },
-                    ],
-                    collateral: createEmptyCollateral(),
-                };
-                if (this.requiresCollateral) {
-                    asset.collateral.enabled = true;
-                    asset.collateral.description = "Sample collateral.";
-                    asset.collateral.insurance = {
-                        type: this.testOption("insurance_type", /comprehensive/i, "Comprehensive"),
-                        status: this.testOption("insurance_status", /policy/i, "Policy"),
-                        provider: "Test Insurance Co.",
-                        reference: "POL-TEST-001",
-                        coverage_amount: 45000,
-                        premium: 150,
-                        premium_frequency: this.testOption(
-                            "insurance_premium_frequency",
-                            /month/i,
-                        ),
-                        expiry_date: "2030-12-31",
-                    };
+            if (id === "assets") {
+                // A purchase loan already has the asset being bought.
+                if (!form.assets.length) {
+                    form.assets.push({
+                        client_key: generateRowKey("asset"),
+                        id: null,
+                        name: "Test vehicle",
+                        asset_type: this.testOption("asset_type", /vehicle|car|auto/i),
+                        description: "Sample asset added in test mode.",
+                        declared_value: 45000,
+                        registration_number: "PTEST1",
+                        chassis_number: "",
+                        block_and_parcel: "",
+                        deed_number: "",
+                        document_ids: [],
+                        owners: [
+                            {
+                                client_key: generateRowKey("owner"),
+                                id: null,
+                                party_id: this.toId(primary.party_id) || "",
+                                percentage: 100,
+                            },
+                        ],
+                        collateral: Object.assign(createEmptyCollateral(), {
+                            enabled: this.requiresCollateral,
+                        }),
+                    });
                 }
-                form.assets.push(asset);
+                // Fill the insurance on every asset used as collateral.
+                form.assets
+                    .filter((asset) => this.isCollateral(asset))
+                    .forEach((asset) => {
+                        this.fillBlanks(asset.collateral, {
+                            description: "Sample collateral.",
+                        });
+                        this.fillBlanks(asset.collateral.insurance, {
+                            type: this.testOption("insurance_type", /comprehensive/i, "Comprehensive"),
+                            provider: "Test Insurance Co.",
+                            reference: "QUOTE-TEST-001",
+                            coverage_amount: asset.declared_value,
+                            premium: 150,
+                            premium_frequency: this.testOption(
+                                "insurance_premium_frequency",
+                                /^monthly/i,
+                                "Monthly",
+                            ),
+                        });
+                    });
             }
 
             if (id === "liabilities" && !form.liabilities.length) {
@@ -1670,6 +2435,10 @@ export default {
                     payment_frequency: this.testOption("payment_frequency", /month/i),
                     credit_limit: type && type.is_revolving ? 5000 : null,
                     assessed_payment: null,
+                    description: "",
+                    is_to_be_paid_off: false,
+                    is_secured: false,
+                    secured_asset_ref: "",
                     document_ids: [],
                     responsibilities: [
                         {
@@ -1693,7 +2462,8 @@ export default {
                     expense_name: "",
                     expense_type: type ? type.value : "",
                     amount: 800,
-                    frequency: this.testOption("expense_frequency", /month/i),
+                    frequency: this.testOption("expense_frequency", /^monthly/i),
+                    is_household: false,
                     document_ids: [],
                 });
             }
@@ -2167,6 +2937,20 @@ export default {
                         person,
                     };
                 },
+                // Other income is saved as part of its applicant.
+                income: () => {
+                    const person =
+                        this.allApplicants.find((entry) =>
+                            (entry.incomes || []).some(
+                                (row) => row.client_key === ref,
+                            ),
+                        ) || null;
+                    return {
+                        resourceName: "IncomeSource",
+                        record: person ? find(person.incomes) : null,
+                        person,
+                    };
+                },
                 asset: () => ({ resourceName: "Asset", record: find(form.assets) }),
                 liability: () => ({
                     resourceName: "Liability",
@@ -2251,8 +3035,12 @@ export default {
         async ensureOwnerSaved(owner) {
             const record = owner.record;
 
-            if (owner.kind === "applicant" || owner.kind === "identification") {
-                // An identification is saved as part of its applicant.
+            if (
+                owner.kind === "applicant" ||
+                owner.kind === "identification" ||
+                owner.kind === "income"
+            ) {
+                // Identifications and other income are saved with their applicant.
                 const person = owner.kind === "applicant" ? record : owner.person;
                 const primary = this.formData.primary;
                 const isPrimary = person.client_key === primary.client_key;
@@ -2320,9 +3108,13 @@ export default {
             // An asset's collateral ID lives in a nested object.
             if (saved.collateral && current.collateral && saved.collateral.id) {
                 current.collateral.id = saved.collateral.id;
+                if (saved.collateral.projected_expense_id) {
+                    current.collateral.projected_expense_id =
+                        saved.collateral.projected_expense_id;
+                }
             }
 
-            ["owners", "responsibilities", "identifications"].forEach((listKey) =>
+            ["owners", "responsibilities", "identifications", "incomes"].forEach((listKey) =>
                 (saved[listKey] || []).forEach((row) => {
                     const match = (current[listKey] || []).find(
                         (entry) => entry.client_key === row.client_key,
@@ -2607,6 +3399,8 @@ export default {
                 liabilityProps,
                 expenseProps,
                 collateralProps,
+                incomeProps,
+                referenceProps,
             ] = await Promise.all([
                 safeList("LoanType"),
                 safeList("LiabilityType"),
@@ -2619,6 +3413,8 @@ export default {
                 safeLoadProps("Liability"),
                 safeLoadProps("Expense"),
                 safeLoadProps("Collateral"),
+                safeLoadProps("IncomeSource"),
+                safeLoadProps("Reference"),
             ]);
 
             this.products = this.toList(products);
@@ -2632,22 +3428,24 @@ export default {
                 Liability: this.toList(liabilityProps),
                 Expense: this.toList(expenseProps),
                 Collateral: this.toList(collateralProps),
+                IncomeSource: this.toList(incomeProps),
+                Reference: this.toList(referenceProps),
             };
 
             this.liabilityTypes = this.activeSortedTypes(liabilityTypeRows).map(
-                (type) => ({
-                    ...type,
-                    is_revolving: this.toBool(type.is_revolving),
-                    revolving_rate: this.normalizeRate(type.revolving_rate),
-                }),
+                (type) =>
+                    Object.assign({}, type, {
+                        is_revolving: this.toBool(type.is_revolving),
+                        revolving_rate: this.normalizeRate(type.revolving_rate),
+                    }),
             );
 
             this.expenseTypes = this.activeSortedTypes(expenseTypeRows).map(
-                (type) => ({
-                    ...type,
-                    applies_to: this.normalizeCategories(type.applies_to),
-                    user_selectable: this.toBool(type.user_selectable, true),
-                }),
+                (type) =>
+                    Object.assign({}, type, {
+                        applies_to: this.normalizeCategories(type.applies_to),
+                        user_selectable: this.toBool(type.user_selectable, true),
+                    }),
             );
 
             if (!this.liabilityTypes.length || !this.expenseTypes.length) {
@@ -2679,7 +3477,10 @@ export default {
                     "vehicle_condition",
                 ),
                 property_type: this.options(applicationProps, "property_type"),
-                business_type: this.options(applicationProps, "business_type"),
+                // The business is its own Party now; fall back to Application.
+                business_type: this.options(partyProps, "business_type").length
+                    ? this.options(partyProps, "business_type")
+                    : this.options(applicationProps, "business_type"),
                 asset_type: this.options(assetProps, "asset_type"),
                 payment_frequency: this.options(
                     liabilityProps,
@@ -2702,6 +3503,17 @@ export default {
                     applicationPartyProps,
                     "relationship_to_applicant",
                 ),
+                residency_status: this.options(partyProps, "residency_status"),
+                housing_status: this.options(applicationPartyProps, "housing_status"),
+                employment_type: this.options(applicationPartyProps, "employment_type"),
+                pay_frequency: this.options(applicationPartyProps, "pay_frequency"),
+                guarantee_type: this.options(applicationPartyProps, "guarantee_type"),
+                income_type: this.options(incomeProps, "income_type"),
+                income_frequency: this.options(incomeProps, "frequency"),
+                reference_type: this.options(referenceProps, "reference_type"),
+                reference_relationship: this.options(referenceProps, "relationship"),
+                source_of_funds: this.options(applicationProps, "source_of_funds"),
+                seller_type: this.options(applicationProps, "seller_type"),
             });
         },
 
@@ -2737,7 +3549,7 @@ export default {
          */
         estimateNis(person) {
             const settings = STATUTORY_DEDUCTIONS.nis;
-            const gross = Number(person.gross_monthly_income) || 0;
+            const gross = Number(this.grossMonthly(person)) || 0;
             const status = String(person.employment_status || "")
                 .trim()
                 .toLowerCase();
@@ -2772,7 +3584,7 @@ export default {
 
         /** Estimated monthly income tax (PAYE), applied band by band. */
         estimateIncomeTax(person) {
-            const gross = Number(person.gross_monthly_income) || 0;
+            const gross = Number(this.grossMonthly(person)) || 0;
             let tax = 0;
             let lower = 0;
             for (const band of STATUTORY_DEDUCTIONS.incomeTaxBands) {
@@ -2789,10 +3601,11 @@ export default {
          * recalculate them from the saved gross income.
          */
         statutoryDeductions(person) {
-            const gross = Number(person.gross_monthly_income) || 0;
+            const gross = Number(this.grossMonthly(person)) || 0;
             const nis = this.estimateNis(person);
             const incomeTax = this.estimateIncomeTax(person);
             return {
+                gross,
                 nis: nis.amount,
                 nisBasis: nis.basis,
                 incomeTax,
@@ -2817,9 +3630,27 @@ export default {
             );
         },
 
-        /** Today's date as YYYY-MM-DD, for comparing expiry dates. */
+        /**
+         * Today's local date as YYYY-MM-DD, for comparing dates. (toISOString
+         * is UTC, which is a day ahead in Grenada after 8pm.)
+         */
         today() {
-            return new Date().toISOString().slice(0, 10);
+            const now = new Date();
+            const pad = (number) => String(number).padStart(2, "0");
+            return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        },
+
+        /**
+         * An applicant's gross monthly income: their pay per pay period
+         * turned into a monthly figure, or the monthly figure saved before
+         * pay frequency was asked for.
+         */
+        grossMonthly(person) {
+            if (person.gross_pay !== null && person.gross_pay !== undefined && person.gross_pay !== "") {
+                return monthlyAmount(person.gross_pay, person.pay_frequency || "Monthly");
+            }
+            const saved = person.gross_monthly_income;
+            return saved === null || saved === undefined || saved === "" ? null : Number(saved);
         },
 
         /** What's wrong with one identification row, or "" if it's complete. */
@@ -2878,16 +3709,59 @@ export default {
                     ? "Complete the street address, parish, and country."
                     : "Complete the street address and country.";
             }
+            if (person.years_at_address === null || person.years_at_address === undefined || person.years_at_address === "") {
+                return "Enter how many years you've lived at this address.";
+            }
+            if (this.needsPreviousAddress(person) && !person.previous_address) {
+                return "Enter your previous address (you've been at this one under 2 years).";
+            }
+            if (!person.housing_status) return "Choose your housing situation.";
+            if (person.number_of_dependants === null || person.number_of_dependants === undefined || person.number_of_dependants === "") {
+                return "Enter the number of dependants (0 if none).";
+            }
+            if (person.is_member && !person.member_number) {
+                return "Enter your member number, or untick \"I'm a member\".";
+            }
+            if (!person.citizenship || !person.residency_status) {
+                return "Choose your citizenship and residency status.";
+            }
             if (!person.nis_number) return "Enter the NIS number.";
 
             const identificationIssue = this.identificationsIssue(person);
             if (identificationIssue) return identificationIssue;
 
-            if (
-                person.gross_monthly_income === null ||
-                person.gross_monthly_income === undefined
-            ) {
-                return "Enter the gross monthly income.";
+            if (!person.employment_status) return "Choose your employment status.";
+            if (this.showsEmploymentDetails(person.employment_status)) {
+                if (!person.employment_type || !person.employment_start_date) {
+                    return "Enter your employment type and start date.";
+                }
+                if (this.needsPreviousEmployment(person) && !person.previous_employer_name) {
+                    return "Enter your previous employer (you've been in this job under 2 years).";
+                }
+            }
+            if (person.gross_pay === null || person.gross_pay === undefined || person.gross_pay === "") {
+                return "Enter your gross pay (0 if none).";
+            }
+            if (Number(person.gross_pay) > 0 && !person.pay_frequency) {
+                return "Choose how often you're paid.";
+            }
+            for (const income of person.incomes || []) {
+                const issue = this.incomeRowIssue(income);
+                if (issue) return issue;
+            }
+            if (this.isGuarantor(person) && (!person.guarantee_type || !(Number(person.guarantee_amount) > 0))) {
+                return "Enter the guarantee type and amount.";
+            }
+            if (person.is_pep && !person.pep_details) {
+                return "Explain the politically exposed person answer.";
+            }
+            const declaredYes =
+                person.declared_bankruptcy ||
+                person.declared_judgments ||
+                person.declared_arrears ||
+                person.declared_other_applications;
+            if (declaredYes && !person.declaration_details) {
+                return "Explain any \"yes\" answer in the declarations.";
             }
             if (
                 !person.consent_accuracy_confirmation ||
@@ -2970,6 +3844,12 @@ export default {
                         : this.applicantIssue(person);
                     if (issue) return `${name}: ${issue}`;
                 }
+
+                for (const row of form.references || []) {
+                    if (!row.name || !row.relationship || !row.phone) {
+                        return `${row.reference_type}: enter their name, relationship, and phone number.`;
+                    }
+                }
             }
 
             if (this.current.id === "request") {
@@ -2989,6 +3869,25 @@ export default {
                 }
                 if (term < this.termMinimum || term > this.termMaximum) {
                     return `Term must be between ${this.termMinimum} and ${this.termMaximum} months.`;
+                }
+
+                const price = Number(form.purchase_price) || 0;
+                const downPayment = Number(form.down_payment_amount) || 0;
+                if (price > 0 && downPayment >= price) {
+                    return "The down payment must be less than the purchase price.";
+                }
+                if (downPayment > 0 && !form.source_of_funds) {
+                    return "Choose where the down payment is coming from.";
+                }
+                if (
+                    downPayment > 0 &&
+                    String(form.source_of_funds).toLowerCase() === "other" &&
+                    !form.source_of_funds_details
+                ) {
+                    return "Describe where the down payment is coming from.";
+                }
+                if (form.loan_category === "business" && !form.business_name) {
+                    return "Enter the business name.";
                 }
             }
 
@@ -3065,6 +3964,13 @@ export default {
                 if (hasInvalidLiability) {
                     return "Complete every liability and total responsibility to 100%.";
                 }
+
+                const missingSecurity = form.liabilities.find(
+                    (item) => item.is_secured && !this.assetForRef(item.secured_asset_ref),
+                );
+                if (missingSecurity) {
+                    return `${missingSecurity.creditor_name || "A secured liability"}: choose the asset it's secured on (add it on the Assets step if it's missing).`;
+                }
             }
 
             if (this.current.id === "expenses") {
@@ -3079,11 +3985,14 @@ export default {
                     return `Remove or change expenses that don't apply to a ${this.loanCategoryLabel}.`;
                 }
 
+                // A shared household expense isn't assigned to one person.
                 const hasInvalidExpense = form.expenses.some(
                     (item) =>
-                        !this.isBorrowerLink(item.application_party_id) ||
+                        (!item.is_household &&
+                            !this.isBorrowerLink(item.application_party_id)) ||
                         !item.expense_type ||
-                        item.amount === null,
+                        item.amount === null ||
+                        item.amount === undefined,
                 );
                 if (hasInvalidExpense) {
                     return "Complete and assign every expense.";
@@ -3094,7 +4003,7 @@ export default {
             // above run first, since items can't receive uploads until
             // they're complete.
             const kindsByStep = {
-                parties: ["applicant", "identification"],
+                parties: ["applicant", "identification", "income"],
                 assets: ["asset", "collateral"],
                 liabilities: ["liability"],
                 expenses: ["expense"],
@@ -3120,6 +4029,9 @@ export default {
             if (issue) return this.warn(issue);
 
             this.alert = { text: "", type: "warning" };
+
+            // The vehicle or property being bought becomes a collateral asset.
+            if (this.current.id === "request") this.syncPurchaseAsset();
 
             const persistedSteps = [
                 "parties",
@@ -3184,21 +4096,49 @@ export default {
                     property_value: form.property_value,
                 });
             }
-            if (form.loan_category === "business") {
+            // Purchase details (auto and home). The down payment's source is
+            // an anti-money-laundering question.
+            if (form.loan_category === "auto" || form.loan_category === "home") {
+                const hasDownPayment = Number(form.down_payment_amount) > 0;
                 Object.assign(payload, {
-                    business_name: form.business_name,
-                    business_registration_number:
-                        form.business_registration_number,
-                    business_type: form.business_type,
-                    business_incorporation_date:
-                        form.business_incorporation_date,
-                    business_employee_count: String(
-                        form.business_employee_count || "",
-                    ),
+                    purchase_price: form.purchase_price,
+                    down_payment_amount: form.down_payment_amount,
+                    source_of_funds: hasDownPayment ? form.source_of_funds : "",
+                    source_of_funds_details: hasDownPayment
+                        ? form.source_of_funds_details
+                        : "",
+                    seller_type: form.seller_type,
+                    seller_name: form.seller_name,
                 });
+            }
+            // The business itself is its own Party (see saveBusinessParty).
+            if (form.loan_category === "business") {
+                payload.business_party = this.toId(form.business_party_id);
             }
 
             return payload;
+        },
+
+        /**
+         * Saves the business on a business loan as its own Party (kind
+         * ORGANIZATION) and returns its ID. Party records are shared, so the
+         * business is never deleted by the form.
+         */
+        async saveBusinessParty() {
+            const form = this.formData;
+            if (form.loan_category !== "business" || !form.business_name) {
+                return this.toId(form.business_party_id);
+            }
+            form.business_party_id = await this.upsert("Party", form.business_party_id, {
+                kind: "ORGANIZATION",
+                business_name: form.business_name,
+                legal_name: form.business_name,
+                registration_number: form.business_registration_number,
+                business_type: form.business_type,
+                incorporation_date: form.business_incorporation_date || null,
+                number_of_employees: form.business_employee_count,
+            });
+            return form.business_party_id;
         },
 
         /** Identity data stored on the Party resource (shared across applications). */
@@ -3229,6 +4169,24 @@ export default {
                 parish: this.isGrenada(person.country) ? person.parish : "",
                 country: person.country,
                 nis_number: person.nis_number,
+                is_member: Boolean(person.is_member),
+                member_number: person.is_member ? person.member_number : "",
+                citizenship: person.citizenship,
+                residency_status: person.residency_status,
+                tin: person.tin,
+                years_at_address: person.years_at_address,
+                previous_address: this.needsPreviousAddress(person)
+                    ? person.previous_address
+                    : "",
+                previous_parish:
+                    this.needsPreviousAddress(person) &&
+                    this.isGrenada(person.previous_country)
+                        ? person.previous_parish
+                        : "",
+                previous_country: this.needsPreviousAddress(person)
+                    ? person.previous_country
+                    : "",
+                mailing_address: person.mailing_address,
                 // ids are set after the identifications are saved, since a
                 // PartyIdentification can't exist before its Party.
             };
@@ -3288,6 +4246,8 @@ export default {
             const showEmployment = this.showsEmploymentDetails(
                 person.employment_status,
             );
+            const showPrevious = this.needsPreviousEmployment(person);
+            const guarantor = !isPrimary && this.isGuarantor(person);
 
             return {
                 party: this.toId(person.party_id),
@@ -3296,11 +4256,38 @@ export default {
                 relationship_status: "Active",
                 is_primary_contact: isPrimary,
                 relationship_to_applicant: "",
+                housing_status: person.housing_status,
+                number_of_dependants: person.number_of_dependants,
                 employment_status: person.employment_status,
+                employment_type: showEmployment ? person.employment_type : "",
+                employment_start_date: showEmployment
+                    ? person.employment_start_date || null
+                    : null,
                 employer_name: showEmployment ? person.employer_name : "",
                 job_title: showEmployment ? person.job_title : "",
-                years_employed: showEmployment ? person.years_employed : null,
-                gross_monthly_income: person.gross_monthly_income,
+                // Worked out from the start date.
+                years_employed: showEmployment
+                    ? this.yearsSince(person.employment_start_date)
+                    : null,
+                previous_employer_name: showPrevious ? person.previous_employer_name : "",
+                previous_job_title: showPrevious ? person.previous_job_title : "",
+                previous_employment_years: showPrevious
+                    ? person.previous_employment_years
+                    : null,
+                gross_pay: person.gross_pay,
+                pay_frequency: person.pay_frequency,
+                // Worked out from gross pay and pay frequency.
+                gross_monthly_income: this.grossMonthly(person),
+                annual_revenue: person.annual_revenue,
+                guarantee_type: guarantor ? person.guarantee_type : "",
+                guarantee_amount: guarantor ? person.guarantee_amount : null,
+                is_pep: Boolean(person.is_pep),
+                pep_details: person.is_pep ? person.pep_details : "",
+                declared_bankruptcy: Boolean(person.declared_bankruptcy),
+                declared_judgments: Boolean(person.declared_judgments),
+                declared_arrears: Boolean(person.declared_arrears),
+                declared_other_applications: Boolean(person.declared_other_applications),
+                declaration_details: person.declaration_details,
                 // Calculated from gross monthly income, not entered.
                 nis_deduction: this.estimateNis(person).amount,
                 income_tax_deduction: this.estimateIncomeTax(person),
@@ -3411,7 +4398,62 @@ export default {
             person.consent_policy_version =
                 applicationPartyPayload.consent_policy_version;
 
+            // Other income hangs off the ApplicationParty, so it's saved after.
+            await this.saveIncomes(person, isPrimary);
+
             return person.application_party_id;
+        },
+
+        /**
+         * Saves an applicant's other income as IncomeSource records and links
+         * them through ApplicationParty.income_ids. Third Party Owners aren't
+         * borrowing, so they have none. Removed rows are deleted by
+         * deleteStaleRecords().
+         */
+        async saveIncomes(person, isPrimary) {
+            const incomes =
+                !isPrimary && this.isThirdPartyOwner(person) ? [] : person.incomes || [];
+            for (const income of incomes) {
+                income.id = await this.upsert("IncomeSource", income.id, {
+                    application_party: this.toId(person.application_party_id),
+                    income_type: income.income_type,
+                    description: income.description,
+                    amount: income.amount,
+                    frequency: income.frequency,
+                    monthly_equivalent: monthlyAmount(income.amount, income.frequency),
+                    documents: this.documentIdsOf(income),
+                });
+            }
+            await new Resource(this, "ApplicationParty").update(
+                person.application_party_id,
+                {
+                    income_ids: incomes
+                        .map((income) => this.toId(income.id))
+                        .filter(Boolean),
+                },
+            );
+        },
+
+        /**
+         * Saves the references (personal reference and next of kin) as
+         * Reference records linked to the application, and returns their IDs.
+         */
+        async saveReferences() {
+            const ids = [];
+            for (const row of this.formData.references || []) {
+                if (!row.name) continue;
+                row.id = await this.upsert("Reference", row.id, {
+                    application: this.toId(this.formData.id),
+                    reference_type: row.reference_type,
+                    name: row.name,
+                    relationship: row.relationship,
+                    phone: row.phone,
+                    email: row.email,
+                    address: row.address,
+                });
+                ids.push(row.id);
+            }
+            return ids;
         },
 
         /**
@@ -3461,12 +4503,20 @@ export default {
          * are skipped; they're saved once assigned.
          */
         async saveAsset(asset) {
+            // Identifiers only apply to their kind of asset.
+            const vehicle = this.isVehicleType(asset.asset_type);
+            const property = this.isPropertyType(asset.asset_type);
             asset.id = await this.upsert("Asset", asset.id, {
                 name: asset.name,
                 asset_type: asset.asset_type,
                 description: asset.description,
                 declared_value: asset.declared_value,
-                status: "Declared",
+                registration_number: vehicle ? asset.registration_number || "" : "",
+                chassis_number: vehicle ? asset.chassis_number || "" : "",
+                block_and_parcel: property ? asset.block_and_parcel || "" : "",
+                deed_number: property ? asset.deed_number || "" : "",
+                // The vehicle or property a purchase loan is buying.
+                status: asset.is_purchase ? PURCHASE_ASSET_STATUS : "Declared",
                 documents: this.documentIdsOf(asset),
             });
 
@@ -3501,6 +4551,15 @@ export default {
                 assessed_payment: revolving
                     ? this.assessedPayment(liability)
                     : null,
+                monthly_equivalent: this.liabilityMonthlyPayment(liability),
+                // The balance is as of the date the application is filled in.
+                balance_as_of: this.today(),
+                description: liability.description,
+                is_to_be_paid_off: Boolean(liability.is_to_be_paid_off),
+                is_secured: Boolean(liability.is_secured),
+                secured_asset: liability.is_secured
+                    ? this.toId(this.assetForRef(liability.secured_asset_ref)?.id)
+                    : null,
                 documents: this.documentIdsOf(liability),
             });
 
@@ -3516,18 +4575,64 @@ export default {
         },
 
         async saveExpense(expense) {
+            // A shared household expense is linked to the primary applicant
+            // (so it can be found again) and marked is_household.
+            const linkId = expense.is_household
+                ? this.toId(this.formData.primary.application_party_id)
+                : this.toId(expense.application_party_id);
             expense.id = await this.upsert("Expense", expense.id, {
-                applicationpartiesid: this.toId(expense.application_party_id),
+                applicationpartiesid: linkId,
+                is_household: Boolean(expense.is_household),
                 expense_name:
                     expense.expense_name ||
                     this.expenseTypeName(expense.expense_type),
                 expense_type: this.toId(expense.expense_type),
                 amount: expense.amount,
                 frequency: expense.frequency,
+                monthly_equivalent: monthlyAmount(expense.amount, expense.frequency),
+                is_projected: false,
                 status: "Declared",
                 documents: this.documentIdsOf(expense),
             });
             return expense.id;
+        },
+
+        /**
+         * Saves the projected monthly insurance cost of a collateral asset as
+         * an Expense marked is_projected, linked to its Collateral record.
+         * Uses the COLLATERAL_INSURANCE expense type when it's set up in
+         * Saturn. Returns the Expense ID, or null when there's no premium
+         * (a projected expense saved earlier is then deleted on this save).
+         */
+        async saveProjectedInsurance(asset) {
+            const collateral = asset.collateral;
+            const projected = this.projectedInsuranceExpenses.find(
+                (item) => item.asset_key === asset.client_key,
+            );
+            if (!projected) {
+                collateral.projected_expense_id = null;
+                return null;
+            }
+            const type = this.collateralInsuranceType;
+            collateral.projected_expense_id = await this.upsert(
+                "Expense",
+                collateral.projected_expense_id,
+                {
+                    applicationpartiesid: this.toId(
+                        this.formData.primary.application_party_id,
+                    ),
+                    expense_name: projected.name,
+                    expense_type: type ? this.toId(type) : null,
+                    amount: projected.amount,
+                    frequency: projected.frequency,
+                    monthly_equivalent: projected.monthly,
+                    is_projected: true,
+                    is_household: false,
+                    collateral: this.toId(collateral.id),
+                    status: "Projected",
+                },
+            );
+            return collateral.projected_expense_id;
         },
 
         /**
@@ -3571,9 +4676,16 @@ export default {
             // Collateral is saved with its asset, and only while the loan
             // requires it. If the applicant switched to an unsecured loan,
             // deleteStaleRecords() removes any collateral saved earlier.
+            // Projected insurance expenses are saved after their collateral.
             for (const asset of this.formData.assets) {
                 assetIds.push(await this.saveAsset(asset));
-                if (this.isCollateral(asset)) await this.saveCollateral(asset);
+                if (this.isCollateral(asset)) {
+                    await this.saveCollateral(asset);
+                    const projectedId = await this.saveProjectedInsurance(asset);
+                    if (projectedId) expenseIds.push(projectedId);
+                } else {
+                    asset.collateral.projected_expense_id = null;
+                }
             }
             for (const liability of this.formData.liabilities) {
                 liabilityIds.push(await this.saveLiability(liability));
@@ -3602,7 +4714,14 @@ export default {
                 LiabilityResponsibility: form.liabilities.flatMap(
                     (liability) => idsOf(liability.responsibilities),
                 ),
-                Expense: idsOf(form.expenses),
+                // Declared expenses plus the projected insurance expenses of
+                // collateral that still has a premium.
+                Expense: idsOf(form.expenses).concat(
+                    form.assets
+                        .filter((asset) => this.isCollateral(asset))
+                        .map((asset) => this.toId(asset.collateral.projected_expense_id))
+                        .filter(Boolean),
+                ),
                 // Collateral counts only while its asset is marked as
                 // collateral and the loan requires it.
                 Collateral: idsOf(
@@ -3610,6 +4729,11 @@ export default {
                         .filter((asset) => this.isCollateral(asset))
                         .map((asset) => asset.collateral),
                 ),
+                // Third Party Owners have no other income.
+                IncomeSource: this.allApplicants
+                    .filter((person) => !this.isThirdPartyOwner(person))
+                    .flatMap((person) => idsOf(person.incomes)),
+                Reference: idsOf(form.references),
                 ApplicationParty: this.allApplicants
                     .map((person) => this.toId(person.application_party_id))
                     .filter(Boolean),
@@ -3710,6 +4834,21 @@ export default {
                     .filter(Boolean),
                 "Collateral",
             );
+            form.assets.forEach((asset) => {
+                const collateral = asset.collateral;
+                if (
+                    collateral &&
+                    collateral.projected_expense_id &&
+                    deleted.Expense &&
+                    deleted.Expense.has(this.toId(collateral.projected_expense_id))
+                ) {
+                    collateral.projected_expense_id = null;
+                }
+            });
+            this.allApplicants.forEach((person) =>
+                clear(person.incomes, "IncomeSource"),
+            );
+            clear(form.references, "Reference");
         },
 
         /**
@@ -3730,6 +4869,9 @@ export default {
                     partyLinks.push(await this.saveApplicant(person, false));
                 }
 
+                // The business on a business loan is its own Party.
+                await this.saveBusinessParty();
+
                 // 2. Bundle the newly minted party IDs into the core payload
                 const resource = new Resource(this, "Application");
                 const payload = Object.assign(this.appPayload(), {
@@ -3747,14 +4889,16 @@ export default {
                     await resource.update(this.formData.id, payload);
                 }
 
-                // 4. Save financials (these still run after since Collateral relies on this.formData.id)
+                // 4. Save financials and references (these need this.formData.id)
                 const financials = await this.saveFinancials();
+                const referenceIds = await this.saveReferences();
 
-                // Link the financials back to the application
+                // Link them back to the application
                 await resource.update(this.formData.id, {
                     asset_ids: financials.assetIds,
                     liability_ids: financials.liabilityIds,
                     expense_ids: financials.expenseIds,
+                    reference_ids: referenceIds,
                 });
 
                 // 5. Delete what the applicant removed since the last save.
@@ -3842,6 +4986,7 @@ export default {
                     "assets",
                     "liabilities",
                     "expenses",
+                    "references",
                 ];
                 Object.keys(form).forEach((fieldName) => {
                     if (
@@ -3899,6 +5044,29 @@ export default {
                         identificationRows[0].is_primary = true;
                     }
 
+                    // Other income is linked from ApplicationParty.income_ids.
+                    const incomeRows = (
+                        await this.byIds("IncomeSource", link.income_ids || [])
+                    ).map((row) =>
+                        Object.assign(createEmptyIncome(), {
+                            id: this.toId(row),
+                            income_type: row.income_type || "",
+                            description: row.description || "",
+                            amount: row.amount ?? null,
+                            frequency: row.frequency || "",
+                            document_ids: (row.documents || [])
+                                .map(this.toId)
+                                .filter(Boolean),
+                        }),
+                    );
+
+                    // Drafts saved before pay frequency existed only have a
+                    // monthly figure.
+                    const hasGrossPay =
+                        link.gross_pay !== null &&
+                        link.gross_pay !== undefined &&
+                        link.gross_pay !== "";
+
                     people.push(
                         Object.assign(createEmptyApplicant(link.role || ""), {
                             party_id: partyId,
@@ -3921,6 +5089,19 @@ export default {
                             parish: party.parish || "",
                             country: party.country || DEFAULT_COUNTRY,
                             nis_number: party.nis_number || "",
+                            is_member: party.is_member === true,
+                            member_number: party.member_number || "",
+                            citizenship: party.citizenship || "",
+                            residency_status: party.residency_status || "",
+                            tin: party.tin || "",
+                            years_at_address: party.years_at_address ?? null,
+                            previous_address: party.previous_address || "",
+                            previous_parish: party.previous_parish || "",
+                            previous_country:
+                                party.previous_country || DEFAULT_COUNTRY,
+                            mailing_address: party.mailing_address || "",
+                            housing_status: link.housing_status || "",
+                            number_of_dependants: link.number_of_dependants ?? null,
                             identifications: identificationRows.length
                                 ? identificationRows
                                 : [createEmptyIdentification(true)],
@@ -3928,11 +5109,40 @@ export default {
                                 (row) => row.id,
                             ),
                             employment_status: link.employment_status || "",
+                            employment_type: link.employment_type || "",
+                            employment_start_date: link.employment_start_date
+                                ? String(link.employment_start_date).slice(0, 10)
+                                : "",
                             employer_name: link.employer_name || "",
                             job_title: link.job_title || "",
                             years_employed: link.years_employed ?? null,
+                            gross_pay: hasGrossPay
+                                ? link.gross_pay
+                                : link.gross_monthly_income ?? null,
+                            pay_frequency: hasGrossPay
+                                ? link.pay_frequency || ""
+                                : link.gross_monthly_income !== null &&
+                                    link.gross_monthly_income !== undefined
+                                  ? "Monthly"
+                                  : "",
                             gross_monthly_income:
                                 link.gross_monthly_income ?? null,
+                            annual_revenue: link.annual_revenue ?? null,
+                            previous_employer_name: link.previous_employer_name || "",
+                            previous_job_title: link.previous_job_title || "",
+                            previous_employment_years:
+                                link.previous_employment_years ?? null,
+                            incomes: incomeRows,
+                            guarantee_type: link.guarantee_type || "",
+                            guarantee_amount: link.guarantee_amount ?? null,
+                            is_pep: link.is_pep === true,
+                            pep_details: link.pep_details || "",
+                            declared_bankruptcy: link.declared_bankruptcy === true,
+                            declared_judgments: link.declared_judgments === true,
+                            declared_arrears: link.declared_arrears === true,
+                            declared_other_applications:
+                                link.declared_other_applications === true,
+                            declaration_details: link.declaration_details || "",
                             consent_accuracy_confirmation:
                                 link.consent_accuracy_confirmation === true,
                             consent_credit_check:
@@ -3977,10 +5187,69 @@ export default {
                         asset_type: item.asset_type || "",
                         description: item.description || "",
                         declared_value: item.declared_value ?? null,
+                        registration_number: item.registration_number || "",
+                        chassis_number: item.chassis_number || "",
+                        block_and_parcel: item.block_and_parcel || "",
+                        deed_number: item.deed_number || "",
+                        is_purchase: item.status === PURCHASE_ASSET_STATUS,
                         owners: [],
                         collateral: createEmptyCollateral(),
                     }),
                 );
+
+                // The vehicle or property being bought keeps its identifiers
+                // on its Asset; copy them back to the "Your request" step.
+                const purchased = form.assets.find((asset) => asset.is_purchase);
+                if (purchased) {
+                    Object.assign(form, {
+                        vehicle_registration_number: purchased.registration_number,
+                        vehicle_chassis_number: purchased.chassis_number,
+                        property_block_and_parcel: purchased.block_and_parcel,
+                        property_deed_number: purchased.deed_number,
+                    });
+                }
+
+                // --- Rebuild references ---
+                const referenceRows = await this.byIds(
+                    "Reference",
+                    record.reference_ids || [],
+                );
+                form.references = ["Personal reference", "Next of kin"].map(
+                    (referenceType) => {
+                        const row = referenceRows.find(
+                            (entry) => entry.reference_type === referenceType,
+                        );
+                        const reference = createEmptyReference(referenceType);
+                        if (!row) return reference;
+                        return Object.assign(reference, {
+                            id: this.toId(row),
+                            name: row.name || "",
+                            relationship: row.relationship || "",
+                            phone: row.phone || "",
+                            email: row.email || "",
+                            address: row.address || "",
+                        });
+                    },
+                );
+
+                // --- Rebuild the business (business loans) ---
+                const businessId = this.toId(record.business_party);
+                form.business_party_id = businessId;
+                if (businessId) {
+                    const business = (await this.byIds("Party", [businessId]))[0];
+                    if (business) {
+                        Object.assign(form, {
+                            business_name: business.business_name || business.legal_name || "",
+                            business_registration_number:
+                                business.registration_number || "",
+                            business_type: business.business_type || "",
+                            business_incorporation_date: business.incorporation_date
+                                ? String(business.incorporation_date).slice(0, 10)
+                                : "",
+                            business_employee_count: business.number_of_employees ?? null,
+                        });
+                    }
+                }
 
                 for (const asset of form.assets) {
                     const ownershipRows = await this.listFor(
@@ -4049,6 +5318,12 @@ export default {
                     payment_frequency: item.payment_frequency || "",
                     credit_limit: item.credit_limit ?? null,
                     assessed_payment: item.assessed_payment ?? null,
+                    description: item.description || "",
+                    is_to_be_paid_off: item.is_to_be_paid_off === true,
+                    is_secured: item.is_secured === true,
+                    // Points at the asset's client key, like the dropdown.
+                    secured_asset_ref:
+                        this.assetForRef(item.secured_asset)?.client_key || "",
                     responsibilities: [],
                 }));
 
@@ -4094,16 +5369,23 @@ export default {
                     );
                 } else {
                     for (const person of people) {
-                        expenseRecords.push(
-                            ...(await this.listFor(
+                        expenseRecords = expenseRecords.concat(
+                            await this.listFor(
                                 "Expense",
                                 `applicationpartiesid = ${this.quote(this.toId(person.application_party_id))}`,
-                            )),
+                            ),
                         );
                     }
                 }
 
-                form.expenses = expenseRecords.map((item) => ({
+                // Projected insurance expenses are rebuilt from their
+                // collateral below, not shown as declared expenses.
+                const projectedRecords = expenseRecords.filter(
+                    (item) => item.is_projected === true,
+                );
+                form.expenses = expenseRecords
+                    .filter((item) => item.is_projected !== true)
+                    .map((item) => ({
                     client_key: generateRowKey("expense"),
                     id: this.toId(item),
                     document_ids: (item.documents || [])
@@ -4118,6 +5400,7 @@ export default {
                     ),
                     amount: item.amount ?? null,
                     frequency: item.frequency || "",
+                    is_household: item.is_household === true,
                 }));
 
                 // --- Rebuild collateral onto its assets ---
@@ -4153,6 +5436,13 @@ export default {
                             expiry_date: item.insurance_expiry_date || "",
                         },
                     });
+
+                    const projected = projectedRecords.find(
+                        (entry) => this.toId(entry.collateral) === this.toId(item),
+                    );
+                    if (projected) {
+                        asset.collateral.projected_expense_id = this.toId(projected);
+                    }
                 });
 
                 // Everything just loaded is what's on the server right now.
@@ -4198,6 +5488,7 @@ export default {
                     application: "documents",
                     applicant: "parties",
                     identification: "parties",
+                    income: "parties",
                     asset: "assets",
                     liability: "liabilities",
                     expense: "expenses",

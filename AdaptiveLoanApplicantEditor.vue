@@ -177,6 +177,60 @@
         </el-form-item>
       </div>
 
+      <!-- Membership, citizenship, and tax (anti-money-laundering) -->
+      <section class="context">
+        <h3>Membership and residency</h3>
+        <div class="field-grid">
+          <el-form-item label="I'm a member of the credit union">
+            <FormField
+              :model-value="draft.is_member"
+              :property="field('Party', 'is_member', 'I\'m a member of the credit union', 'checkbox')"
+              :form="draft"
+              @update:model-value="set('is_member', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="draft.is_member" label="Member number" required>
+            <FormField
+              :model-value="draft.member_number"
+              :property="field('Party', 'member_number', 'Member number', 'input')"
+              :form="draft"
+              @update:model-value="set('member_number', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Citizenship" required>
+            <FormField
+              :model-value="draft.citizenship"
+              :property="field('Party', 'citizenship', 'Citizenship', 'select')"
+              :form="draft"
+              @update:model-value="set('citizenship', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Residency status" required>
+            <FormField
+              :model-value="draft.residency_status"
+              :property="field('Party', 'residency_status', 'Residency status', 'select')"
+              :form="draft"
+              @update:model-value="set('residency_status', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Tax ID (TIN)">
+            <FormField
+              :model-value="draft.tin"
+              :property="field('Party', 'tin', 'Tax ID (TIN)', 'input')"
+              :form="draft"
+              @update:model-value="set('tin', $event)"
+            />
+          </el-form-item>
+        </div>
+        <p v-if="!draft.is_member" class="helper">
+          Not a member yet? You can still apply. We'll contact you about joining.
+        </p>
+      </section>
+
       <!-- Home address, split into street, parish, and country -->
       <section class="context">
         <h3>Home address</h3>
@@ -207,7 +261,77 @@
               @update:model-value="set('parish', $event)"
             />
           </el-form-item>
+
+          <el-form-item label="Years at this address" required>
+            <FormField
+              :model-value="draft.years_at_address"
+              :property="field('Party', 'years_at_address', 'Years at this address', 'number')"
+              :form="draft"
+              @update:model-value="set('years_at_address', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Housing" required>
+            <FormField
+              :model-value="draft.housing_status"
+              :property="field('ApplicationParty', 'housing_status', 'Housing', 'select')"
+              :form="draft"
+              @update:model-value="set('housing_status', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Number of dependants" required>
+            <FormField
+              :model-value="draft.number_of_dependants"
+              :property="field('ApplicationParty', 'number_of_dependants', 'Number of dependants', 'number')"
+              :form="draft"
+              @update:model-value="set('number_of_dependants', $event)"
+            />
+          </el-form-item>
         </div>
+        <p class="helper">
+          Enter rent as an expense and a mortgage as a liability, on their own steps.
+        </p>
+
+        <!-- Previous address: only under 2 years at this one -->
+        <template v-if="needsPreviousAddress">
+          <h4 class="subheading">Previous address</h4>
+          <el-form-item label="Previous street address" required>
+            <FormField
+              :model-value="draft.previous_address"
+              :property="field('Party', 'previous_address', 'Previous street address', 'textarea')"
+              :form="draft"
+              @update:model-value="set('previous_address', $event)"
+            />
+          </el-form-item>
+          <div class="field-grid">
+            <el-form-item label="Previous country">
+              <FormField
+                :model-value="draft.previous_country"
+                :property="field('Party', 'previous_country', 'Previous country', 'select')"
+                :form="draft"
+                @update:model-value="set('previous_country', $event)"
+              />
+            </el-form-item>
+            <el-form-item v-if="previousInGrenada" label="Previous parish">
+              <FormField
+                :model-value="draft.previous_parish"
+                :property="field('Party', 'previous_parish', 'Previous parish', 'select')"
+                :form="draft"
+                @update:model-value="set('previous_parish', $event)"
+              />
+            </el-form-item>
+          </div>
+        </template>
+
+        <el-form-item label="Mailing address (only if different)">
+          <FormField
+            :model-value="draft.mailing_address"
+            :property="field('Party', 'mailing_address', 'Mailing address (only if different)', 'textarea')"
+            :form="draft"
+            @update:model-value="set('mailing_address', $event)"
+          />
+        </el-form-item>
       </section>
 
       <!-- Identification: one or more PartyIdentification records -->
@@ -316,7 +440,7 @@
       <section class="context">
         <h3>Employment and income</h3>
         <div class="field-grid">
-          <el-form-item label="Employment status">
+          <el-form-item label="Employment status" required>
             <FormField
               :model-value="draft.employment_status"
               :property="field('ApplicationParty', 'employment_status', 'Employment status', 'select')"
@@ -325,16 +449,16 @@
             />
           </el-form-item>
 
-          <el-form-item label="Gross monthly income (EC$)" required>
-            <FormField
-              :model-value="draft.gross_monthly_income"
-              :property="field('ApplicationParty', 'gross_monthly_income', 'Gross monthly income (EC$)', 'number')"
-              :form="draft"
-              @update:model-value="set('gross_monthly_income', $event)"
-            />
-          </el-form-item>
-
           <template v-if="showEmploymentDetails">
+            <el-form-item label="Employment type" required>
+              <FormField
+                :model-value="draft.employment_type"
+                :property="field('ApplicationParty', 'employment_type', 'Employment type', 'select')"
+                :form="draft"
+                @update:model-value="set('employment_type', $event)"
+              />
+            </el-form-item>
+
             <el-form-item label="Employer / business">
               <FormField
                 :model-value="draft.employer_name"
@@ -353,19 +477,81 @@
               />
             </el-form-item>
 
-            <el-form-item label="Years employed">
+            <el-form-item label="Start date" required>
               <FormField
-                :model-value="draft.years_employed"
-                :property="field('ApplicationParty', 'years_employed', 'Years employed', 'number')"
+                :model-value="draft.employment_start_date"
+                :property="field('ApplicationParty', 'employment_start_date', 'Start date', 'date')"
                 :form="draft"
-                @update:model-value="set('years_employed', $event)"
+                @update:model-value="set('employment_start_date', $event, 'date')"
               />
             </el-form-item>
           </template>
+
+          <el-form-item label="Gross pay (EC$, before deductions)" required>
+            <FormField
+              :model-value="draft.gross_pay"
+              :property="field('ApplicationParty', 'gross_pay', 'Gross pay (EC$, before deductions)', 'number')"
+              :form="draft"
+              @update:model-value="set('gross_pay', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item label="Paid how often?" :required="Number(draft.gross_pay) > 0">
+            <FormField
+              :model-value="draft.pay_frequency"
+              :property="field('ApplicationParty', 'pay_frequency', 'Paid how often?', 'select')"
+              :form="draft"
+              @update:model-value="set('pay_frequency', $event)"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="isSelfEmployed" label="Annual business revenue (EC$)">
+            <FormField
+              :model-value="draft.annual_revenue"
+              :property="field('ApplicationParty', 'annual_revenue', 'Annual business revenue (EC$)', 'number')"
+              :form="draft"
+              @update:model-value="set('annual_revenue', $event)"
+            />
+          </el-form-item>
         </div>
+
+        <!-- Previous job: only under 2 years in the current one -->
+        <template v-if="needsPreviousEmployment">
+          <h4 class="subheading">Previous job</h4>
+          <div class="field-grid">
+            <el-form-item label="Previous employer" required>
+              <FormField
+                :model-value="draft.previous_employer_name"
+                :property="field('ApplicationParty', 'previous_employer_name', 'Previous employer', 'input')"
+                :form="draft"
+                @update:model-value="set('previous_employer_name', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="Previous job title">
+              <FormField
+                :model-value="draft.previous_job_title"
+                :property="field('ApplicationParty', 'previous_job_title', 'Previous job title', 'input')"
+                :form="draft"
+                @update:model-value="set('previous_job_title', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="Years there">
+              <FormField
+                :model-value="draft.previous_employment_years"
+                :property="field('ApplicationParty', 'previous_employment_years', 'Years there', 'number')"
+                :form="draft"
+                @update:model-value="set('previous_employment_years', $event)"
+              />
+            </el-form-item>
+          </div>
+        </template>
 
         <!-- NIS and income tax are calculated by the parent form, not entered -->
         <div v-if="showDeductions" class="deduction-summary">
+          <div class="deduction-row">
+            <span>Gross monthly income</span>
+            <strong>{{ money(deductions.gross) }}</strong>
+          </div>
           <div class="deduction-row">
             <span>
               Estimated NIS
@@ -382,10 +568,165 @@
             <strong>{{ money(deductions.net) }}</strong>
           </div>
           <small>
-            Calculated from gross monthly income using current NIS and income tax
+            Calculated from your gross pay using current NIS and income tax
             rates. Your payslip may differ.
           </small>
         </div>
+      </section>
+
+      <!-- Other income: IncomeSource records -->
+      <section class="context">
+        <div class="collection-header">
+          <div>
+            <h3>Other income</h3>
+            <p>For example rental income, a pension, remittances, or a second job.</p>
+          </div>
+          <el-button type="primary" plain @click="addIncome">
+            <v-icon start>mdi-plus</v-icon>
+            Add income
+          </el-button>
+        </div>
+
+        <article
+          v-for="(income, index) in draft.incomes"
+          :key="income.client_key"
+          class="item-card"
+        >
+          <div class="item-title">
+            <strong>{{ lookupLabel('income_type', income.income_type) || `Income ${index + 1}` }}</strong>
+            <el-button text type="danger" @click="removeIncome(index)">Remove</el-button>
+          </div>
+          <div class="field-grid">
+            <el-form-item label="Type of income" required>
+              <FormField
+                :model-value="income.income_type"
+                :property="field('IncomeSource', 'income_type', 'Type of income', 'select')"
+                :form="income"
+                @update:model-value="setIncome(index, 'income_type', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="Description">
+              <FormField
+                :model-value="income.description"
+                :property="field('IncomeSource', 'description', 'Description', 'input')"
+                :form="income"
+                @update:model-value="setIncome(index, 'description', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="Amount (EC$)" required>
+              <FormField
+                :model-value="income.amount"
+                :property="field('IncomeSource', 'amount', 'Amount (EC$)', 'number')"
+                :form="income"
+                @update:model-value="setIncome(index, 'amount', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="How often?" required>
+              <FormField
+                :model-value="income.frequency"
+                :property="field('IncomeSource', 'frequency', 'How often?', 'select')"
+                :form="income"
+                @update:model-value="setIncome(index, 'frequency', $event)"
+              />
+            </el-form-item>
+          </div>
+
+          <!-- Proof of this income, if the credit union requires it -->
+          <AdaptiveLoanDocumentRequirements
+            title="Proof of income"
+            :scope="documentScopes[`income:${income.client_key}`]"
+            :uploading-key="uploadingKey"
+            :disabled="documentsDisabled"
+            @stage-file="$emit('stage-file', $event)"
+            @remove-file="$emit('remove-file', $event)"
+            @request-file-upload="$emit('request-file-upload', $event)"
+            @file-rejected="$emit('file-rejected', $event)"
+          />
+        </article>
+      </section>
+
+      <!-- Guarantors: the guarantee they're giving -->
+      <section v-if="isGuarantor" class="context">
+        <h3>Guarantee</h3>
+        <div class="field-grid">
+          <el-form-item label="Guarantee type" required>
+            <FormField
+              :model-value="draft.guarantee_type"
+              :property="field('ApplicationParty', 'guarantee_type', 'Guarantee type', 'select')"
+              :form="draft"
+              @update:model-value="set('guarantee_type', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Amount guaranteed (EC$)" required>
+            <FormField
+              :model-value="draft.guarantee_amount"
+              :property="field('ApplicationParty', 'guarantee_amount', 'Amount guaranteed (EC$)', 'number')"
+              :form="draft"
+              @update:model-value="set('guarantee_amount', $event)"
+            />
+          </el-form-item>
+        </div>
+      </section>
+
+      <!-- Declarations (a "yes" needs an explanation) -->
+      <section class="context">
+        <h3>Declarations</h3>
+        <el-form-item label="Are you, or are you closely related to, a senior public official (a politically exposed person)?">
+          <FormField
+            :model-value="draft.is_pep"
+            :property="field('ApplicationParty', 'is_pep', 'Politically exposed person', 'checkbox')"
+            :form="draft"
+            @update:model-value="set('is_pep', $event)"
+          />
+        </el-form-item>
+        <el-form-item v-if="draft.is_pep" label="Please explain (position and relationship)" required>
+          <FormField
+            :model-value="draft.pep_details"
+            :property="field('ApplicationParty', 'pep_details', 'Please explain', 'textarea')"
+            :form="draft"
+            @update:model-value="set('pep_details', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Have you ever been declared bankrupt?">
+          <FormField
+            :model-value="draft.declared_bankruptcy"
+            :property="field('ApplicationParty', 'declared_bankruptcy', 'Bankruptcy', 'checkbox')"
+            :form="draft"
+            @update:model-value="set('declared_bankruptcy', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Are there any court judgments against you?">
+          <FormField
+            :model-value="draft.declared_judgments"
+            :property="field('ApplicationParty', 'declared_judgments', 'Court judgments', 'checkbox')"
+            :form="draft"
+            @update:model-value="set('declared_judgments', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Are you behind on any loan or bill payments?">
+          <FormField
+            :model-value="draft.declared_arrears"
+            :property="field('ApplicationParty', 'declared_arrears', 'Arrears', 'checkbox')"
+            :form="draft"
+            @update:model-value="set('declared_arrears', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Do you have loan applications pending anywhere else?">
+          <FormField
+            :model-value="draft.declared_other_applications"
+            :property="field('ApplicationParty', 'declared_other_applications', 'Other applications', 'checkbox')"
+            :form="draft"
+            @update:model-value="set('declared_other_applications', $event)"
+          />
+        </el-form-item>
+        <el-form-item v-if="anyDeclaration" label="Please explain each &quot;yes&quot; answer" required>
+          <FormField
+            :model-value="draft.declaration_details"
+            :property="field('ApplicationParty', 'declaration_details', 'Please explain', 'textarea')"
+            :form="draft"
+            @update:model-value="set('declaration_details', $event)"
+          />
+        </el-form-item>
       </section>
 
       <div class="consents">
@@ -513,13 +854,50 @@ export default {
       return String(this.draft.role || '').trim().toLowerCase() === 'third party owner';
     },
 
+    /** Matches GUARANTOR_ROLE in the main form. */
+    isGuarantor() {
+      return String(this.draft.role || '').trim().toLowerCase() === 'guarantor';
+    },
+
     showEmploymentDetails() {
       const value = String(this.draft.employment_status || '').trim().toLowerCase();
       return value !== 'unemployed' && value !== 'retired';
     },
 
+    isSelfEmployed() {
+      const pattern = /self/i;
+      return pattern.test(this.draft.employment_status || '') || pattern.test(this.draft.employment_type || '');
+    },
+
+    /** Under 2 years in the current job (matches needsPreviousEmployment in the main form). */
+    needsPreviousEmployment() {
+      const years = this.yearsSince(this.draft.employment_start_date);
+      return this.showEmploymentDetails && years !== null && years < 2;
+    },
+
+    /** Under 2 years at this address (matches needsPreviousAddress in the main form). */
+    needsPreviousAddress() {
+      const years = this.draft.years_at_address;
+      return years !== null && years !== undefined && years !== '' && Number(years) < 2;
+    },
+
+    anyDeclaration() {
+      const person = this.draft;
+      return Boolean(
+        person.declared_bankruptcy ||
+          person.declared_judgments ||
+          person.declared_arrears ||
+          person.declared_other_applications
+      );
+    },
+
     inGrenada() {
       const country = String(this.draft.country || '').trim().toLowerCase();
+      return !country || country === 'grenada';
+    },
+
+    previousInGrenada() {
+      const country = String(this.draft.previous_country || '').trim().toLowerCase();
       return !country || country === 'grenada';
     },
 
@@ -534,8 +912,8 @@ export default {
 
     /** Show the estimate once there's a gross income to base it on. */
     showDeductions() {
-      const gross = this.draft.gross_monthly_income;
-      return Boolean(this.deductions) && gross !== null && gross !== undefined;
+      const gross = this.draft.gross_pay;
+      return Boolean(this.deductions) && gross !== null && gross !== undefined && gross !== '';
     },
   },
 
@@ -552,7 +930,22 @@ export default {
     copy(value) {
       const copy = JSON.parse(JSON.stringify(value || {}));
       if (!Array.isArray(copy.identifications)) copy.identifications = [];
+      if (!Array.isArray(copy.incomes)) copy.incomes = [];
       return copy;
+    },
+
+    /** Whole years from a YYYY-MM-DD date until today, or null. */
+    yearsSince(date) {
+      if (!date) return null;
+      const start = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+      if (Number.isNaN(start.getTime())) return null;
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      const anniversaryPassed =
+        now.getMonth() > start.getMonth() ||
+        (now.getMonth() === start.getMonth() && now.getDate() >= start.getDate());
+      if (!anniversaryPassed) years--;
+      return Math.max(0, years);
     },
 
     key(prefix) {
@@ -670,6 +1063,32 @@ export default {
       this.draft.identifications.forEach((row, rowIndex) => {
         row.is_primary = rowIndex === index;
       });
+      this.notify();
+    },
+
+    // ---- Other income ----
+
+    setIncome(index, key, event) {
+      this.draft.incomes[index][key] = this.valueOf(event);
+      this.notify();
+    },
+
+    /** Matches createEmptyIncome() in the main form. */
+    addIncome() {
+      this.draft.incomes.push({
+        client_key: this.key('income'),
+        id: null,
+        income_type: '',
+        description: '',
+        amount: null,
+        frequency: '',
+        document_ids: [],
+      });
+      this.notify();
+    },
+
+    removeIncome(index) {
+      this.draft.incomes.splice(index, 1);
       this.notify();
     },
 

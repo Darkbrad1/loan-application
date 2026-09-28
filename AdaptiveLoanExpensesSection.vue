@@ -26,7 +26,16 @@
       </div>
 
       <div class="field-grid">
-        <el-form-item label="Responsible applicant" required>
+        <el-form-item label="Shared household expense">
+          <FormField
+            :model-value="item.is_household"
+            :property="field('Expense', 'is_household', 'Shared household expense', 'checkbox')"
+            :form="item"
+            @update:model-value="set(index, 'is_household', $event)"
+          />
+        </el-form-item>
+
+        <el-form-item v-if="!item.is_household" label="Responsible applicant" required>
           <el-select
             :model-value="item.application_party_id"
             placeholder="Select applicant"
@@ -128,6 +137,23 @@
         @file-rejected="$emit('file-rejected', $event)"
       />
     </article>
+
+    <!-- Worked out from the insurance on collateral; can't be edited here -->
+    <section v-if="projectedExpenses.length" class="context">
+      <h3>Projected insurance</h3>
+      <p class="helper">
+        Worked out from the insurance on your collateral. To change it, edit the
+        insurance on the Assets step.
+      </p>
+      <div
+        v-for="item in projectedExpenses"
+        :key="item.asset_key"
+        class="projected-row"
+      >
+        <span>{{ item.name }}</span>
+        <strong>{{ money(item.monthly) }} a month</strong>
+      </div>
+    </section>
   </section>
 </template>
 
@@ -141,6 +167,10 @@
  * Uses the local draft pattern: edits happen on a deep-cloned copy and are
  * committed upward via update:modelValue.
  *
+ * A shared household expense (is_household) isn't assigned to one
+ * applicant. Projected collateral insurance is shown read-only below the
+ * list; the parent works it out and saves it.
+ *
  * Every input is Saturn's built-in FormField, using Saturn's own
  * definitions of the Expense properties when they exist. The responsible
  * applicant and expense type are el-selects of the options from the parent.
@@ -149,6 +179,11 @@ export default {
   props: {
     /** Expenses array owned by the parent form. */
     modelValue: {
+      type: Array,
+      default: () => [],
+    },
+    /** Projected insurance: { asset_key, name, monthly }, read-only. */
+    projectedExpenses: {
       type: Array,
       default: () => [],
     },
@@ -306,6 +341,13 @@ export default {
       return item.expense_name || this.typeName(item.expense_type) || `Expense ${index + 1}`;
     },
 
+    money(value) {
+      return `EC$ ${Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    },
+
     // ---- Saturn FormField helpers (the same in every section) ----
 
     /**
@@ -389,6 +431,7 @@ export default {
         expense_type: '',
         amount: null,
         frequency: '',
+        is_household: false,
         document_ids: [],
       });
       this.notify();
@@ -401,3 +444,12 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.projected-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+</style>

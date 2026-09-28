@@ -72,6 +72,63 @@
       <v-icon start>mdi-account-plus</v-icon>
       Add another applicant or guarantor
     </el-button>
+
+    <!-- References for the primary applicant: one personal reference, one next of kin -->
+    <section class="context references">
+      <h3>References</h3>
+      <p>Someone who knows you, and your next of kin. They shouldn't be applying with you.</p>
+      <article
+        v-for="(row, index) in references"
+        :key="row.client_key"
+        class="item-card"
+      >
+        <div class="item-title">
+          <strong>{{ row.reference_type }}</strong>
+        </div>
+        <div class="field-grid">
+          <el-form-item label="Full name" required>
+            <FormField
+              :model-value="row.name"
+              :property="field('Reference', 'name', 'Full name', 'input')"
+              :form="row"
+              @update:model-value="setReference(index, 'name', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Relationship to you" required>
+            <FormField
+              :model-value="row.relationship"
+              :property="field('Reference', 'relationship', 'Relationship to you', 'select')"
+              :form="row"
+              @update:model-value="setReference(index, 'relationship', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Phone" required>
+            <FormField
+              :model-value="row.phone"
+              :property="field('Reference', 'phone', 'Phone', 'input')"
+              :form="row"
+              @update:model-value="setReference(index, 'phone', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Email">
+            <FormField
+              :model-value="row.email"
+              :property="field('Reference', 'email', 'Email', 'input')"
+              :form="row"
+              @update:model-value="setReference(index, 'email', $event)"
+            />
+          </el-form-item>
+        </div>
+        <el-form-item label="Address">
+          <FormField
+            :model-value="row.address"
+            :property="field('Reference', 'address', 'Address', 'textarea')"
+            :form="row"
+            @update:model-value="setReference(index, 'address', $event)"
+          />
+        </el-form-item>
+      </article>
+    </section>
   </section>
 </template>
 
@@ -81,6 +138,10 @@
  * primary applicant first. Fully controlled by the parent. Each tab also
  * shows that applicant's required documents; upload state lives in the
  * parent form.
+ *
+ * Below the tabs are the primary applicant's references (a personal
+ * reference and next of kin), saved as Reference records. Their inputs are
+ * Saturn's FormField, using Saturn's own Reference property definitions.
  */
 export default {
   props: {
@@ -129,11 +190,17 @@ export default {
       type: Boolean,
       default: false,
     },
+    /** The personal reference and next of kin (Reference records). */
+    references: {
+      type: Array,
+      default: () => [],
+    },
   },
 
   emits: [
     'update:primary',
     'update:parties',
+    'update:references',
     'update:activeTab',
     'request-add',
     'request-remove',
@@ -180,6 +247,54 @@ export default {
     remove(index) {
       this.$emit('request-remove', index);
     },
+
+    /** Updates one field on one reference and sends a fresh copy up. */
+    setReference(index, key, event) {
+      const rows = JSON.parse(JSON.stringify(this.references));
+      rows[index][key] = this.valueOf(event);
+      this.$emit('update:references', rows);
+    },
+
+    // ---- Saturn FormField helpers (the same in every section) ----
+
+    /**
+     * FormField's update event may send the value itself or
+     * { property, data } (the Saturn guide isn't clear), so accept both.
+     */
+    valueOf(event) {
+      if (event && typeof event === 'object' && 'property' in event && 'data' in event) {
+        return event.data;
+      }
+      return event;
+    },
+
+    /** Saturn's definition of one property of a resource, or null. */
+    savedProperty(resourceName, name) {
+      const rows = this.resourceProps[resourceName] || [];
+      return rows.find((row) => String(row.property || row.key || row.name || '') === name) || null;
+    },
+
+    /**
+     * FormField property config for one field: Saturn's own definition of
+     * the property (with our label) when there is one, otherwise a basic
+     * text box. Configs are reused while unchanged, so FormField isn't
+     * handed a new object on every keystroke.
+     */
+    field(resourceName, name, label, kind) {
+      const saved = this.savedProperty(resourceName, name);
+      const config = saved
+        ? Object.assign({}, saved, { property: name, label })
+        : {
+            property: name,
+            label,
+            type: 'string',
+            input_properties: { type: kind === 'textarea' ? 'textarea' : 'input' },
+          };
+      if (!this.fieldCache) this.fieldCache = {};
+      const cacheKey = JSON.stringify(config);
+      if (!this.fieldCache[cacheKey]) this.fieldCache[cacheKey] = config;
+      return this.fieldCache[cacheKey];
+    },
   },
 };
 </script>
@@ -187,5 +302,9 @@ export default {
 <style scoped>
 .owner-note {
   margin-bottom: 16px;
+}
+
+.references {
+  margin-top: 24px;
 }
 </style>

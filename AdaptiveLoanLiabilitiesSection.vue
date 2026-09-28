@@ -114,6 +114,54 @@
         </p>
       </div>
 
+      <div class="field-grid">
+        <el-form-item label="Will this loan pay it off?">
+          <FormField
+            :model-value="item.is_to_be_paid_off"
+            :property="field('Liability', 'is_to_be_paid_off', 'Will this loan pay it off?', 'checkbox')"
+            :form="item"
+            @update:model-value="set(index, 'is_to_be_paid_off', $event)"
+          />
+        </el-form-item>
+
+        <el-form-item label="Is it secured on one of your assets?">
+          <FormField
+            :model-value="item.is_secured"
+            :property="field('Liability', 'is_secured', 'Is it secured on one of your assets?', 'checkbox')"
+            :form="item"
+            @update:model-value="set(index, 'is_secured', $event)"
+          />
+        </el-form-item>
+
+        <!-- The form decides the choices (this application's assets), so it's an el-select -->
+        <el-form-item v-if="item.is_secured" label="Secured on" required>
+          <el-select
+            :model-value="item.secured_asset_ref"
+            placeholder="Select the asset"
+            @update:model-value="set(index, 'secured_asset_ref', $event)"
+          >
+            <el-option
+              v-for="option in assetOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <small v-if="!assetOptions.length" class="helper invalid">
+            Add the asset on the Assets step first.
+          </small>
+        </el-form-item>
+      </div>
+
+      <el-form-item label="Notes (unusual terms, payment arrangements, and so on)">
+        <FormField
+          :model-value="item.description"
+          :property="field('Liability', 'description', 'Notes', 'textarea')"
+          :form="item"
+          @update:model-value="set(index, 'description', $event)"
+        />
+      </el-form-item>
+
       <!-- Responsibility percentages must total 100% across applicants -->
       <AdaptiveLoanAllocationEditor
         :model-value="item.responsibilities"
@@ -150,12 +198,21 @@
  * Uses the local draft pattern: edits happen on a deep-cloned copy and are
  * committed upward via update:modelValue.
  *
+ * Each liability also records whether this loan will pay it off, whether
+ * it's secured on one of the applicant's assets (a lien), and free-text
+ * notes. The balance date is set by the parent when it saves.
+ *
  * Every input is Saturn's built-in FormField, using Saturn's own
  * definitions of the Liability properties when they exist. Liability type
- * is an el-select of the LiabilityType records passed in by the parent.
+ * and "Secured on" are el-selects of choices passed in by the parent.
  */
 export default {
   props: {
+    /** The application's assets as { value: client key, label } choices. */
+    assetOptions: {
+      type: Array,
+      default: () => [],
+    },
     /** Liabilities array owned by the parent form. */
     modelValue: {
       type: Array,
@@ -382,6 +439,10 @@ export default {
         item.credit_limit = null;
         item.assessed_payment = null;
       }
+      // Not secured any more: forget which asset it was secured on.
+      if (fieldName === 'is_secured' && !item.is_secured) {
+        item.secured_asset_ref = '';
+      }
 
       this.notify();
     },
@@ -398,6 +459,10 @@ export default {
         payment_frequency: '',
         credit_limit: null,
         assessed_payment: null,
+        description: '',
+        is_to_be_paid_off: false,
+        is_secured: false,
+        secured_asset_ref: '',
         document_ids: [],
         responsibilities: [
           {
