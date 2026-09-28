@@ -389,6 +389,22 @@ const monthlyAmount = (amount, frequency) => {
     return Math.round(Number(amount) * factor * 100) / 100;
 };
 
+/**
+ * Date fields the form saves. Saturn rejects null (or "") for a date, so
+ * upsert() leaves an empty date out of the data instead of sending it.
+ */
+const DATE_FIELDS = [
+    "date_of_birth",
+    "issue_date",
+    "expiry_date",
+    "employment_start_date",
+    "incorporation_date",
+    "insurance_expiry_date",
+    "balance_as_of",
+    "consented_at",
+    "submitted_at",
+];
+
 /** Asset status for the vehicle or property a purchase loan is buying. */
 const PURCHASE_ASSET_STATUS = "To be purchased";
 
@@ -4313,9 +4329,10 @@ export default {
          * the server's reply, and rethrown with the resource's name, so a
          * failed save says which record it was.
          */
-        async upsert(resourceName, id, payload) {
+        async upsert(resourceName, id, fullPayload) {
             const resource = new Resource(this, resourceName);
             const action = id ? "updating" : "creating";
+            const payload = this.withoutEmptyDates(fullPayload);
 
             try {
                 if (id) {
@@ -4363,6 +4380,22 @@ export default {
                 failure.cause = error;
                 throw failure;
             }
+        },
+
+        /**
+         * A copy of a payload without empty date fields (see DATE_FIELDS).
+         * Saturn rejects null for a date, so an empty date is left out; on
+         * an update, that leaves any date saved earlier as it was.
+         */
+        withoutEmptyDates(payload) {
+            const result = Object.assign({}, payload);
+            DATE_FIELDS.forEach((field) => {
+                const value = result[field];
+                if (value === null || value === undefined || value === "") {
+                    delete result[field];
+                }
+            });
+            return result;
         },
 
         /**
