@@ -255,6 +255,7 @@ The developer then added the fields for membership, other income, monthly equiva
 - **Test the gap-analysis batch in Saturn** on `dev`, then merge to `main`.
 - **Set up the ExpenseType records** in Saturn (see "Not set up in Saturn yet").
 - **Consent forms on submit:** a workflow that emails the Credit Bureau consent form (and the Valuation authorization when property is collateral) and sets `Application.consent_forms_sent_at`. First check that Saturn workflows can send emails with attachments.
+- **Reference and next-of-kin emails:** the developer will build a Saturn workflow that emails them. The form then just calls it on submit (like `MXHGYH`); waiting on the workflow ID.
 - **Remove spread syntax (`...`):** the reverted code still uses it (about 14 places left in the main form; the sections are clean), and Saturn fails on it at runtime.
 - **Add missing files to the repo:** `AdaptiveLoanDocumentRequirements.vue` is used by the main form but isn't in the repo yet.
 - **Cleanup:** remove the dead CSS from the old Documents screen (e.g. `.legacy-queue`), and reorganize the main form into labelled sections.
