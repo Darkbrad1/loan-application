@@ -389,22 +389,6 @@ const monthlyAmount = (amount, frequency) => {
     return Math.round(Number(amount) * factor * 100) / 100;
 };
 
-/**
- * Date fields the form saves. Saturn rejects null (or "") for a date, so
- * upsert() leaves an empty date out of the data instead of sending it.
- */
-const DATE_FIELDS = [
-    "date_of_birth",
-    "issue_date",
-    "expiry_date",
-    "employment_start_date",
-    "incorporation_date",
-    "insurance_expiry_date",
-    "balance_as_of",
-    "consented_at",
-    "submitted_at",
-];
-
 /** Asset status for the vehicle or property a purchase loan is buying. */
 const PURCHASE_ASSET_STATUS = "To be purchased";
 
@@ -3012,19 +2996,17 @@ export default {
                 .map((person) => this.toId(person.application_party_id))
                 .filter(Boolean);
             const links = { parties: partyLinks, application_parties: partyLinks };
-            const resource = new Resource(this, "Application");
 
             if (this.formData.id) {
-                await resource.update(this.formData.id, links);
+                await this.upsert("Application", this.formData.id, links);
                 return;
             }
 
-            const createdId = this.toId(
-                await resource.create({ ...this.appPayload(), ...links }),
+            const createdId = await this.upsert(
+                "Application",
+                null,
+                Object.assign(this.appPayload(), links),
             );
-            if (!createdId) {
-                throw Error("Application did not return a record ID.");
-            }
             this.formData.id = createdId;
             this.rememberDraftLocation();
         },
@@ -3032,7 +3014,7 @@ export default {
         /** Updates the application's asset/liability/expense ID lists. */
         async linkFinancialsToApplication() {
             const ids = this.collectPersistedIds();
-            await new Resource(this, "Application").update(this.formData.id, {
+            await this.upsert("Application", this.formData.id, {
                 // Every declared asset, including ones part- or fully owned
                 // by a Third Party Owner. Ownership rows say whose share is whose.
                 asset_ids: this.formData.assets
@@ -3240,7 +3222,7 @@ export default {
                 // Tag the Upload with its Attachment_type after resolving it.
                 let typeSaved = true;
                 try {
-                    await new Resource(this, "Upload").update(uploadedId, {
+                    await this.upsert("Upload", uploadedId, {
                         saturn_file_type: payload.requirementKey,
                     });
                 } catch (error) {
@@ -3258,7 +3240,7 @@ export default {
                         uploadedId,
                     ]),
                 ];
-                await new Resource(this, resourceName).update(ownerId, {
+                await this.upsert(resourceName, ownerId, {
                     documents: documentIds,
                 });
 
@@ -4332,7 +4314,7 @@ export default {
         async upsert(resourceName, id, fullPayload) {
             const resource = new Resource(this, resourceName);
             const action = id ? "updating" : "creating";
-            const payload = this.withoutEmptyDates(fullPayload);
+            const payload = this.withoutEmptyValues(fullPayload);
 
             try {
                 if (id) {
@@ -4383,17 +4365,20 @@ export default {
         },
 
         /**
-         * A copy of a payload without empty date fields (see DATE_FIELDS).
-         * Saturn rejects null for a date, so an empty date is left out; on
-         * an update, that leaves any date saved earlier as it was.
+         * A copy of a payload with every empty value left out: null,
+         * undefined, "" (an empty text box or unchosen dropdown), and numbers
+         * that aren't numbers (NaN). Saturn only accepts values of the
+         * field's own type, and rejects null. Lists (even empty ones),
+         * true/false, and 0 are kept. On an update, a field left out keeps
+         * whatever was saved before, so a value can't be cleared this way.
          */
-        withoutEmptyDates(payload) {
-            const result = Object.assign({}, payload);
-            DATE_FIELDS.forEach((field) => {
-                const value = result[field];
-                if (value === null || value === undefined || value === "") {
-                    delete result[field];
-                }
+        withoutEmptyValues(payload) {
+            const result = {};
+            Object.keys(payload || {}).forEach((field) => {
+                const value = payload[field];
+                if (value === null || value === undefined || value === "") return;
+                if (typeof value === "number" && Number.isNaN(value)) return;
+                result[field] = value;
             });
             return result;
         },
@@ -4468,7 +4453,7 @@ export default {
             }
 
             // Link the identifications back onto the Party.
-            await new Resource(this, "Party").update(person.party_id, {
+            await this.upsert("Party", person.party_id, {
                 ids: (person.identifications || [])
                     .map((row) => this.toId(row.id))
                     .filter(Boolean),
@@ -4538,7 +4523,8 @@ export default {
                     documents: this.documentIdsOf(income),
                 });
             }
-            await new Resource(this, "ApplicationParty").update(
+            await this.upsert(
+                "ApplicationParty",
                 person.application_party_id,
                 {
                     income_ids: incomes
@@ -4987,7 +4973,6 @@ export default {
                 await this.saveBusinessParty();
 
                 // 2. Bundle the newly minted party IDs into the core payload
-                const resource = new Resource(this, "Application");
                 const payload = Object.assign(this.appPayload(), {
                     parties: partyLinks,
                     application_parties: partyLinks,
@@ -4995,20 +4980,18 @@ export default {
                 });
 
                 // 3. Create or update the Application in a single shot
-                if (!this.formData.id) {
-                    this.formData.id = this.toId(
-                        await resource.create(payload),
-                    );
-                } else {
-                    await resource.update(this.formData.id, payload);
-                }
+                this.formData.id = await this.upsert(
+                    "Application",
+                    this.formData.id,
+                    payload,
+                );
 
                 // 4. Save financials and references (these need this.formData.id)
                 const financials = await this.saveFinancials();
                 const referenceIds = await this.saveReferences();
 
                 // Link them back to the application
-                await resource.update(this.formData.id, {
+                await this.upsert("Application", this.formData.id, {
                     asset_ids: financials.assetIds,
                     liability_ids: financials.liabilityIds,
                     expense_ids: financials.expenseIds,
@@ -5628,7 +5611,7 @@ export default {
                 await this.saveDraft(true);
 
                 const resource = new Resource(this, "Application");
-                await resource.update(this.formData.id, {
+                await this.upsert("Application", this.formData.id, {
                     status: "submitted",
                     submitted_at: new Date().toISOString(),
                 });
