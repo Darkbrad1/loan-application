@@ -1,20 +1,27 @@
 <template>
   <div class="allocation">
-    <strong class="allocation-title">{{ title }}</strong>
+    <p class="question">{{ title }}</p>
 
     <!-- Simple mode: most people choose "Just me" and never see percentages -->
-    <div v-if="simple && options.length > 1" class="choice-row">
-      <el-button size="large" :type="mode === 'me' ? 'primary' : ''" @click="justMe">
-        Just me
-      </el-button>
-      <el-button size="large" :type="mode === 'shared' ? 'primary' : ''" @click="shared">
-        {{ sharedLabel }}
-      </el-button>
+    <div v-if="simple && options.length > 1" class="choice-list inline" role="radiogroup">
+      <button
+        v-for="option in [{ value: 'me', label: 'Just me' }, { value: 'shared', label: sharedLabel }]"
+        :key="option.value"
+        type="button"
+        role="radio"
+        class="choice"
+        :class="{ selected: mode === option.value }"
+        :aria-checked="mode === option.value"
+        @click="option.value === 'me' ? justMe() : shared()"
+      >
+        <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+        <span>{{ option.label }}</span>
+      </button>
     </div>
-    <p v-else-if="simple" class="helper">{{ meLabel }}</p>
+    <p v-else-if="simple" class="hint">{{ meLabel }}</p>
 
     <template v-if="!simple || mode === 'shared'">
-      <p v-if="simple" class="helper">
+      <p v-if="simple" class="hint">
         Choose each person and their share. The shares must add up to 100%.
       </p>
       <div
@@ -46,17 +53,15 @@
           />
         </el-form-item>
 
-        <el-button
-          v-if="draft.length > 1"
-          text
-          type="danger"
-          @click="removeRow(index)"
-        >
-          <v-icon>mdi-close</v-icon>
-        </el-button>
+        <el-form-item v-if="draft.length > 1" label=" ">
+          <button type="button" class="link-btn danger" @click="removeRow(index)">Remove</button>
+        </el-form-item>
       </div>
 
-      <el-button size="small" plain @click="addRow">Add another person</el-button>
+      <button type="button" class="more-link" @click="addRow">
+        <v-icon size="20">mdi-plus</v-icon>
+        Add another person
+      </button>
 
       <p :class="total === 100 ? 'total valid' : 'total invalid'">
         {{ totalLabel }}: {{ total }}%
@@ -241,19 +246,5 @@ export default {
 </script>
 
 <style scoped>
-.allocation-title {
-  display: block;
-  margin: 16px 0 8px;
-}
-
-.choice-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.choice-row :deep(.el-button) {
-  margin: 0;
-}
+/* Styled in the main form's stylesheet (.allocation, .choice, .allocation-row). */
 </style>

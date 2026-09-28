@@ -1,32 +1,56 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
-
-    <!-- One card per declared liability -->
+    <!-- One card per debt: a short summary, or the details while editing -->
     <article
       v-for="(item, index) in draft"
       :key="item.client_key"
       class="item-card"
+      :class="{ open: isOpen(item), 'needs-work': !isOpen(item) && showErrors && missing(item) }"
     >
-      <div class="item-title">
-        <strong>{{ item.creditor_name || `Debt ${index + 1}` }}</strong>
-        <el-button text type="danger" @click="remove(index)">Remove</el-button>
+      <div class="item-head">
+        <span class="item-icon"><v-icon>{{ isRevolving(item) ? 'mdi-credit-card-outline' : 'mdi-bank-outline' }}</v-icon></span>
+        <div class="item-text">
+          <strong>{{ item.creditor_name || `Debt ${index + 1}` }}</strong>
+          <span v-if="!isOpen(item) && missing(item)" class="needs">Some details are missing</span>
+          <span v-else>{{ summaryOf(item) }}</span>
+        </div>
+        <div class="item-actions">
+          <button v-if="!isOpen(item)" type="button" class="link-btn" @click="openItem(item)">Change</button>
+          <button type="button" class="link-btn danger" @click="remove(index)">Remove</button>
+        </div>
       </div>
 
-      <div class="field-grid">
+      <template v-if="isOpen(item)">
         <el-form-item label="Who do you owe?" required :error="need(item.creditor_name)">
           <FormField
             :model-value="item.creditor_name"
-            :property="field('Liability', 'creditor_name', 'Creditor', 'input')"
+            :property="field('Liability', 'creditor_name', 'Who do you owe?', 'input')"
             :form="item"
             @update:model-value="set(index, 'creditor_name', $event)"
           />
           <small class="helper">The bank, credit union, shop, or person.</small>
         </el-form-item>
-
-        <!-- Options come from LiabilityType records; value is the record ID -->
+        <!-- Options come from LiabilityType records; the value is the record ID -->
         <el-form-item label="What kind of debt is it?" required :error="need(item.liability_type)">
+          <template v-if="liabilityTypeOptions.length <= 7">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in liabilityTypeOptions"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: item.liability_type === option.value }"
+                :aria-checked="item.liability_type === option.value"
+                @click="set(index, 'liability_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
           <el-select
+            v-else
             :model-value="item.liability_type"
             placeholder="Choose one"
             @update:model-value="set(index, 'liability_type', $event)"
@@ -38,30 +62,19 @@
               :value="option.value"
             />
           </el-select>
-          <small
-            v-if="item.liability_type && !typeOf(item)"
-            class="helper invalid"
-          >
+          <small v-if="item.liability_type && !typeOf(item)" class="helper invalid">
             This type is no longer available. Choose another.
           </small>
         </el-form-item>
-
         <el-form-item label="How much do you still owe? (EC$)" required :error="need(item.outstanding_balance)">
           <FormField
             :model-value="item.outstanding_balance"
-            :property="field('Liability', 'outstanding_balance', 'Outstanding balance (EC$)', 'number')"
+            :property="field('Liability', 'outstanding_balance', 'How much do you still owe? (EC$)', 'number')"
             :form="item"
             @update:model-value="set(index, 'outstanding_balance', $event)"
           />
         </el-form-item>
-
-        <!-- Revolving credit (credit cards, overdrafts) needs its limit -->
-        <el-form-item
-          v-if="isRevolving(item)"
-          label="Credit limit (EC$)"
-          required
-          :error="need(item.credit_limit)"
-        >
+        <el-form-item label="Credit limit (EC$)" required :error="need(item.credit_limit)" v-if="isRevolving(item)">
           <FormField
             :model-value="item.credit_limit"
             :property="field('Liability', 'credit_limit', 'Credit limit (EC$)', 'number')"
@@ -70,128 +83,145 @@
           />
           <small class="helper">The most you're allowed to owe on it.</small>
         </el-form-item>
-
-        <el-form-item label="How much do you pay? (EC$)" required :error="need(item.payment_amount)">
-          <FormField
-            :model-value="item.payment_amount"
-            :property="field('Liability', 'payment_amount', 'Payment amount (EC$)', 'number')"
-            :form="item"
-            @update:model-value="set(index, 'payment_amount', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item label="How often do you pay?">
-          <FormField
-            :model-value="item.payment_frequency"
-            :property="field('Liability', 'payment_frequency', 'Payment frequency', 'select')"
-            :form="item"
-            @update:model-value="set(index, 'payment_frequency', $event)"
-          />
-        </el-form-item>
+        <div class="field-grid">
+          <el-form-item label="How much do you pay? (EC$)" required :error="need(item.payment_amount)">
+            <FormField
+              :model-value="item.payment_amount"
+              :property="field('Liability', 'payment_amount', 'How much do you pay? (EC$)', 'number')"
+              :form="item"
+              @update:model-value="set(index, 'payment_amount', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="How often?">
+            <FormField
+              :model-value="item.payment_frequency"
+              :property="field('Liability', 'payment_frequency', 'How often?', 'select')"
+              :form="item"
+              @update:model-value="set(index, 'payment_frequency', $event)"
+            />
+          </el-form-item>
+        </div>
 
         <!--
-          Assessed repayment preview: a fixed % of the credit limit rather
-          than the outstanding balance. The server recalculates this figure.
+          Assessed repayment: a fixed % of the credit limit rather than the
+          balance. The server recalculates this figure.
         -->
-        <p v-if="isRevolving(item)" class="assessed-note">
+        <p v-if="isRevolving(item)" class="soft-box info">
           <template v-if="assessed(item) !== null">
             We'll count {{ money(assessed(item)) }} a month for this
             ({{ percentLabel(rateFor(item)) }} of the credit limit).
           </template>
           <template v-else>
-            We'll count {{ percentLabel(rateFor(item)) }} of the credit limit
-            as your monthly payment.
+            We'll count {{ percentLabel(rateFor(item)) }} of the credit limit as your monthly payment.
           </template>
         </p>
-      </div>
-
-      <div class="field-grid">
         <el-form-item label="Will the new loan pay this off?">
-          <FormField
-            :model-value="item.is_to_be_paid_off"
-            :property="field('Liability', 'is_to_be_paid_off', 'Will the new loan pay this off?', 'checkbox')"
-            :form="item"
-            @update:model-value="set(index, 'is_to_be_paid_off', $event)"
-          />
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: item.is_to_be_paid_off === true === option.value }"
+              :aria-checked="item.is_to_be_paid_off === true === option.value"
+              @click="set(index, 'is_to_be_paid_off', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
         </el-form-item>
-
-        <el-form-item label="Is something you own held against it? (For example, a car loan on your car.)">
-          <FormField
-            :model-value="item.is_secured"
-            :property="field('Liability', 'is_secured', 'Is something you own held against it?', 'checkbox')"
-            :form="item"
-            @update:model-value="set(index, 'is_secured', $event)"
-          />
+        <el-form-item label="Is something you own held against it?">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: item.is_secured === true === option.value }"
+              :aria-checked="item.is_secured === true === option.value"
+              @click="set(index, 'is_secured', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+          <small class="helper">For example, a car loan on your car.</small>
         </el-form-item>
-
-        <!-- The form decides the choices (this application's assets), so it's an el-select -->
         <el-form-item v-if="item.is_secured" label="Which thing?" required :error="need(item.secured_asset_ref)">
-          <el-select
-            :model-value="item.secured_asset_ref"
-            placeholder="Choose one"
-            @update:model-value="set(index, 'secured_asset_ref', $event)"
-          >
-            <el-option
+          <div class="choice-list" role="radiogroup">
+            <button
               v-for="option in assetOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: item.secured_asset_ref === option.value }"
+              :aria-checked="item.secured_asset_ref === option.value"
+              @click="set(index, 'secured_asset_ref', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
           <small v-if="!assetOptions.length" class="helper invalid">
             Add it under "Things you own" first.
           </small>
         </el-form-item>
-      </div>
+        <el-form-item label="Note" v-if="item.description || notesFor[item.client_key]">
+          <FormField
+            :model-value="item.description"
+            :property="field('Liability', 'description', 'Note', 'textarea')"
+            :form="item"
+            @update:model-value="set(index, 'description', $event)"
+          />
+        </el-form-item>
+        <button v-else type="button" class="more-link" @click="notesFor[item.client_key] = true">
+          <v-icon size="20">mdi-plus</v-icon>
+          Add a note (for example, unusual payment terms)
+        </button>
 
-      <el-button
-        v-if="!item.description && !notesFor[item.client_key]"
-        text
-        type="primary"
-        @click="notesFor[item.client_key] = true"
-      >
-        + Add a note (for example, unusual payment terms)
-      </el-button>
-      <el-form-item v-else label="Note">
-        <FormField
-          :model-value="item.description"
-          :property="field('Liability', 'description', 'Notes', 'textarea')"
-          :form="item"
-          @update:model-value="set(index, 'description', $event)"
+        <!-- Responsibility percentages must total 100% across the people on the loan -->
+        <AdaptiveLoanAllocationEditor
+          :model-value="item.responsibilities"
+          :options="applicationPartyOptions"
+          reference-key="application_party_id"
+          simple
+          :default-value="primaryLinkId"
+          title="Who pays it?"
+          select-label="Person"
+          total-label="Shares add up to"
+          me-label="You pay this."
+          responsibility-type="Borrower"
+          @update:model-value="set(index, 'responsibilities', $event)"
         />
-      </el-form-item>
 
-      <!-- Responsibility percentages must total 100% across applicants -->
-      <AdaptiveLoanAllocationEditor
-        :model-value="item.responsibilities"
-        :options="applicationPartyOptions"
-        reference-key="application_party_id"
-        simple
-        :default-value="primaryLinkId"
-        title="Who pays it?"
-        select-label="Person"
-        total-label="Shares add up to"
-        me-label="You pay this."
-        responsibility-type="Borrower"
-        @update:model-value="set(index, 'responsibilities', $event)"
-      />
+        <!-- Required documents for this debt; uploads unlock once it's complete -->
+        <AdaptiveLoanDocumentRequirements
+          :scope="documentScopes[`liability:${item.client_key}`]"
+          :uploading-key="uploadingKey"
+          :disabled="documentsDisabled"
+          @stage-file="$emit('stage-file', $event)"
+          @remove-file="$emit('remove-file', $event)"
+          @request-file-upload="$emit('request-file-upload', $event)"
+          @file-rejected="$emit('file-rejected', $event)"
+        />
 
-      <!-- Required documents for this liability; uploads unlock once it's complete -->
-      <AdaptiveLoanDocumentRequirements
-        :scope="documentScopes[`liability:${item.client_key}`]"
-        :uploading-key="uploadingKey"
-        :disabled="documentsDisabled"
-        @stage-file="$emit('stage-file', $event)"
-        @remove-file="$emit('remove-file', $event)"
-        @request-file-upload="$emit('request-file-upload', $event)"
-        @file-rejected="$emit('file-rejected', $event)"
-      />
+        <div class="item-done">
+          <button type="button" class="small-btn" @click="finish(item)">
+            <v-icon size="20">mdi-check</v-icon>
+            Done
+          </button>
+        </div>
+      </template>
     </article>
 
-    <el-button type="primary" plain size="large" @click="add">
-      <v-icon start>mdi-plus</v-icon>
+    <button type="button" class="add-button" @click="add">
+      <v-icon>mdi-plus</v-icon>
       Add {{ draft.length ? 'another debt' : 'a debt' }}
-    </el-button>
+    </button>
   </section>
 </template>
 
@@ -294,12 +324,22 @@ export default {
       draft: this.copy(this.modelValue),
       // Shows the optional note, by the liability's client key.
       notesFor: {},
+      // The one item being edited (the rest fold up into a summary).
+      openKey: '',
+      // True after "Done" is pressed on an item with missing details.
+      checking: false,
     };
   },
 
   mounted() {
     // They said they owe money, so start with one to fill in.
-    if (!this.draft.length) this.add();
+    if (!this.draft.length) {
+      this.add();
+      return;
+    }
+    // Open the first item that still needs details, if any.
+    const unfinished = this.draft.find((item) => this.missing(item));
+    this.openKey = unfinished ? unfinished.client_key : '';
   },
 
   created() {
@@ -326,6 +366,14 @@ export default {
         this.draft = this.copy(value);
       },
     },
+    // After a failed Continue, open the first item that's missing details.
+    showErrors(value) {
+      if (!value) return;
+      const open = this.draft.find((item) => this.isOpen(item));
+      if (open && this.missing(open)) return;
+      const unfinished = this.draft.find((item) => this.missing(item));
+      if (unfinished) this.openKey = unfinished.client_key;
+    },
   },
 
   methods: {
@@ -346,7 +394,7 @@ export default {
 
     /** "This is needed" under an empty required box, after a failed Next. */
     need(value) {
-      if (!this.showErrors) return '';
+      if (!this.showErrors && !this.checking) return '';
       return value === null || value === undefined || value === '' ? 'This is needed' : '';
     },
 
@@ -504,7 +552,53 @@ export default {
           },
         ],
       });
+      this.openKey = this.draft[this.draft.length - 1].client_key;
+      this.checking = false;
       this.notify();
+    },
+
+    // ---- Fold-up cards ----
+
+    /** True when an item's details are showing. */
+    isOpen(item) {
+      return this.openKey === item.client_key;
+    },
+
+    openItem(item) {
+      this.openKey = item.client_key;
+      this.checking = false;
+    },
+
+    /** "Done": folds the item up, or points out what's missing. */
+    finish(item) {
+      if (this.missing(item)) {
+        this.checking = true;
+        return;
+      }
+      this.checking = false;
+      this.openKey = '';
+    },
+
+    /** True when a required detail is still empty. */
+    missing(item) {
+      const empty = (value) => value === null || value === undefined || value === '';
+      if (['creditor_name', 'liability_type', 'outstanding_balance', 'payment_amount'].some((key) => empty(item[key]))) {
+        return true;
+      }
+      if (this.isRevolving(item) && empty(item.credit_limit)) return true;
+      if (item.is_secured && empty(item.secured_asset_ref)) return true;
+      return false;
+    },
+
+    /** One line under the item's name. */
+    summaryOf(item) {
+      const empty = (value) => value === null || value === undefined || value === '';
+      const parts = [];
+      const type = this.typeOf(item);
+      if (type && type.name) parts.push(type.name);
+      if (!empty(item.outstanding_balance)) parts.push(`${this.money(item.outstanding_balance)} left`);
+      if (item.is_to_be_paid_off) parts.push('Paid off by this loan');
+      return parts.join(' · ');
     },
 
     remove(index) {
@@ -514,3 +608,7 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Styled in the main form's stylesheet (.item-card, .choice, .soft-box, ...). */
+</style>

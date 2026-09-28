@@ -2,63 +2,77 @@
   <div class="applicant-editor">
     <!-- ===== Someone who co-owns what secures the loan, but isn't borrowing ===== -->
     <template v-if="show('owner')">
-      <div class="field-grid">
-        <el-form-item label="Is this a person or a business?" required>
-          <el-select
-            :model-value="draft.kind || 'PERSON'"
-            @update:model-value="set('kind', $event)"
+      <el-form-item label="Is this a person or a business?">
+        <div class="choice-list inline" role="radiogroup">
+          <button
+            v-for="option in ownerKindOptions"
+            :key="String(option.value)"
+            type="button"
+            role="radio"
+            class="choice"
+            :class="{ selected: (draft.kind || 'PERSON') === option.value }"
+            :aria-checked="(draft.kind || 'PERSON') === option.value"
+            @click="set('kind', option.value)"
           >
-            <el-option
-              v-for="option in ownerKindOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item
-          v-if="draft.kind === 'ORGANIZATION'"
-          label="Business name"
-          required
-          :error="need(draft.business_name)"
-        >
+            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+      </el-form-item>
+      <el-form-item v-if="draft.kind === 'ORGANIZATION'" label="Business name" required :error="need(draft.business_name)">
+        <FormField
+          :model-value="draft.business_name"
+          :property="field('Party', 'business_name', 'Business name', 'input')"
+          :form="draft"
+          @update:model-value="set('business_name', $event)"
+        />
+      </el-form-item>
+      <div v-else class="field-grid">
+        <el-form-item label="First name" required :error="need(draft.first_name)">
           <FormField
-            :model-value="draft.business_name"
-            :property="field('Party', 'business_name', 'Business name', 'input')"
+            :model-value="draft.first_name"
+            :property="field('Party', 'first_name', 'First name', 'input')"
             :form="draft"
-            @update:model-value="set('business_name', $event)"
+            @update:model-value="set('first_name', $event)"
           />
         </el-form-item>
-
-        <template v-else>
-          <el-form-item label="First name" required :error="need(draft.first_name)">
-            <FormField
-              :model-value="draft.first_name"
-              :property="field('Party', 'first_name', 'First name', 'input')"
-              :form="draft"
-              @update:model-value="set('first_name', $event)"
-            />
-          </el-form-item>
-          <el-form-item label="Last name" required :error="need(draft.last_name)">
-            <FormField
-              :model-value="draft.last_name"
-              :property="field('Party', 'last_name', 'Last name', 'input')"
-              :form="draft"
-              @update:model-value="set('last_name', $event)"
-            />
-          </el-form-item>
+        <el-form-item label="Last name" required :error="need(draft.last_name)">
+          <FormField
+            :model-value="draft.last_name"
+            :property="field('Party', 'last_name', 'Last name', 'input')"
+            :form="draft"
+            @update:model-value="set('last_name', $event)"
+          />
+        </el-form-item>
+      </div>
+      <el-form-item label="How are they related to you?" required :error="need(draft.relationship_to_applicant)">
+        <template v-if="choices('relationship_to_applicant')">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in choices('relationship_to_applicant')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.relationship_to_applicant === option.value }"
+              :aria-checked="draft.relationship_to_applicant === option.value"
+              @click="set('relationship_to_applicant', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
         </template>
-
-        <el-form-item label="How are they related to you?" required :error="need(draft.relationship_to_applicant)">
+        <template v-else>
           <FormField
             :model-value="draft.relationship_to_applicant"
             :property="field('ApplicationParty', 'relationship_to_applicant', 'How are they related to you?', 'select')"
             :form="draft"
             @update:model-value="set('relationship_to_applicant', $event)"
           />
-        </el-form-item>
-
+        </template>
+      </el-form-item>
+      <div class="field-grid">
         <el-form-item label="Phone number" required :error="need(draft.phone)">
           <FormField
             :model-value="draft.phone"
@@ -67,11 +81,10 @@
             @update:model-value="set('phone', $event)"
           />
         </el-form-item>
-
         <el-form-item label="Email (if they have one)">
           <FormField
             :model-value="draft.email"
-            :property="field('Party', 'email', 'Email', 'input')"
+            :property="field('Party', 'email', 'Email (if they have one)', 'input')"
             :form="draft"
             @update:model-value="set('email', $event)"
           />
@@ -98,39 +111,59 @@
             @update:model-value="set('last_name', $event)"
           />
         </el-form-item>
-        <el-form-item label="Phone number" required :error="need(draft.phone)">
-          <FormField
-            :model-value="draft.phone"
-            :property="field('Party', 'phone', 'Phone number', 'input')"
-            :form="draft"
-            @update:model-value="set('phone', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Email" required :error="need(draft.email)">
-          <FormField
-            :model-value="draft.email"
-            :property="field('Party', 'email', 'Email', 'input')"
-            :form="draft"
-            @update:model-value="set('email', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Date of birth" required :error="need(draft.date_of_birth)">
-          <FormField
-            :model-value="draft.date_of_birth"
-            :property="field('Party', 'date_of_birth', 'Date of birth', 'date')"
-            :form="draft"
-            @update:model-value="set('date_of_birth', $event, 'date')"
-          />
-        </el-form-item>
-        <el-form-item label="Marital status">
+      </div>
+      <el-form-item label="Mobile phone number" required :error="need(draft.phone)">
+        <FormField
+          :model-value="draft.phone"
+          :property="field('Party', 'phone', 'Mobile phone number', 'input')"
+          :form="draft"
+          @update:model-value="set('phone', $event)"
+        />
+        <small class="helper">We'll call or text you about your application.</small>
+      </el-form-item>
+      <el-form-item label="Email address" required :error="need(draft.email)">
+        <FormField
+          :model-value="draft.email"
+          :property="field('Party', 'email', 'Email address', 'input')"
+          :form="draft"
+          @update:model-value="set('email', $event)"
+        />
+      </el-form-item>
+      <el-form-item label="Date of birth" required :error="need(draft.date_of_birth)">
+        <FormField
+          :model-value="draft.date_of_birth"
+          :property="field('Party', 'date_of_birth', 'Date of birth', 'date')"
+          :form="draft"
+          @update:model-value="set('date_of_birth', $event, 'date')"
+        />
+      </el-form-item>
+      <el-form-item label="Are you married?">
+        <template v-if="choices('marital_status')">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in choices('marital_status')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.marital_status === option.value }"
+              :aria-checked="draft.marital_status === option.value"
+              @click="set('marital_status', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
           <FormField
             :model-value="draft.marital_status"
-            :property="field('Party', 'marital_status', 'Marital status', 'select')"
+            :property="field('Party', 'marital_status', 'Are you married?', 'select')"
             :form="draft"
             @update:model-value="set('marital_status', $event)"
           />
-        </el-form-item>
-      </div>
+        </template>
+      </el-form-item>
     </template>
 
     <!-- ===== Home: address, housing, dependants ===== -->
@@ -153,7 +186,7 @@
             @update:model-value="set('country', $event)"
           />
         </el-form-item>
-        <el-form-item v-if="inGrenada" label="Parish" required :error="need(draft.parish)">
+        <el-form-item label="Parish" required :error="need(draft.parish)" v-if="inGrenada">
           <FormField
             :model-value="draft.parish"
             :property="field('Party', 'parish', 'Parish', 'select')"
@@ -161,26 +194,47 @@
             @update:model-value="set('parish', $event)"
           />
         </el-form-item>
-        <el-form-item label="How many years have you lived there?" required :error="need(draft.years_at_address)">
+      </div>
+      <el-form-item label="Do you own or rent your home?" required :error="need(draft.housing_status)">
+        <template v-if="choices('housing_status')">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in choices('housing_status')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.housing_status === option.value }"
+              :aria-checked="draft.housing_status === option.value"
+              @click="set('housing_status', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
+          <FormField
+            :model-value="draft.housing_status"
+            :property="field('ApplicationParty', 'housing_status', 'Do you own or rent your home?', 'select')"
+            :form="draft"
+            @update:model-value="set('housing_status', $event)"
+          />
+        </template>
+      </el-form-item>
+      <div class="field-grid">
+        <el-form-item label="Years living there" required :error="need(draft.years_at_address)">
           <FormField
             :model-value="draft.years_at_address"
-            :property="field('Party', 'years_at_address', 'Years at this address', 'number')"
+            :property="field('Party', 'years_at_address', 'Years living there', 'number')"
             :form="draft"
             @update:model-value="set('years_at_address', $event)"
           />
         </el-form-item>
-        <el-form-item label="Do you own or rent your home?" required :error="need(draft.housing_status)">
-          <FormField
-            :model-value="draft.housing_status"
-            :property="field('ApplicationParty', 'housing_status', 'Housing', 'select')"
-            :form="draft"
-            @update:model-value="set('housing_status', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="How many people depend on you for money?" required :error="need(draft.number_of_dependants)">
+        <el-form-item label="People who depend on you" required :error="need(draft.number_of_dependants)">
           <FormField
             :model-value="draft.number_of_dependants"
-            :property="field('ApplicationParty', 'number_of_dependants', 'Dependants', 'number')"
+            :property="field('ApplicationParty', 'number_of_dependants', 'People who depend on you', 'number')"
             :form="draft"
             @update:model-value="set('number_of_dependants', $event)"
           />
@@ -190,7 +244,8 @@
 
       <!-- Previous address: only under 2 years at this one -->
       <template v-if="needsPreviousAddress">
-        <p class="subheading">You've lived there less than 2 years. Where did you live before?</p>
+        <p class="subheading">Where did you live before?</p>
+        <p class="hint">You've lived at your address for less than 2 years, so we need your previous one too.</p>
         <el-form-item label="Previous address" required :error="need(draft.previous_address)">
           <FormField
             :model-value="draft.previous_address"
@@ -200,18 +255,18 @@
           />
         </el-form-item>
         <div class="field-grid">
-          <el-form-item label="Previous country">
+          <el-form-item label="Country">
             <FormField
               :model-value="draft.previous_country"
-              :property="field('Party', 'previous_country', 'Previous country', 'select')"
+              :property="field('Party', 'previous_country', 'Country', 'select')"
               :form="draft"
               @update:model-value="set('previous_country', $event)"
             />
           </el-form-item>
-          <el-form-item v-if="previousInGrenada" label="Previous parish">
+          <el-form-item label="Parish" v-if="previousInGrenada">
             <FormField
               :model-value="draft.previous_parish"
-              :property="field('Party', 'previous_parish', 'Previous parish', 'select')"
+              :property="field('Party', 'previous_parish', 'Parish', 'select')"
               :form="draft"
               @update:model-value="set('previous_parish', $event)"
             />
@@ -219,11 +274,12 @@
         </div>
       </template>
 
-      <!-- Optional extras, hidden until asked for -->
-      <el-button v-if="!showMore && !draft.mailing_address" text type="primary" @click="showMore = true">
-        + My mail goes to a different address
-      </el-button>
-      <el-form-item v-else label="Mailing address">
+      <!-- Optional extra, hidden until asked for -->
+      <button v-if="!showMore && !draft.mailing_address" type="button" class="more-link" @click="showMore = true">
+        <v-icon size="20">mdi-plus</v-icon>
+        My mail goes to a different address
+      </button>
+      <el-form-item label="Mailing address" v-else>
         <FormField
           :model-value="draft.mailing_address"
           :property="field('Party', 'mailing_address', 'Mailing address', 'textarea')"
@@ -236,56 +292,72 @@
     <!-- ===== Membership and citizenship ===== -->
     <template v-if="show('membership')">
       <el-form-item label="Are you a member of the credit union?">
-        <div class="choice-row">
-          <el-button
-            size="large"
-            :type="draft.is_member ? 'primary' : ''"
-            @click="set('is_member', true)"
+        <div class="choice-list inline" role="radiogroup">
+          <button
+            v-for="option in [{ value: true, label: 'Yes, I am a member' }, { value: false, label: 'Not yet' }]"
+            :key="String(option.value)"
+            type="button"
+            role="radio"
+            class="choice"
+            :class="{ selected: Boolean(draft.is_member) === option.value }"
+            :aria-checked="Boolean(draft.is_member) === option.value"
+            @click="set('is_member', option.value)"
           >
-            Yes, I'm a member
-          </el-button>
-          <el-button
-            size="large"
-            :type="!draft.is_member ? 'primary' : ''"
-            @click="set('is_member', false)"
-          >
-            Not yet
-          </el-button>
+            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span>{{ option.label }}</span>
+          </button>
         </div>
       </el-form-item>
-      <el-form-item v-if="draft.is_member" label="Member number" required :error="need(draft.member_number)">
+      <el-form-item label="Member number" required :error="need(draft.member_number)" v-if="draft.is_member">
         <FormField
           :model-value="draft.member_number"
           :property="field('Party', 'member_number', 'Member number', 'input')"
           :form="draft"
           @update:model-value="set('member_number', $event)"
         />
+        <small class="helper">It's on your passbook or member card.</small>
       </el-form-item>
-      <p v-else class="helper">That's fine. You can still apply, and we'll help you join.</p>
-
-      <div class="field-grid">
-        <el-form-item label="Citizen of which country?" required :error="need(draft.citizenship)">
-          <FormField
-            :model-value="draft.citizenship"
-            :property="field('Party', 'citizenship', 'Citizenship', 'select')"
-            :form="draft"
-            @update:model-value="set('citizenship', $event)"
-          />
-        </el-form-item>
-        <el-form-item label="Residency status" required :error="need(draft.residency_status)">
+      <p v-else class="soft-box info">That's fine. You can still apply, and we'll help you join.</p>
+      <el-form-item label="Which country are you a citizen of?" required :error="need(draft.citizenship)">
+        <FormField
+          :model-value="draft.citizenship"
+          :property="field('Party', 'citizenship', 'Which country are you a citizen of?', 'select')"
+          :form="draft"
+          @update:model-value="set('citizenship', $event)"
+        />
+      </el-form-item>
+      <el-form-item label="Residency status" required :error="need(draft.residency_status)">
+        <template v-if="choices('residency_status')">
+          <div class="choice-list" role="radiogroup">
+            <button
+              v-for="option in choices('residency_status')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.residency_status === option.value }"
+              :aria-checked="draft.residency_status === option.value"
+              @click="set('residency_status', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
           <FormField
             :model-value="draft.residency_status"
             :property="field('Party', 'residency_status', 'Residency status', 'select')"
             :form="draft"
             @update:model-value="set('residency_status', $event)"
           />
-        </el-form-item>
-      </div>
-
-      <el-button v-if="!showMore && !draft.tin" text type="primary" @click="showMore = true">
-        + Add a tax number (TIN)
-      </el-button>
-      <el-form-item v-else label="Tax number (TIN)">
+        </template>
+      </el-form-item>
+      <button v-if="!showMore && !draft.tin" type="button" class="more-link" @click="showMore = true">
+        <v-icon size="20">mdi-plus</v-icon>
+        Add a tax number (TIN)
+      </button>
+      <el-form-item label="Tax number (TIN)" v-else>
         <FormField
           :model-value="draft.tin"
           :property="field('Party', 'tin', 'Tax number (TIN)', 'input')"
@@ -307,42 +379,65 @@
         <small class="helper">It's printed on your NIS card.</small>
       </el-form-item>
 
+      <p class="subheading">Photo ID</p>
       <article
         v-for="(row, index) in draft.identifications"
         :key="row.client_key"
-        class="item-card"
+        class="item-card open"
       >
-        <div class="item-title">
-          <strong>{{ identificationTitle(row, index) }}</strong>
-          <div>
-            <el-tag v-if="row.is_primary && draft.identifications.length > 1" type="success" size="small">Main ID</el-tag>
-            <el-button
-              v-else-if="draft.identifications.length > 1"
-              text
+        <div class="item-head">
+          <span class="item-icon"><v-icon>mdi-card-account-details-outline</v-icon></span>
+          <div class="item-text">
+            <strong>{{ identificationTitle(row, index) }}</strong>
+            <span v-if="row.is_primary && draft.identifications.length > 1">Your main ID</span>
+          </div>
+          <div class="item-actions">
+            <button
+              v-if="!row.is_primary && draft.identifications.length > 1"
+              type="button"
+              class="link-btn"
               @click="setPrimary(index)"
             >
-              Make this my main ID
-            </el-button>
-            <el-button
+              Make main
+            </button>
+            <button
               v-if="draft.identifications.length > 1"
-              text
-              type="danger"
+              type="button"
+              class="link-btn danger"
               @click="removeIdentification(index)"
             >
               Remove
-            </el-button>
+            </button>
           </div>
         </div>
-
-        <div class="field-grid">
-          <el-form-item label="Type of ID" required :error="need(row.identification_type)">
+        <el-form-item label="Type of ID" required :error="need(row.identification_type)">
+          <template v-if="choices('identification_type')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('identification_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: row.identification_type === option.value }"
+                :aria-checked="row.identification_type === option.value"
+                @click="setIdentification(index, 'identification_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
             <FormField
               :model-value="row.identification_type"
               :property="field('PartyIdentification', 'identification_type', 'Type of ID', 'select')"
               :form="row"
               @update:model-value="setIdentification(index, 'identification_type', $event)"
             />
-          </el-form-item>
+          </template>
+        </el-form-item>
+        <div class="field-grid">
           <el-form-item label="ID number" required :error="need(row.identification_number)">
             <FormField
               :model-value="row.identification_number"
@@ -365,9 +460,10 @@
         </div>
 
         <!-- Less common details, hidden until asked for -->
-        <el-button v-if="!moreFor[row.client_key]" text type="primary" @click="moreFor[row.client_key] = true">
-          + Add issue date and country
-        </el-button>
+        <button v-if="!moreFor[row.client_key]" type="button" class="more-link" @click="moreFor[row.client_key] = true">
+          <v-icon size="20">mdi-plus</v-icon>
+          Add issue date and country
+        </button>
         <div v-else class="field-grid">
           <el-form-item label="Issuing country">
             <FormField
@@ -400,10 +496,10 @@
         />
       </article>
 
-      <el-button plain @click="addIdentification">
-        <v-icon start>mdi-plus</v-icon>
+      <button type="button" class="add-button" @click="addIdentification">
+        <v-icon>mdi-plus</v-icon>
         Add another ID
-      </el-button>
+      </button>
       <p class="helper">{{ identificationHint }}</p>
 
       <!-- Documents everyone gives, like the NIS card -->
@@ -421,29 +517,66 @@
 
     <!-- ===== Work ===== -->
     <template v-if="show('job')">
-      <div class="field-grid">
-        <el-form-item label="What is your work situation?" required :error="need(draft.employment_status)">
+      <el-form-item label="What is your work situation?" required :error="need(draft.employment_status)">
+        <template v-if="choices('employment_status')">
+          <div class="choice-list" role="radiogroup">
+            <button
+              v-for="option in choices('employment_status')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.employment_status === option.value }"
+              :aria-checked="draft.employment_status === option.value"
+              @click="set('employment_status', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
           <FormField
             :model-value="draft.employment_status"
-            :property="field('ApplicationParty', 'employment_status', 'Work situation', 'select')"
+            :property="field('ApplicationParty', 'employment_status', 'What is your work situation?', 'select')"
             :form="draft"
             @update:model-value="set('employment_status', $event)"
           />
-        </el-form-item>
-
-        <template v-if="showEmploymentDetails">
-          <el-form-item label="Type of job" required :error="need(draft.employment_type)">
+        </template>
+      </el-form-item>
+      <template v-if="showEmploymentDetails">
+        <el-form-item label="Type of job" required :error="need(draft.employment_type)">
+          <template v-if="choices('employment_type')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('employment_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.employment_type === option.value }"
+                :aria-checked="draft.employment_type === option.value"
+                @click="set('employment_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
             <FormField
               :model-value="draft.employment_type"
               :property="field('ApplicationParty', 'employment_type', 'Type of job', 'select')"
               :form="draft"
               @update:model-value="set('employment_type', $event)"
             />
-          </el-form-item>
+          </template>
+        </el-form-item>
+        <div class="field-grid">
           <el-form-item label="Employer or business name">
             <FormField
               :model-value="draft.employer_name"
-              :property="field('ApplicationParty', 'employer_name', 'Employer', 'input')"
+              :property="field('ApplicationParty', 'employer_name', 'Employer or business name', 'input')"
               :form="draft"
               @update:model-value="set('employer_name', $event)"
             />
@@ -456,38 +589,39 @@
               @update:model-value="set('job_title', $event)"
             />
           </el-form-item>
-          <el-form-item label="When did you start this job?" required :error="need(draft.employment_start_date)">
-            <FormField
-              :model-value="draft.employment_start_date"
-              :property="field('ApplicationParty', 'employment_start_date', 'Start date', 'date')"
-              :form="draft"
-              @update:model-value="set('employment_start_date', $event, 'date')"
-            />
-          </el-form-item>
-        </template>
-      </div>
+        </div>
+        <el-form-item label="When did you start?" required :error="need(draft.employment_start_date)">
+          <FormField
+            :model-value="draft.employment_start_date"
+            :property="field('ApplicationParty', 'employment_start_date', 'When did you start?', 'date')"
+            :form="draft"
+            @update:model-value="set('employment_start_date', $event, 'date')"
+          />
+        </el-form-item>
+      </template>
 
       <!-- Previous job: only under 2 years in this one -->
       <template v-if="needsPreviousEmployment">
-        <p class="subheading">You started less than 2 years ago. Where did you work before?</p>
+        <p class="subheading">Where did you work before?</p>
+        <p class="hint">You started less than 2 years ago, so we need your previous job too.</p>
+        <el-form-item label="Previous employer" required :error="need(draft.previous_employer_name)">
+          <FormField
+            :model-value="draft.previous_employer_name"
+            :property="field('ApplicationParty', 'previous_employer_name', 'Previous employer', 'input')"
+            :form="draft"
+            @update:model-value="set('previous_employer_name', $event)"
+          />
+        </el-form-item>
         <div class="field-grid">
-          <el-form-item label="Previous employer" required :error="need(draft.previous_employer_name)">
-            <FormField
-              :model-value="draft.previous_employer_name"
-              :property="field('ApplicationParty', 'previous_employer_name', 'Previous employer', 'input')"
-              :form="draft"
-              @update:model-value="set('previous_employer_name', $event)"
-            />
-          </el-form-item>
           <el-form-item label="Job title there">
             <FormField
               :model-value="draft.previous_job_title"
-              :property="field('ApplicationParty', 'previous_job_title', 'Previous job title', 'input')"
+              :property="field('ApplicationParty', 'previous_job_title', 'Job title there', 'input')"
               :form="draft"
               @update:model-value="set('previous_job_title', $event)"
             />
           </el-form-item>
-          <el-form-item label="How many years there?">
+          <el-form-item label="Years there">
             <FormField
               :model-value="draft.previous_employment_years"
               :property="field('ApplicationParty', 'previous_employment_years', 'Years there', 'number')"
@@ -501,86 +635,134 @@
 
     <!-- ===== Pay, other income, and (guarantors) the guarantee ===== -->
     <template v-if="show('pay')">
-      <div class="field-grid">
-        <el-form-item label="Pay before tax (EC$)" required :error="need(draft.gross_pay)">
-          <FormField
-            :model-value="draft.gross_pay"
-            :property="field('ApplicationParty', 'gross_pay', 'Pay before tax (EC$)', 'number')"
-            :form="draft"
-            @update:model-value="set('gross_pay', $event)"
-          />
-          <small class="helper">The amount on your payslip before anything is taken off. Enter 0 if none.</small>
-        </el-form-item>
-        <el-form-item label="How often are you paid?" :required="Number(draft.gross_pay) > 0" :error="Number(draft.gross_pay) > 0 ? need(draft.pay_frequency) : ''">
+      <el-form-item label="Your pay before tax (EC$)" required :error="need(draft.gross_pay)">
+        <FormField
+          :model-value="draft.gross_pay"
+          :property="field('ApplicationParty', 'gross_pay', 'Your pay before tax (EC$)', 'number')"
+          :form="draft"
+          @update:model-value="set('gross_pay', $event)"
+        />
+        <small class="helper">The amount on your payslip before anything is taken off. Enter 0 if you have no pay.</small>
+      </el-form-item>
+      <el-form-item label="How often are you paid?" v-if="Number(draft.gross_pay) > 0" required :error="need(draft.pay_frequency)">
+        <template v-if="choices('pay_frequency')">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in choices('pay_frequency')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.pay_frequency === option.value }"
+              :aria-checked="draft.pay_frequency === option.value"
+              @click="set('pay_frequency', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
           <FormField
             :model-value="draft.pay_frequency"
             :property="field('ApplicationParty', 'pay_frequency', 'How often are you paid?', 'select')"
             :form="draft"
             @update:model-value="set('pay_frequency', $event)"
           />
-        </el-form-item>
-        <el-form-item v-if="isSelfEmployed" label="Business sales in a year (EC$)">
-          <FormField
-            :model-value="draft.annual_revenue"
-            :property="field('ApplicationParty', 'annual_revenue', 'Business sales in a year', 'number')"
-            :form="draft"
-            @update:model-value="set('annual_revenue', $event)"
-          />
-        </el-form-item>
-      </div>
+        </template>
+      </el-form-item>
+      <el-form-item label="Business sales in a year (EC$)" v-if="isSelfEmployed">
+        <FormField
+          :model-value="draft.annual_revenue"
+          :property="field('ApplicationParty', 'annual_revenue', 'Business sales in a year (EC$)', 'number')"
+          :form="draft"
+          @update:model-value="set('annual_revenue', $event)"
+        />
+      </el-form-item>
 
       <!-- NIS and income tax are worked out, not entered -->
-      <div v-if="showDeductions" class="deduction-summary">
-        <div class="deduction-row">
+      <div v-if="showDeductions" class="soft-box">
+        <div class="sum-row">
           <span>Pay each month, before tax</span>
           <strong>{{ money(deductions.gross) }}</strong>
         </div>
-        <div class="deduction-row">
-          <span>NIS (estimated)</span>
-          <strong>- {{ money(deductions.nis) }}</strong>
+        <div class="sum-row">
+          <span>NIS (estimate)</span>
+          <strong>− {{ money(deductions.nis) }}</strong>
         </div>
-        <div class="deduction-row">
-          <span>Income tax (estimated)</span>
-          <strong>- {{ money(deductions.incomeTax) }}</strong>
+        <div class="sum-row">
+          <span>Income tax (estimate)</span>
+          <strong>− {{ money(deductions.incomeTax) }}</strong>
         </div>
-        <div class="deduction-row net">
-          <span>Take-home pay each month (estimated)</span>
+        <div class="sum-row total">
+          <span>Take-home pay each month</span>
           <strong>{{ money(deductions.net) }}</strong>
         </div>
       </div>
 
       <!-- Other income: asked as Yes/No first -->
       <el-form-item label="Do you get money from anywhere else?">
-        <div class="choice-row">
-          <el-button size="large" :type="hasOtherIncome === true ? 'primary' : ''" @click="setOtherIncome(true)">
-            Yes
-          </el-button>
-          <el-button size="large" :type="hasOtherIncome === false ? 'primary' : ''" @click="setOtherIncome(false)">
-            No
-          </el-button>
+        <div class="choice-list inline" role="radiogroup">
+          <button
+            v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+            :key="String(option.value)"
+            type="button"
+            role="radio"
+            class="choice"
+            :class="{ selected: hasOtherIncome === option.value }"
+            :aria-checked="hasOtherIncome === option.value"
+            @click="setOtherIncome(option.value)"
+          >
+            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span>{{ option.label }}</span>
+          </button>
         </div>
-        <small class="helper">For example rent from a property, a pension, money sent from abroad, or a second job.</small>
+        <small class="helper">For example rent, a pension, money sent from abroad, or a second job.</small>
       </el-form-item>
 
       <template v-if="hasOtherIncome">
         <article
           v-for="(income, index) in draft.incomes"
           :key="income.client_key"
-          class="item-card"
+          class="item-card open"
         >
-          <div class="item-title">
-            <strong>{{ lookupLabel('income_type', income.income_type) || `Other money ${index + 1}` }}</strong>
-            <el-button text type="danger" @click="removeIncome(index)">Remove</el-button>
+          <div class="item-head">
+            <span class="item-icon"><v-icon>mdi-cash-plus</v-icon></span>
+            <div class="item-text">
+              <strong>{{ lookupLabel('income_type', income.income_type) || `Other money ${index + 1}` }}</strong>
+            </div>
+            <div class="item-actions">
+              <button type="button" class="link-btn danger" @click="removeIncome(index)">Remove</button>
+            </div>
           </div>
-          <div class="field-grid">
-            <el-form-item label="Where does it come from?" required :error="need(income.income_type)">
+          <el-form-item label="Where does it come from?" required :error="need(income.income_type)">
+            <template v-if="choices('income_type')">
+              <div class="choice-list inline" role="radiogroup">
+                <button
+                  v-for="option in choices('income_type')"
+                  :key="String(option.value)"
+                  type="button"
+                  role="radio"
+                  class="choice"
+                  :class="{ selected: income.income_type === option.value }"
+                  :aria-checked="income.income_type === option.value"
+                  @click="setIncome(index, 'income_type', option.value)"
+                >
+                  <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </template>
+            <template v-else>
               <FormField
                 :model-value="income.income_type"
                 :property="field('IncomeSource', 'income_type', 'Where does it come from?', 'select')"
                 :form="income"
                 @update:model-value="setIncome(index, 'income_type', $event)"
               />
-            </el-form-item>
+            </template>
+          </el-form-item>
+          <div class="field-grid">
             <el-form-item label="Amount (EC$)" required :error="need(income.amount)">
               <FormField
                 :model-value="income.amount"
@@ -598,7 +780,6 @@
               />
             </el-form-item>
           </div>
-
           <AdaptiveLoanDocumentRequirements
             title="Proof of this money"
             :scope="documentScopes[`income:${income.client_key}`]"
@@ -610,105 +791,112 @@
             @file-rejected="$emit('file-rejected', $event)"
           />
         </article>
-        <el-button plain @click="addIncome">
-          <v-icon start>mdi-plus</v-icon>
-          Add {{ draft.incomes.length ? 'more' : 'where it comes from' }}
-        </el-button>
+        <button type="button" class="add-button" @click="addIncome">
+          <v-icon>mdi-plus</v-icon>
+          Add more money you get
+        </button>
       </template>
 
       <!-- Guarantors: the guarantee they're giving -->
       <template v-if="isGuarantor">
         <p class="subheading">The guarantee</p>
-        <div class="field-grid">
-          <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
+        <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
+          <template v-if="choices('guarantee_type')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('guarantee_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.guarantee_type === option.value }"
+                :aria-checked="draft.guarantee_type === option.value"
+                @click="set('guarantee_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
             <FormField
               :model-value="draft.guarantee_type"
               :property="field('ApplicationParty', 'guarantee_type', 'Type of guarantee', 'select')"
               :form="draft"
               @update:model-value="set('guarantee_type', $event)"
             />
-          </el-form-item>
-          <el-form-item label="Amount guaranteed (EC$)" required :error="need(draft.guarantee_amount)">
-            <FormField
-              :model-value="draft.guarantee_amount"
-              :property="field('ApplicationParty', 'guarantee_amount', 'Amount guaranteed (EC$)', 'number')"
-              :form="draft"
-              @update:model-value="set('guarantee_amount', $event)"
-            />
-          </el-form-item>
-        </div>
+          </template>
+        </el-form-item>
+        <el-form-item label="Amount guaranteed (EC$)" required :error="need(draft.guarantee_amount)">
+          <FormField
+            :model-value="draft.guarantee_amount"
+            :property="field('ApplicationParty', 'guarantee_amount', 'Amount guaranteed (EC$)', 'number')"
+            :form="draft"
+            @update:model-value="set('guarantee_amount', $event)"
+          />
+        </el-form-item>
       </template>
     </template>
 
     <!-- ===== Declarations: Yes/No questions ===== -->
     <template v-if="show('declarations')">
-      <div v-for="question in declarationQuestions" :key="question.key" class="yes-no">
-        <p class="yes-no-question">{{ question.text }}</p>
-        <div class="choice-row">
-          <el-button size="large" :type="draft[question.key] === true ? 'primary' : ''" @click="set(question.key, true)">Yes</el-button>
-          <el-button size="large" :type="draft[question.key] === false ? 'primary' : ''" @click="set(question.key, false)">No</el-button>
+      <div v-for="question in declarationQuestions" :key="question.key" class="question-block">
+        <p class="question">{{ question.text }}</p>
+        <div class="choice-list inline" role="radiogroup">
+          <button
+            v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+            :key="String(option.value)"
+            type="button"
+            role="radio"
+            class="choice"
+            :class="{ selected: draft[question.key] === option.value }"
+            :aria-checked="draft[question.key] === option.value"
+            @click="set(question.key, option.value)"
+          >
+            <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+            <span>{{ option.label }}</span>
+          </button>
         </div>
+        <small v-if="showErrors && draft[question.key] !== true && draft[question.key] !== false" class="helper invalid">
+          Please choose Yes or No.
+        </small>
       </div>
-
-      <el-form-item
-        v-if="draft.is_pep"
-        label="Please tell us the position and who holds it"
-        required
-        :error="need(draft.pep_details)"
-      >
+      <el-form-item label="Please tell us the position and who holds it" required :error="need(draft.pep_details)" v-if="draft.is_pep">
         <FormField
           :model-value="draft.pep_details"
-          :property="field('ApplicationParty', 'pep_details', 'Please explain', 'textarea')"
+          :property="field('ApplicationParty', 'pep_details', 'Please tell us the position and who holds it', 'textarea')"
           :form="draft"
           @update:model-value="set('pep_details', $event)"
         />
       </el-form-item>
-      <el-form-item
-        v-if="anyDeclaration"
-        label="Please explain each &quot;Yes&quot; answer"
-        required
-        :error="need(draft.declaration_details)"
-      >
+      <el-form-item label="Please tell us more about each Yes answer" required :error="need(draft.declaration_details)" v-if="anyDeclaration">
         <FormField
           :model-value="draft.declaration_details"
-          :property="field('ApplicationParty', 'declaration_details', 'Please explain', 'textarea')"
+          :property="field('ApplicationParty', 'declaration_details', 'Please tell us more about each Yes answer', 'textarea')"
           :form="draft"
           @update:model-value="set('declaration_details', $event)"
         />
       </el-form-item>
     </template>
 
-    <!-- ===== Agreement ===== -->
+    <!-- ===== Agreement: big tick boxes ===== -->
     <template v-if="show('consent')">
-      <div class="consents">
-        <el-form-item label="Everything I've told you is true and complete.">
-          <el-checkbox
-            size="large"
-            :model-value="Boolean(draft.consent_accuracy_confirmation)"
-            @update:model-value="set('consent_accuracy_confirmation', $event)"
-          >
-            Yes, I agree
-          </el-checkbox>
-        </el-form-item>
-        <el-form-item label="You may check my credit history.">
-          <el-checkbox
-            size="large"
-            :model-value="Boolean(draft.consent_credit_check)"
-            @update:model-value="set('consent_credit_check', $event)"
-          >
-            Yes, I agree
-          </el-checkbox>
-        </el-form-item>
-        <el-form-item label="You may use my information to process this application, as your privacy terms explain.">
-          <el-checkbox
-            size="large"
-            :model-value="Boolean(draft.consent_data_processing)"
-            @update:model-value="set('consent_data_processing', $event)"
-          >
-            Yes, I agree
-          </el-checkbox>
-        </el-form-item>
+      <div class="choice-list">
+        <button
+          v-for="statement in consentStatements"
+          :key="statement.key"
+          type="button"
+          role="checkbox"
+          class="choice"
+          :class="{ selected: Boolean(draft[statement.key]) }"
+          :aria-checked="Boolean(draft[statement.key])"
+          @click="set(statement.key, !draft[statement.key])"
+        >
+          <span class="choice-mark square"><v-icon size="16">mdi-check</v-icon></span>
+          <span>{{ statement.text }}</span>
+        </button>
       </div>
+      <small v-if="showErrors && !allConsented" class="helper invalid">Please tick every box to continue.</small>
     </template>
   </div>
 </template>
@@ -729,7 +917,10 @@
  * A Third Party Owner (owns collateral but isn't borrowing) gets a short
  * form instead: person or business, name, relationship, phone, and email.
  *
- * Every input is Saturn's built-in FormField. Each field uses Saturn's own
+ * Questions with a short list of answers (see choices()) are shown as big
+ * tappable answer cards; the rest use Saturn's built-in FormField.
+ *
+ * Every other input is Saturn's built-in FormField. Each field uses Saturn's own
  * definition of the property (Party, ApplicationParty, or
  * PartyIdentification) when there is one. Role and "Owner is a" are
  * el-selects, since the form decides their choices ("Primary Applicant" is
@@ -844,6 +1035,22 @@ export default {
           text: 'Have you applied for any other loans that are still being decided?',
         },
       ];
+    },
+
+    /** The three agreement statements, each a big tick box. */
+    consentStatements() {
+      return [
+        { key: 'consent_accuracy_confirmation', text: "Everything I've told you is true and complete." },
+        { key: 'consent_credit_check', text: 'You may check my credit history.' },
+        {
+          key: 'consent_data_processing',
+          text: 'You may use my information to process this application, as your privacy terms explain.',
+        },
+      ];
+    },
+
+    allConsented() {
+      return this.consentStatements.every((statement) => Boolean(this.draft[statement.key]));
     },
 
     /** Matches THIRD_PARTY_OWNER_ROLE in the main form. */
@@ -978,6 +1185,15 @@ export default {
 
     lookup(key) {
       return this.lookups[key] || [];
+    },
+
+    /**
+     * The answers for a question as tappable cards, when Saturn's list is
+     * short (2 to 7 answers). Otherwise null, and Saturn's dropdown is used.
+     */
+    choices(key) {
+      const options = this.lookup(key);
+      return options.length >= 2 && options.length <= 7 ? options : null;
     },
 
     lookupLabel(key, value) {
@@ -1144,58 +1360,5 @@ export default {
 </script>
 
 <style scoped>
-.choice-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.choice-row :deep(.el-button) {
-  min-width: 120px;
-  margin: 0;
-}
-
-.subheading {
-  margin: 20px 0 8px;
-  font-weight: 600;
-}
-
-.yes-no {
-  padding: 12px 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.yes-no-question {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.deduction-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
-}
-
-.deduction-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.deduction-row.net {
-  padding-top: 8px;
-  border-top: 1px solid #e2e8f0;
-  font-weight: 600;
-}
-
-.consents {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* Styled in the main form's stylesheet (.choice, .item-card, .soft-box, ...). */
 </style>

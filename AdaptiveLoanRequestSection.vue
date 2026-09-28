@@ -1,275 +1,370 @@
 <template>
-    <section>
-        <template v-if="show('main')">
-        <div class="field-grid">
-            <el-form-item label="How much would you like to borrow? (EC$)" required :error="need(draft.requested_loan_amount)">
-                <FormField
-                    :model-value="draft.requested_loan_amount"
-                    :property="fields.requested_loan_amount"
-                    :form="draft"
-                    @update:model-value="set('requested_loan_amount', $event)"
-                />
-                <small v-if="selectedProduct" class="helper">
-                    Between {{ money(amountMinimum) }} and {{ money(amountMaximum) }}.
-                </small>
-            </el-form-item>
-
-            <el-form-item label="How many months to pay it back?" required :error="need(draft.requested_loan_term)">
-                <FormField
-                    :model-value="draft.requested_loan_term"
-                    :property="fields.requested_loan_term"
-                    :form="draft"
-                    @update:model-value="set('requested_loan_term', $event)"
-                />
-                <small v-if="selectedProduct" class="helper">
-                    Between {{ termMinimum }} and {{ termMaximum }} months ({{ yearsLabel(termMinimum) }} to {{ yearsLabel(termMaximum) }}).
-                </small>
-            </el-form-item>
-
-            <el-form-item label="How often would you like to pay?">
-                <FormField
-                    :model-value="draft.repayment_frequency"
-                    :property="fields.repayment_frequency"
-                    :form="draft"
-                    @update:model-value="set('repayment_frequency', $event)"
-                />
-            </el-form-item>
-        </div>
-
-        <el-form-item label="What is the loan for?" required :error="need(draft.loan_purpose)">
-            <FormField
-                :model-value="draft.loan_purpose"
-                :property="fields.loan_purpose"
-                :form="draft"
-                @update:model-value="set('loan_purpose', $event)"
-            />
-            <small class="helper">A sentence is enough, for example "To buy a used car for work".</small>
-        </el-form-item>
-        </template>
-
-        <template v-if="show('details')">
-
-        <section v-if="loanCategory === 'auto'" class="context">
-            <div class="field-grid">
-                <el-form-item label="Make">
-                    <FormField
-                        :model-value="draft.vehicle_make"
-                        :property="fields.vehicle_make"
-                        :form="draft"
-                        @update:model-value="set('vehicle_make', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Model">
-                    <FormField
-                        :model-value="draft.vehicle_model"
-                        :property="fields.vehicle_model"
-                        :form="draft"
-                        @update:model-value="set('vehicle_model', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Year">
-                    <FormField
-                        :model-value="draft.vehicle_year"
-                        :property="fields.vehicle_year"
-                        :form="draft"
-                        @update:model-value="set('vehicle_year', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Condition">
-                    <FormField
-                        :model-value="draft.vehicle_condition"
-                        :property="fields.vehicle_condition"
-                        :form="draft"
-                        @update:model-value="set('vehicle_condition', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Registration number (if it has one)">
-                    <FormField
-                        :model-value="draft.vehicle_registration_number"
-                        :property="fields.vehicle_registration_number"
-                        :form="draft"
-                        @update:model-value="set('vehicle_registration_number', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Chassis number (VIN)">
-                    <FormField
-                        :model-value="draft.vehicle_chassis_number"
-                        :property="fields.vehicle_chassis_number"
-                        :form="draft"
-                        @update:model-value="set('vehicle_chassis_number', $event)"
-                    />
-                </el-form-item>
-            </div>
-        </section>
-
-        <section v-if="loanCategory === 'home'" class="context">
-            <el-form-item label="Property address">
-                <FormField
-                    :model-value="draft.property_address"
-                    :property="fields.property_address"
-                    :form="draft"
-                    @update:model-value="set('property_address', $event)"
-                />
-            </el-form-item>
-            <div class="field-grid">
-                <el-form-item label="Property type">
-                    <FormField
-                        :model-value="draft.property_type"
-                        :property="fields.property_type"
-                        :form="draft"
-                        @update:model-value="set('property_type', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Estimated value (EC$)">
-                    <FormField
-                        :model-value="draft.property_value"
-                        :property="fields.property_value"
-                        :form="draft"
-                        @update:model-value="set('property_value', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Block and parcel">
-                    <FormField
-                        :model-value="draft.property_block_and_parcel"
-                        :property="fields.property_block_and_parcel"
-                        :form="draft"
-                        @update:model-value="set('property_block_and_parcel', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Deed number">
-                    <FormField
-                        :model-value="draft.property_deed_number"
-                        :property="fields.property_deed_number"
-                        :form="draft"
-                        @update:model-value="set('property_deed_number', $event)"
-                    />
-                </el-form-item>
-            </div>
-        </section>
-
-        <!--
-          Purchase details (auto and home). With a purchase price, the vehicle
-          or property being bought is added on the Assets step as collateral.
-        -->
-        <section v-if="isPurchaseCategory" class="context">
-            <h3>Are you buying it?</h3>
-            <p class="helper">
-                Leave the purchase price blank if you're not buying (for example, a
-                refinance). With a price, we'll add the
-                {{ loanCategory === 'auto' ? 'vehicle' : 'property' }} to your assets
-                as collateral for this loan.
-            </p>
-            <div class="field-grid">
-                <el-form-item label="Purchase price (EC$)">
-                    <FormField
-                        :model-value="draft.purchase_price"
-                        :property="fields.purchase_price"
-                        :form="draft"
-                        @update:model-value="set('purchase_price', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Down payment (EC$)">
-                    <FormField
-                        :model-value="draft.down_payment_amount"
-                        :property="fields.down_payment_amount"
-                        :form="draft"
-                        @update:model-value="set('down_payment_amount', $event)"
-                    />
-                </el-form-item>
-                <el-form-item
-                    v-if="Number(draft.down_payment_amount) > 0"
-                    label="Where is the down payment coming from?"
-                    required
-                    :error="need(draft.source_of_funds)"
-                >
-                    <FormField
-                        :model-value="draft.source_of_funds"
-                        :property="fields.source_of_funds"
-                        :form="draft"
-                        @update:model-value="set('source_of_funds', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Seller type">
-                    <FormField
-                        :model-value="draft.seller_type"
-                        :property="fields.seller_type"
-                        :form="draft"
-                        @update:model-value="set('seller_type', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Seller name">
-                    <FormField
-                        :model-value="draft.seller_name"
-                        :property="fields.seller_name"
-                        :form="draft"
-                        @update:model-value="set('seller_name', $event)"
-                    />
-                </el-form-item>
-            </div>
-            <el-form-item
-                v-if="Number(draft.down_payment_amount) > 0"
-                label="Down payment details"
-                :required="String(draft.source_of_funds).toLowerCase() === 'other'"
+  <section>
+    <template v-if="show('main')">
+      <el-form-item label="How much would you like to borrow? (EC$)" required :error="need(draft.requested_loan_amount)">
+        <FormField
+          :model-value="draft.requested_loan_amount"
+          :property="fields.requested_loan_amount"
+          :form="draft"
+          @update:model-value="set('requested_loan_amount', $event)"
+        />
+        <small v-if="selectedProduct" class="helper">You can borrow from {{ money(amountMinimum) }} to {{ money(amountMaximum) }}.</small>
+      </el-form-item>
+      <el-form-item label="How many months do you need to pay it back?" required :error="need(draft.requested_loan_term)">
+        <FormField
+          :model-value="draft.requested_loan_term"
+          :property="fields.requested_loan_term"
+          :form="draft"
+          @update:model-value="set('requested_loan_term', $event)"
+        />
+        <small v-if="selectedProduct" class="helper">From {{ termMinimum }} to {{ termMaximum }} months (up to {{ yearsLabel(termMaximum) }}).</small>
+      </el-form-item>
+      <el-form-item label="How often would you like to pay?">
+        <template v-if="choices('repayment_frequency')">
+          <div class="choice-list inline" role="radiogroup">
+            <button
+              v-for="option in choices('repayment_frequency')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: draft.repayment_frequency === option.value }"
+              :aria-checked="draft.repayment_frequency === option.value"
+              @click="set('repayment_frequency', option.value)"
             >
-                <FormField
-                    :model-value="draft.source_of_funds_details"
-                    :property="fields.source_of_funds_details"
-                    :form="draft"
-                    @update:model-value="set('source_of_funds_details', $event)"
-                />
-            </el-form-item>
-            <p v-if="loanToValue !== null" class="helper">
-                The loan is {{ loanToValue }}% of the purchase price.
-            </p>
-        </section>
-
-        <!-- The business is saved as its own Party record -->
-        <section v-if="loanCategory === 'business'" class="context">
-            <div class="field-grid">
-                <el-form-item label="Business name" required :error="need(draft.business_name)">
-                    <FormField
-                        :model-value="draft.business_name"
-                        :property="fields.business_name"
-                        :form="draft"
-                        @update:model-value="set('business_name', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Registration number">
-                    <FormField
-                        :model-value="draft.business_registration_number"
-                        :property="fields.business_registration_number"
-                        :form="draft"
-                        @update:model-value="set('business_registration_number', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Business type">
-                    <FormField
-                        :model-value="draft.business_type"
-                        :property="fields.business_type"
-                        :form="draft"
-                        @update:model-value="set('business_type', $event)"
-                    />
-                </el-form-item>
-                <el-form-item label="Incorporation date">
-                    <FormField
-                        :model-value="draft.business_incorporation_date"
-                        :property="fields.business_incorporation_date"
-                        :form="draft"
-                        @update:model-value="set('business_incorporation_date', $event, 'date')"
-                    />
-                </el-form-item>
-                <el-form-item label="Number of employees">
-                    <FormField
-                        :model-value="draft.business_employee_count"
-                        :property="fields.business_employee_count"
-                        :form="draft"
-                        @update:model-value="set('business_employee_count', $event)"
-                    />
-                </el-form-item>
-            </div>
-        </section>
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
         </template>
-    </section>
+        <template v-else>
+          <FormField
+            :model-value="draft.repayment_frequency"
+            :property="fields.repayment_frequency"
+            :form="draft"
+            @update:model-value="set('repayment_frequency', $event)"
+          />
+        </template>
+      </el-form-item>
+      <el-form-item label="What is the loan for?" required :error="need(draft.loan_purpose)">
+        <FormField
+          :model-value="draft.loan_purpose"
+          :property="fields.loan_purpose"
+          :form="draft"
+          @update:model-value="set('loan_purpose', $event)"
+        />
+        <small class="helper">A sentence is enough, for example &quot;To buy a used car for work&quot;.</small>
+      </el-form-item>
+    </template>
+
+    <template v-if="show('details')">
+      <template v-if="loanCategory === 'auto'">
+        <div class="field-grid">
+          <el-form-item label="Make">
+            <FormField
+              :model-value="draft.vehicle_make"
+              :property="fields.vehicle_make"
+              :form="draft"
+              @update:model-value="set('vehicle_make', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Model">
+            <FormField
+              :model-value="draft.vehicle_model"
+              :property="fields.vehicle_model"
+              :form="draft"
+              @update:model-value="set('vehicle_model', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Year">
+            <FormField
+              :model-value="draft.vehicle_year"
+              :property="fields.vehicle_year"
+              :form="draft"
+              @update:model-value="set('vehicle_year', $event)"
+            />
+          </el-form-item>
+        </div>
+        <el-form-item label="Is it new or used?">
+          <template v-if="choices('vehicle_condition')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('vehicle_condition')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.vehicle_condition === option.value }"
+                :aria-checked="draft.vehicle_condition === option.value"
+                @click="set('vehicle_condition', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.vehicle_condition"
+              :property="fields.vehicle_condition"
+              :form="draft"
+              @update:model-value="set('vehicle_condition', $event)"
+            />
+          </template>
+        </el-form-item>
+        <div class="field-grid">
+          <el-form-item label="Registration number (if it has one)">
+            <FormField
+              :model-value="draft.vehicle_registration_number"
+              :property="fields.vehicle_registration_number"
+              :form="draft"
+              @update:model-value="set('vehicle_registration_number', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Chassis number (VIN)">
+            <FormField
+              :model-value="draft.vehicle_chassis_number"
+              :property="fields.vehicle_chassis_number"
+              :form="draft"
+              @update:model-value="set('vehicle_chassis_number', $event)"
+            />
+          </el-form-item>
+        </div>
+      </template>
+
+      <template v-if="loanCategory === 'home'">
+        <el-form-item label="Address of the property">
+          <FormField
+            :model-value="draft.property_address"
+            :property="fields.property_address"
+            :form="draft"
+            @update:model-value="set('property_address', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="What kind of property is it?">
+          <template v-if="choices('property_type')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('property_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.property_type === option.value }"
+                :aria-checked="draft.property_type === option.value"
+                @click="set('property_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.property_type"
+              :property="fields.property_type"
+              :form="draft"
+              @update:model-value="set('property_type', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="What is it worth? (EC$)">
+          <FormField
+            :model-value="draft.property_value"
+            :property="fields.property_value"
+            :form="draft"
+            @update:model-value="set('property_value', $event)"
+          />
+          <small class="helper">Your best guess is fine.</small>
+        </el-form-item>
+        <div class="field-grid">
+          <el-form-item label="Block and parcel">
+            <FormField
+              :model-value="draft.property_block_and_parcel"
+              :property="fields.property_block_and_parcel"
+              :form="draft"
+              @update:model-value="set('property_block_and_parcel', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Deed number">
+            <FormField
+              :model-value="draft.property_deed_number"
+              :property="fields.property_deed_number"
+              :form="draft"
+              @update:model-value="set('property_deed_number', $event)"
+            />
+          </el-form-item>
+        </div>
+      </template>
+
+      <!--
+        Purchase details (auto and home). With a purchase price, the vehicle
+        or property being bought is added on the Assets step as collateral.
+      -->
+      <template v-if="isPurchaseCategory">
+        <p class="subheading">Are you buying it?</p>
+        <p class="hint">
+          If you're not buying it (for example, you're refinancing), leave the price empty.
+        </p>
+        <div class="field-grid">
+          <el-form-item label="Price (EC$)">
+            <FormField
+              :model-value="draft.purchase_price"
+              :property="fields.purchase_price"
+              :form="draft"
+              @update:model-value="set('purchase_price', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Your down payment (EC$)">
+            <FormField
+              :model-value="draft.down_payment_amount"
+              :property="fields.down_payment_amount"
+              :form="draft"
+              @update:model-value="set('down_payment_amount', $event)"
+            />
+          </el-form-item>
+        </div>
+        <el-form-item label="Where is the down payment coming from?" required :error="need(draft.source_of_funds)" v-if="Number(draft.down_payment_amount) > 0">
+          <template v-if="choices('source_of_funds')">
+            <div class="choice-list" role="radiogroup">
+              <button
+                v-for="option in choices('source_of_funds')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.source_of_funds === option.value }"
+                :aria-checked="draft.source_of_funds === option.value"
+                @click="set('source_of_funds', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.source_of_funds"
+              :property="fields.source_of_funds"
+              :form="draft"
+              @update:model-value="set('source_of_funds', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Tell us more about the down payment" v-if="Number(draft.down_payment_amount) > 0" :required="String(draft.source_of_funds).toLowerCase() === 'other'">
+          <FormField
+            :model-value="draft.source_of_funds_details"
+            :property="fields.source_of_funds_details"
+            :form="draft"
+            @update:model-value="set('source_of_funds_details', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Who are you buying it from?">
+          <template v-if="choices('seller_type')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('seller_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.seller_type === option.value }"
+                :aria-checked="draft.seller_type === option.value"
+                @click="set('seller_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.seller_type"
+              :property="fields.seller_type"
+              :form="draft"
+              @update:model-value="set('seller_type', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Seller name">
+          <FormField
+            :model-value="draft.seller_name"
+            :property="fields.seller_name"
+            :form="draft"
+            @update:model-value="set('seller_name', $event)"
+          />
+        </el-form-item>
+        <p v-if="loanToValue !== null" class="soft-box info">
+          The loan is {{ loanToValue }}% of the price.
+        </p>
+      </template>
+
+      <!-- The business is saved as its own Party record -->
+      <template v-if="loanCategory === 'business'">
+        <el-form-item label="Business name" required :error="need(draft.business_name)">
+          <FormField
+            :model-value="draft.business_name"
+            :property="fields.business_name"
+            :form="draft"
+            @update:model-value="set('business_name', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Type of business">
+          <template v-if="choices('business_type')">
+            <div class="choice-list" role="radiogroup">
+              <button
+                v-for="option in choices('business_type')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: draft.business_type === option.value }"
+                :aria-checked="draft.business_type === option.value"
+                @click="set('business_type', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.business_type"
+              :property="fields.business_type"
+              :form="draft"
+              @update:model-value="set('business_type', $event)"
+            />
+          </template>
+        </el-form-item>
+        <div class="field-grid">
+          <el-form-item label="Registration number">
+            <FormField
+              :model-value="draft.business_registration_number"
+              :property="fields.business_registration_number"
+              :form="draft"
+              @update:model-value="set('business_registration_number', $event)"
+            />
+          </el-form-item>
+          <el-form-item label="Date it started">
+            <FormField
+              :model-value="draft.business_incorporation_date"
+              :property="fields.business_incorporation_date"
+              :form="draft"
+              @update:model-value="set('business_incorporation_date', $event, 'date')"
+            />
+          </el-form-item>
+          <el-form-item label="Number of employees">
+            <FormField
+              :model-value="draft.business_employee_count"
+              :property="fields.business_employee_count"
+              :form="draft"
+              @update:model-value="set('business_employee_count', $event)"
+            />
+          </el-form-item>
+        </div>
+      </template>
+    </template>
+  </section>
 </template>
 
 <script>
@@ -376,6 +471,15 @@ export default {
         },
     },
     methods: {
+        /**
+         * The answers for a question as tappable cards, when Saturn's list is
+         * short (2 to 7 answers). Otherwise null, and Saturn's dropdown is used.
+         */
+        choices(key) {
+            const options = this.lookups[key] || [];
+            return options.length >= 2 && options.length <= 7 ? options : null;
+        },
+
         copy(value) {
             return JSON.parse(JSON.stringify(value || {}));
         },
@@ -462,8 +566,11 @@ export default {
         },
 
         /** Months as years, e.g. 60 -> "5 years". */
+        /** "6 months", "1 year", or "2.5 years". */
         yearsLabel(months) {
-            const years = Math.round((Number(months) / 12) * 10) / 10;
+            const count = Number(months);
+            if (count < 12) return `${count} ${count === 1 ? "month" : "months"}`;
+            const years = Math.round((count / 12) * 10) / 10;
             return `${years} ${years === 1 ? "year" : "years"}`;
         },
 
@@ -473,3 +580,7 @@ export default {
     },
 };
 </script>
+
+<style scoped>
+/* Styled in the main form's stylesheet (.choice, .field-grid, .soft-box). */
+</style>

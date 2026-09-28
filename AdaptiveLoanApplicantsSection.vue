@@ -5,30 +5,38 @@
       <article
         v-for="(person, index) in parties"
         :key="person.client_key"
-        class="item-card"
+        class="item-card open"
       >
-        <div class="item-title">
-          <strong>{{ personName(person) || `Person ${index + 1}` }}</strong>
-          <el-button text type="danger" @click="$emit('request-remove', index)">
-            Remove
-          </el-button>
+        <div class="item-head">
+          <span class="item-icon"><v-icon>mdi-account-outline</v-icon></span>
+          <div class="item-text">
+            <strong>{{ personName(person) || `Person ${index + 1}` }}</strong>
+            <span v-if="roleLabel(person.role)">{{ roleLabel(person.role) }}</span>
+          </div>
+          <div class="item-actions">
+            <button type="button" class="link-btn danger" @click="$emit('request-remove', index)">Remove</button>
+          </div>
         </div>
 
-        <!-- The form decides these choices ("Primary Applicant" is left out), so it's an el-select -->
         <el-form-item label="How are they involved?" required :error="need(person.role)">
-          <el-select
-            :model-value="person.role"
-            placeholder="Choose one"
-            @update:model-value="setPerson(index, 'role', $event)"
-          >
-            <el-option
+          <div class="choice-list" role="radiogroup">
+            <button
               v-for="option in roleOptions"
               :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-          <small v-if="roleHelp(person.role)" class="helper">{{ roleHelp(person.role) }}</small>
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: person.role === option.value }"
+              :aria-checked="person.role === option.value"
+              @click="setPerson(index, 'role', option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>
+                {{ option.label }}
+                <small v-if="roleHelp(option.value)">{{ roleHelp(option.value) }}</small>
+              </span>
+            </button>
+          </div>
         </el-form-item>
 
         <div class="field-grid">
@@ -51,13 +59,12 @@
         </div>
       </article>
 
-      <el-button type="primary" plain size="large" @click="$emit('request-add')">
-        <v-icon start>mdi-account-plus</v-icon>
+      <button type="button" class="add-button" @click="$emit('request-add')">
+        <v-icon>mdi-account-plus-outline</v-icon>
         Add {{ parties.length ? 'another person' : 'a person' }}
-      </el-button>
-      <p class="helper note">
-        Only the people on your application can own the things you list later.
-        If someone else co-owns something that secures the loan, add them here.
+      </button>
+      <p class="hint">
+        If someone else co-owns something that secures the loan, add them here too.
       </p>
     </template>
 
@@ -66,35 +73,40 @@
       <article
         v-for="(row, index) in references"
         :key="row.client_key"
-        class="item-card"
+        class="item-card open"
       >
-        <div class="item-title">
-          <strong>{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
+        <div class="item-head">
+          <span class="item-icon">
+            <v-icon>{{ row.reference_type === 'Next of kin' ? 'mdi-home-heart' : 'mdi-account-voice' }}</v-icon>
+          </span>
+          <div class="item-text">
+            <strong>{{ row.reference_type === 'Next of kin' ? 'Your next of kin' : 'Someone who knows you' }}</strong>
+            <span>
+              {{
+                row.reference_type === 'Next of kin'
+                  ? 'Your closest family member, like a spouse, parent, or adult child.'
+                  : 'A friend, co-worker, or employer who has known you for a while.'
+              }}
+            </span>
+          </div>
         </div>
-        <p class="helper">
-          {{
-            row.reference_type === 'Next of kin'
-              ? 'Your closest family member, like a spouse, parent, or adult child.'
-              : 'A friend, co-worker, or employer who has known you for a while.'
-          }}
-        </p>
+        <el-form-item label="Full name" required :error="need(row.name)">
+          <FormField
+            :model-value="row.name"
+            :property="field('Reference', 'name', 'Full name', 'input')"
+            :form="row"
+            @update:model-value="setReference(index, 'name', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="How do they know you?" required :error="need(row.relationship)">
+          <FormField
+            :model-value="row.relationship"
+            :property="field('Reference', 'relationship', 'How do they know you?', 'select')"
+            :form="row"
+            @update:model-value="setReference(index, 'relationship', $event)"
+          />
+        </el-form-item>
         <div class="field-grid">
-          <el-form-item label="Full name" required :error="need(row.name)">
-            <FormField
-              :model-value="row.name"
-              :property="field('Reference', 'name', 'Full name', 'input')"
-              :form="row"
-              @update:model-value="setReference(index, 'name', $event)"
-            />
-          </el-form-item>
-          <el-form-item label="How do they know you?" required :error="need(row.relationship)">
-            <FormField
-              :model-value="row.relationship"
-              :property="field('Reference', 'relationship', 'How do they know you?', 'select')"
-              :form="row"
-              @update:model-value="setReference(index, 'relationship', $event)"
-            />
-          </el-form-item>
           <el-form-item label="Phone number" required :error="need(row.phone)">
             <FormField
               :model-value="row.phone"
@@ -106,7 +118,7 @@
           <el-form-item label="Email (if they have one)">
             <FormField
               :model-value="row.email"
-              :property="field('Reference', 'email', 'Email', 'input')"
+              :property="field('Reference', 'email', 'Email (if they have one)', 'input')"
               :form="row"
               @update:model-value="setReference(index, 'email', $event)"
             />
@@ -191,6 +203,12 @@ export default {
         : `${person.first_name || ''} ${person.last_name || ''}`.trim();
     },
 
+    /** The label of a role value, for the card heading. */
+    roleLabel(role) {
+      const option = this.roleOptions.find((entry) => entry.value === role);
+      return option ? option.label : '';
+    },
+
     /** A plain explanation of a role. */
     roleHelp(role) {
       const value = String(role || '').trim().toLowerCase();
@@ -266,7 +284,5 @@ export default {
 </script>
 
 <style scoped>
-.helper.note {
-  margin-top: 16px;
-}
+/* Styled in the main form's stylesheet (.item-card, .choice, .add-button). */
 </style>

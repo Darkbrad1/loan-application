@@ -1,40 +1,49 @@
 <template>
   <section>
-    <!-- Loan category cards (personal, auto, home, business) -->
-    <div class="loan-grid">
+    <!-- Loan types (personal, auto, home, business) as big cards -->
+    <div class="loan-grid" role="radiogroup" aria-label="Type of loan">
       <button
         v-for="loan in loans"
         :key="loan.id"
         type="button"
+        role="radio"
         class="loan-card"
         :class="{ selected: loanCategory === loan.id }"
+        :aria-checked="loanCategory === loan.id"
         @click="$emit('select-category', loan.id)"
       >
-        <v-icon>{{ loan.icon }}</v-icon>
-        <b>{{ loan.title }}</b>
-        <small>{{ loan.note }}</small>
+        <span class="loan-icon"><v-icon size="28">{{ loan.icon }}</v-icon></span>
+        <span>
+          <b>{{ loan.title }}</b>
+          <small>{{ loan.note }}</small>
+        </span>
       </button>
     </div>
 
-    <!-- Product cards, only shown once a category is chosen -->
-    <div v-if="loanCategory" class="context">
-      <p class="product-question">
-        {{ products.length > 1 ? 'Which of these fits you best?' : 'Your loan' }}
+    <!-- The loans of that type, once a type is chosen -->
+    <div v-if="loanCategory" class="product-block">
+      <p class="question">
+        {{ products.length > 1 ? 'Which one fits you best?' : 'Your loan' }}
       </p>
-      <div class="product-list">
+      <div class="choice-list" role="radiogroup">
         <button
           v-for="product in products"
           :key="product.id"
           type="button"
-          class="product-card"
+          role="radio"
+          class="choice product-card"
           :class="{ selected: loanTypeId === product.id }"
+          :aria-checked="loanTypeId === product.id"
           @click="$emit('select-product', product.id)"
         >
-          <b class="product-name">{{ product.name }}</b>
-          <small v-if="rangeText(product)" class="product-range">{{ rangeText(product) }}</small>
+          <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+          <span>
+            <b>{{ product.name }}</b>
+            <small v-if="rangeText(product)">{{ rangeText(product) }}</small>
+          </span>
         </button>
       </div>
-      <p v-if="!products.length" class="helper">
+      <p v-if="!products.length" class="hint">
         There are no loans of this type right now. Please choose another type.
       </p>
     </div>
@@ -97,74 +106,5 @@ export default {
 </script>
 
 <style scoped>
-.loan-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.loan-card {
-  display: flex;
-  flex: 1 1 240px;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.loan-card.selected {
-  border-color: var(--brand, #1178bd);
-  background: var(--brand-soft, #eff8ff);
-}
-
-.context {
-  margin-top: 20px;
-}
-
-.product-question {
-  margin: 0 0 12px;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.product-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.product-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-  padding: 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fff;
-  font-size: 16px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.product-card.selected {
-  border-color: var(--brand, #1178bd);
-  background: var(--brand-soft, #eff8ff);
-}
-
-.product-name,
-.product-range {
-  display: block;
-}
-
-.product-range {
-  color: #64748b;
-  font-size: 14px;
-}
+/* Styled in the main form's stylesheet (.loan-card, .choice, .product-block). */
 </style>

@@ -1,243 +1,293 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper empty-note">Nothing added yet.</p>
-
-    <!-- One card per declared asset -->
+    <!-- One card per thing they own: a short summary, or the details while editing -->
     <article
       v-for="(asset, index) in draft"
       :key="asset.client_key"
       class="item-card"
+      :class="{ open: isOpen(asset), 'needs-work': !isOpen(asset) && showErrors && missing(asset) }"
     >
-      <div class="item-title">
-        <strong>{{ asset.name || `Item ${index + 1}` }}</strong>
-        <div>
-          <el-tag v-if="asset.is_purchase" type="success" size="small">Buying with this loan</el-tag>
-          <el-tag v-if="isCollateral(asset)" type="warning" size="small">Secures the loan</el-tag>
-          <el-button v-if="!asset.is_purchase" text type="danger" @click="remove(index)">Remove</el-button>
+      <div class="item-head">
+        <span class="item-icon"><v-icon>{{ iconFor(asset) }}</v-icon></span>
+        <div class="item-text">
+          <strong>{{ asset.name || `Item ${index + 1}` }}</strong>
+          <span v-if="!isOpen(asset) && missing(asset)" class="needs">Some details are missing</span>
+          <span v-else>{{ summaryOf(asset) }}</span>
+        </div>
+        <div class="item-actions">
+          <button v-if="!isOpen(asset)" type="button" class="link-btn" @click="openItem(asset)">Change</button>
+          <button v-if="!asset.is_purchase" type="button" class="link-btn danger" @click="remove(index)">Remove</button>
         </div>
       </div>
 
-      <!-- The vehicle or property being bought comes from "Your request" -->
-      <div v-if="asset.is_purchase" class="purchase-summary">
-        <p>
-          You're buying this for {{ money(asset.declared_value) }}.
+      <template v-if="isOpen(asset)">
+        <div v-if="asset.is_purchase || isCollateral(asset)" class="item-tags">
+          <span v-if="asset.is_purchase" class="tag"><v-icon size="14">mdi-cart-outline</v-icon> Buying with this loan</span>
+          <span v-if="isCollateral(asset)" class="tag"><v-icon size="14">mdi-shield-check-outline</v-icon> Secures the loan</span>
+        </div>
+
+        <!-- The vehicle or property being bought comes from "The loan you need" -->
+        <p v-if="asset.is_purchase" class="soft-box">
+          You're buying this for <strong>{{ money(asset.declared_value) }}</strong>.
+          To change the price, go back to "The loan you need".
         </p>
-        <p class="helper">
-          To change it, go back to "The loan you need". Below, tell us who will
-          own it and how it will be insured.
-        </p>
-      </div>
 
-      <div v-else class="field-grid">
-        <el-form-item label="What is it?" required :error="need(asset.name)">
-          <FormField
-            :model-value="asset.name"
-            :property="field('Asset', 'name', 'Asset name', 'input')"
-            :form="asset"
-            @update:model-value="set(index, 'name', $event)"
-          />
-          <small class="helper">For example "My house in Grand Anse" or "2018 Honda Fit".</small>
-        </el-form-item>
-
-        <el-form-item label="Type" required :error="need(asset.asset_type)">
-          <FormField
-            :model-value="asset.asset_type"
-            :property="field('Asset', 'asset_type', 'Asset type', 'select')"
-            :form="asset"
-            @update:model-value="set(index, 'asset_type', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item label="What is it worth? (EC$)" required :error="need(asset.declared_value)">
-          <FormField
-            :model-value="asset.declared_value"
-            :property="field('Asset', 'declared_value', 'Declared value (EC$)', 'number')"
-            :form="asset"
-            @update:model-value="set(index, 'declared_value', $event)"
-          />
-        </el-form-item>
-
-        <el-form-item v-if="asset.description || moreFor[asset.client_key]" label="Description">
-          <FormField
-            :model-value="asset.description"
-            :property="field('Asset', 'description', 'Description', 'input')"
-            :form="asset"
-            @update:model-value="set(index, 'description', $event)"
-          />
-        </el-form-item>
-
-        <!-- Identifiers for vehicles and for land or property -->
-        <template v-if="isVehicle(asset)">
-          <el-form-item label="Registration number">
+        <template v-else>
+          <el-form-item label="What is it?" required :error="need(asset.name)">
             <FormField
-              :model-value="asset.registration_number"
-              :property="field('Asset', 'registration_number', 'Registration number', 'input')"
+              :model-value="asset.name"
+              :property="field('Asset', 'name', 'What is it?', 'input')"
               :form="asset"
-              @update:model-value="set(index, 'registration_number', $event)"
+              @update:model-value="set(index, 'name', $event)"
             />
+            <small class="helper">For example &quot;My house in Grand Anse&quot; or &quot;2018 Honda Fit&quot;.</small>
           </el-form-item>
-          <el-form-item label="Chassis number (VIN)">
-            <FormField
-              :model-value="asset.chassis_number"
-              :property="field('Asset', 'chassis_number', 'Chassis number (VIN)', 'input')"
-              :form="asset"
-              @update:model-value="set(index, 'chassis_number', $event)"
-            />
-          </el-form-item>
-        </template>
-        <template v-if="isProperty(asset)">
-          <el-form-item label="Block and parcel">
-            <FormField
-              :model-value="asset.block_and_parcel"
-              :property="field('Asset', 'block_and_parcel', 'Block and parcel', 'input')"
-              :form="asset"
-              @update:model-value="set(index, 'block_and_parcel', $event)"
-            />
-          </el-form-item>
-          <el-form-item label="Deed number">
-            <FormField
-              :model-value="asset.deed_number"
-              :property="field('Asset', 'deed_number', 'Deed number', 'input')"
-              :form="asset"
-              @update:model-value="set(index, 'deed_number', $event)"
-            />
-          </el-form-item>
-        </template>
-      </div>
-
-      <!-- Existing loans secured on this asset (from the Liabilities step) -->
-      <el-alert
-        v-if="(liens[asset.client_key] || []).length"
-        type="warning"
-        :closable="false"
-        show-icon
-        class="lien-note"
-        :title="`You still owe money on this: ${liens[asset.client_key].join('; ')}`"
-      />
-
-      <el-button
-        v-if="!asset.is_purchase && !asset.description && !moreFor[asset.client_key]"
-        text
-        type="primary"
-        @click="moreFor[asset.client_key] = true"
-      >
-        + Add a description
-      </el-button>
-
-      <!-- Ownership percentages must total 100% across saved parties -->
-      <AdaptiveLoanAllocationEditor
-        :model-value="asset.owners"
-        :options="partyOptions"
-        reference-key="party_id"
-        simple
-        :default-value="primaryPartyId"
-        title="Who owns it?"
-        select-label="Owner"
-        total-label="Shares add up to"
-        @update:model-value="set(index, 'owners', $event)"
-      />
-      <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
-        Someone who isn't borrowing owns all of this, so it can only be listed
-        if it secures the loan.
-      </small>
-
-      <!-- Required documents for this asset; uploads unlock once it's complete -->
-      <AdaptiveLoanDocumentRequirements
-        :scope="documentScopes[`asset:${asset.client_key}`]"
-        :uploading-key="uploadingKey"
-        :disabled="documentsDisabled"
-        @stage-file="$emit('stage-file', $event)"
-        @remove-file="$emit('remove-file', $event)"
-        @request-file-upload="$emit('request-file-upload', $event)"
-        @file-rejected="$emit('file-rejected', $event)"
-      />
-
-      <!-- Collateral: only for loans that need it -->
-      <section v-if="requiresCollateral" class="context">
-        <!-- The asset being bought is always the collateral -->
-        <p v-if="asset.is_purchase" class="helper">
-          This secures the loan. Tell us how it's insured below; a quote is fine for now.
-        </p>
-        <el-form-item v-else label="Use this to secure the loan">
-          <FormField
-            :model-value="asset.collateral.enabled"
-            :property="field(null, 'enabled', 'Use this to secure the loan', 'checkbox')"
-            :form="asset.collateral"
-            @update:model-value="setCollateral(index, 'enabled', $event)"
-          />
-        </el-form-item>
-
-        <template v-if="asset.collateral.enabled">
-          <h4 class="subheading">How is it insured?</h4>
-          <p class="helper">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
-          <div class="field-grid">
-            <el-form-item label="Type of insurance" required :error="need(asset.collateral.insurance.type)">
+          <el-form-item label="What kind of thing is it?" required :error="need(asset.asset_type)">
+            <template v-if="choices('asset_type')">
+              <div class="choice-list inline" role="radiogroup">
+                <button
+                  v-for="option in choices('asset_type')"
+                  :key="String(option.value)"
+                  type="button"
+                  role="radio"
+                  class="choice"
+                  :class="{ selected: asset.asset_type === option.value }"
+                  :aria-checked="asset.asset_type === option.value"
+                  @click="set(index, 'asset_type', option.value)"
+                >
+                  <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </template>
+            <template v-else>
               <FormField
-                :model-value="asset.collateral.insurance.type"
-                :property="field('Collateral', 'insurance_type', 'Insurance type', 'select')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'type', $event)"
+                :model-value="asset.asset_type"
+                :property="field('Asset', 'asset_type', 'What kind of thing is it?', 'select')"
+                :form="asset"
+                @update:model-value="set(index, 'asset_type', $event)"
+              />
+            </template>
+          </el-form-item>
+          <el-form-item label="What is it worth? (EC$)" required :error="need(asset.declared_value)">
+            <FormField
+              :model-value="asset.declared_value"
+              :property="field('Asset', 'declared_value', 'What is it worth? (EC$)', 'number')"
+              :form="asset"
+              @update:model-value="set(index, 'declared_value', $event)"
+            />
+            <small class="helper">Your best guess is fine.</small>
+          </el-form-item>
+          <div v-if="isVehicle(asset)" class="field-grid">
+            <el-form-item label="Registration number">
+              <FormField
+                :model-value="asset.registration_number"
+                :property="field('Asset', 'registration_number', 'Registration number', 'input')"
+                :form="asset"
+                @update:model-value="set(index, 'registration_number', $event)"
               />
             </el-form-item>
+            <el-form-item label="Chassis number (VIN)">
+              <FormField
+                :model-value="asset.chassis_number"
+                :property="field('Asset', 'chassis_number', 'Chassis number (VIN)', 'input')"
+                :form="asset"
+                @update:model-value="set(index, 'chassis_number', $event)"
+              />
+            </el-form-item>
+          </div>
+          <div v-if="isProperty(asset)" class="field-grid">
+            <el-form-item label="Block and parcel">
+              <FormField
+                :model-value="asset.block_and_parcel"
+                :property="field('Asset', 'block_and_parcel', 'Block and parcel', 'input')"
+                :form="asset"
+                @update:model-value="set(index, 'block_and_parcel', $event)"
+              />
+            </el-form-item>
+            <el-form-item label="Deed number">
+              <FormField
+                :model-value="asset.deed_number"
+                :property="field('Asset', 'deed_number', 'Deed number', 'input')"
+                :form="asset"
+                @update:model-value="set(index, 'deed_number', $event)"
+              />
+            </el-form-item>
+          </div>
+          <el-form-item label="Description" v-if="asset.description || moreFor[asset.client_key]">
+            <FormField
+              :model-value="asset.description"
+              :property="field('Asset', 'description', 'Description', 'input')"
+              :form="asset"
+              @update:model-value="set(index, 'description', $event)"
+            />
+          </el-form-item>
+          <button v-else type="button" class="more-link" @click="moreFor[asset.client_key] = true">
+            <v-icon size="20">mdi-plus</v-icon>
+            Add a description
+          </button>
+        </template>
 
+        <!-- Existing loans secured on this (from "Money you owe") -->
+        <p v-if="(liens[asset.client_key] || []).length" class="soft-box warn">
+          You still owe money on this: {{ liens[asset.client_key].join('; ') }}
+        </p>
+
+        <!-- Ownership percentages must total 100% across the people on the loan -->
+        <AdaptiveLoanAllocationEditor
+          :model-value="asset.owners"
+          :options="partyOptions"
+          reference-key="party_id"
+          simple
+          :default-value="primaryPartyId"
+          title="Who owns it?"
+          select-label="Owner"
+          total-label="Shares add up to"
+          @update:model-value="set(index, 'owners', $event)"
+        />
+        <small v-if="ownedOnlyByThirdParty(asset)" class="helper">
+          Someone who isn't borrowing owns all of this, so it can only be listed
+          if it secures the loan.
+        </small>
+
+        <!-- Collateral: only for loans that need it -->
+        <template v-if="requiresCollateral">
+          <p v-if="asset.is_purchase" class="soft-box info">
+            This secures the loan. Tell us how it's insured below; a quote is fine for now.
+          </p>
+          <el-form-item label="Use this to secure the loan?" v-else>
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: Boolean(asset.collateral.enabled) === option.value }"
+                :aria-checked="Boolean(asset.collateral.enabled) === option.value"
+                @click="setCollateral(index, 'enabled', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </el-form-item>
+
+          <template v-if="asset.collateral.enabled">
+            <p class="subheading">How is it insured?</p>
+            <p class="hint">If you don't have insurance yet, get a quote from an insurer and enter it here.</p>
             <el-form-item label="Do you have a policy, or a quote?" required :error="need(asset.collateral.insurance.status)">
-              <FormField
-                :model-value="asset.collateral.insurance.status"
-                :property="field('Collateral', 'insurance_status', 'Policy or quote?', 'select')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'status', $event)"
-              />
+              <template v-if="choices('insurance_status')">
+                <div class="choice-list inline" role="radiogroup">
+                  <button
+                    v-for="option in choices('insurance_status')"
+                    :key="String(option.value)"
+                    type="button"
+                    role="radio"
+                    class="choice"
+                    :class="{ selected: asset.collateral.insurance.status === option.value }"
+                    :aria-checked="asset.collateral.insurance.status === option.value"
+                    @click="setInsurance(index, 'status', option.value)"
+                  >
+                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span>{{ option.label }}</span>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <FormField
+                  :model-value="asset.collateral.insurance.status"
+                  :property="field('Collateral', 'insurance_status', 'Do you have a policy, or a quote?', 'select')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'status', $event)"
+                />
+              </template>
             </el-form-item>
-
-            <el-form-item label="Insurance company" required :error="need(asset.collateral.insurance.provider)">
-              <FormField
-                :model-value="asset.collateral.insurance.provider"
-                :property="field('Collateral', 'insurance_provider', 'Insurer', 'input')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'provider', $event)"
-              />
+            <el-form-item label="Type of insurance" required :error="need(asset.collateral.insurance.type)">
+              <template v-if="choices('insurance_type')">
+                <div class="choice-list" role="radiogroup">
+                  <button
+                    v-for="option in choices('insurance_type')"
+                    :key="String(option.value)"
+                    type="button"
+                    role="radio"
+                    class="choice"
+                    :class="{ selected: asset.collateral.insurance.type === option.value }"
+                    :aria-checked="asset.collateral.insurance.type === option.value"
+                    @click="setInsurance(index, 'type', option.value)"
+                  >
+                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span>{{ option.label }}</span>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <FormField
+                  :model-value="asset.collateral.insurance.type"
+                  :property="field('Collateral', 'insurance_type', 'Type of insurance', 'select')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'type', $event)"
+                />
+              </template>
             </el-form-item>
-
-            <el-form-item
-              :label="isPolicy(asset) ? 'Policy number' : 'Quote number'"
-              :required="isPolicy(asset)"
-            >
-              <FormField
-                :model-value="asset.collateral.insurance.reference"
-                :property="field('Collateral', 'insurance_reference', isPolicy(asset) ? 'Policy number' : 'Quote number', 'input')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'reference', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item v-if="insuranceMore[asset.client_key] || asset.collateral.insurance.coverage_amount" label="Amount covered (EC$)">
-              <FormField
-                :model-value="asset.collateral.insurance.coverage_amount"
-                :property="field('Collateral', 'insurance_coverage_amount', 'Amount covered (EC$)', 'number')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'coverage_amount', $event)"
-              />
-            </el-form-item>
-
-            <el-form-item label="Cost of the insurance (EC$)" required :error="need(asset.collateral.insurance.premium)">
+            <div class="field-grid">
+              <el-form-item label="Insurance company" required :error="need(asset.collateral.insurance.provider)">
+                <FormField
+                  :model-value="asset.collateral.insurance.provider"
+                  :property="field('Collateral', 'insurance_provider', 'Insurance company', 'input')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'provider', $event)"
+                />
+              </el-form-item>
+              <el-form-item
+                :label="isPolicy(asset) ? 'Policy number' : 'Quote number'"
+                :required="isPolicy(asset)"
+                :error="isPolicy(asset) ? need(asset.collateral.insurance.reference) : ''"
+              >
+                <FormField
+                  :model-value="asset.collateral.insurance.reference"
+                  :property="field('Collateral', 'insurance_reference', isPolicy(asset) ? 'Policy number' : 'Quote number', 'input')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'reference', $event)"
+                />
+              </el-form-item>
+            </div>
+            <el-form-item label="What does it cost? (EC$)" required :error="need(asset.collateral.insurance.premium)">
               <FormField
                 :model-value="asset.collateral.insurance.premium"
-                :property="field('Collateral', 'insurance_premium', 'Premium (EC$)', 'number')"
+                :property="field('Collateral', 'insurance_premium', 'What does it cost? (EC$)', 'number')"
                 :form="asset.collateral.insurance"
                 @update:model-value="setInsurance(index, 'premium', $event)"
               />
             </el-form-item>
-
             <el-form-item label="How often do you pay it?" required :error="need(asset.collateral.insurance.premium_frequency)">
-              <FormField
-                :model-value="asset.collateral.insurance.premium_frequency"
-                :property="field('Collateral', 'insurance_premium_frequency', 'Premium paid', 'select')"
-                :form="asset.collateral.insurance"
-                @update:model-value="setInsurance(index, 'premium_frequency', $event)"
-              />
+              <template v-if="choices('insurance_premium_frequency')">
+                <div class="choice-list inline" role="radiogroup">
+                  <button
+                    v-for="option in choices('insurance_premium_frequency')"
+                    :key="String(option.value)"
+                    type="button"
+                    role="radio"
+                    class="choice"
+                    :class="{ selected: asset.collateral.insurance.premium_frequency === option.value }"
+                    :aria-checked="asset.collateral.insurance.premium_frequency === option.value"
+                    @click="setInsurance(index, 'premium_frequency', option.value)"
+                  >
+                    <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                    <span>{{ option.label }}</span>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <FormField
+                  :model-value="asset.collateral.insurance.premium_frequency"
+                  :property="field('Collateral', 'insurance_premium_frequency', 'How often do you pay it?', 'select')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'premium_frequency', $event)"
+                />
+              </template>
             </el-form-item>
-
-            <el-form-item v-if="isPolicy(asset)" label="Policy expiry date">
+            <el-form-item v-if="isPolicy(asset)" label="When does the policy end?">
               <FormField
                 :model-value="asset.collateral.insurance.expiry_date"
                 :property="field('Collateral', 'insurance_expiry_date', 'Policy expiry date', 'date')"
@@ -245,44 +295,68 @@
                 @update:model-value="setInsurance(index, 'expiry_date', $event, 'date')"
               />
             </el-form-item>
-          </div>
 
-          <el-button
-            v-if="!insuranceMore[asset.client_key] && !asset.collateral.insurance.coverage_amount"
-            text
-            type="primary"
-            @click="insuranceMore[asset.client_key] = true"
-          >
-            + Add the amount covered and notes
-          </el-button>
-          <el-form-item v-if="insuranceMore[asset.client_key] || asset.collateral.description" label="Notes">
-            <FormField
-              :model-value="asset.collateral.description"
-              :property="field('Collateral', 'description', 'Collateral notes', 'input')"
-              :form="asset.collateral"
-              @update:model-value="setCollateral(index, 'description', $event)"
+            <template v-if="insuranceMore[asset.client_key] || asset.collateral.insurance.coverage_amount || asset.collateral.description">
+              <el-form-item label="Amount covered (EC$)">
+                <FormField
+                  :model-value="asset.collateral.insurance.coverage_amount"
+                  :property="field('Collateral', 'insurance_coverage_amount', 'Amount covered (EC$)', 'number')"
+                  :form="asset.collateral.insurance"
+                  @update:model-value="setInsurance(index, 'coverage_amount', $event)"
+                />
+              </el-form-item>
+              <el-form-item label="Notes">
+                <FormField
+                  :model-value="asset.collateral.description"
+                  :property="field('Collateral', 'description', 'Notes', 'input')"
+                  :form="asset.collateral"
+                  @update:model-value="setCollateral(index, 'description', $event)"
+                />
+              </el-form-item>
+            </template>
+            <button v-else type="button" class="more-link" @click="insuranceMore[asset.client_key] = true">
+              <v-icon size="20">mdi-plus</v-icon>
+              Add the amount covered and notes
+            </button>
+
+            <!-- Collateral documents; uploads unlock once the details are complete -->
+            <AdaptiveLoanDocumentRequirements
+              title="Documents for this"
+              :scope="documentScopes[`collateral:${asset.client_key}`]"
+              :uploading-key="uploadingKey"
+              :disabled="documentsDisabled"
+              @stage-file="$emit('stage-file', $event)"
+              @remove-file="$emit('remove-file', $event)"
+              @request-file-upload="$emit('request-file-upload', $event)"
+              @file-rejected="$emit('file-rejected', $event)"
             />
-          </el-form-item>
-
-          <!-- Collateral documents; uploads unlock once the asset is complete -->
-          <AdaptiveLoanDocumentRequirements
-            title="Documents for this"
-            :scope="documentScopes[`collateral:${asset.client_key}`]"
-            :uploading-key="uploadingKey"
-            :disabled="documentsDisabled"
-            @stage-file="$emit('stage-file', $event)"
-            @remove-file="$emit('remove-file', $event)"
-            @request-file-upload="$emit('request-file-upload', $event)"
-            @file-rejected="$emit('file-rejected', $event)"
-          />
+          </template>
         </template>
-      </section>
+
+        <!-- Required documents for this; uploads unlock once it is complete -->
+        <AdaptiveLoanDocumentRequirements
+          :scope="documentScopes[`asset:${asset.client_key}`]"
+          :uploading-key="uploadingKey"
+          :disabled="documentsDisabled"
+          @stage-file="$emit('stage-file', $event)"
+          @remove-file="$emit('remove-file', $event)"
+          @request-file-upload="$emit('request-file-upload', $event)"
+          @file-rejected="$emit('file-rejected', $event)"
+        />
+
+        <div class="item-done">
+          <button type="button" class="small-btn" @click="finish(asset)">
+            <v-icon size="20">mdi-check</v-icon>
+            Done
+          </button>
+        </div>
+      </template>
     </article>
 
-    <el-button type="primary" plain size="large" @click="add">
-      <v-icon start>mdi-plus</v-icon>
+    <button type="button" class="add-button" @click="add">
+      <v-icon>mdi-plus</v-icon>
       Add {{ draft.length ? 'something else' : 'something you own' }}
-    </el-button>
+    </button>
   </section>
 </template>
 
@@ -387,12 +461,22 @@ export default {
       moreFor: {},
       // Shows the optional insurance extras, by the asset's client key.
       insuranceMore: {},
+      // The one item being edited (the rest fold up into a summary).
+      openKey: '',
+      // True after "Done" is pressed on an item with missing details.
+      checking: false,
     };
   },
 
   mounted() {
     // They said they own something, so start with one to fill in.
-    if (!this.draft.length) this.add();
+    if (!this.draft.length) {
+      this.add();
+      return;
+    }
+    // Open the first item that still needs details, if any.
+    const unfinished = this.draft.find((asset) => this.missing(asset));
+    this.openKey = unfinished ? unfinished.client_key : '';
   },
 
   created() {
@@ -420,6 +504,14 @@ export default {
       handler(value) {
         this.draft = this.copy(value);
       },
+    },
+    // After a failed Continue, open the first item that's missing details.
+    showErrors(value) {
+      if (!value) return;
+      const open = this.draft.find((asset) => this.isOpen(asset));
+      if (open && this.missing(open)) return;
+      const unfinished = this.draft.find((asset) => this.missing(asset));
+      if (unfinished) this.openKey = unfinished.client_key;
     },
   },
 
@@ -471,7 +563,7 @@ export default {
 
     /** "This is needed" under an empty required box, after a failed Next. */
     need(value) {
-      if (!this.showErrors) return '';
+      if (!this.showErrors && !this.checking) return '';
       return value === null || value === undefined || value === '' ? 'This is needed' : '';
     },
 
@@ -632,7 +724,65 @@ export default {
         ],
         collateral: this.emptyCollateral(),
       });
+      this.openKey = this.draft[this.draft.length - 1].client_key;
+      this.checking = false;
       this.notify();
+    },
+
+    // ---- Fold-up cards ----
+
+    /** True when an item's details are showing. */
+    isOpen(asset) {
+      return this.openKey === asset.client_key;
+    },
+
+    openItem(asset) {
+      this.openKey = asset.client_key;
+      this.checking = false;
+    },
+
+    /** "Done": folds the item up, or points out what's missing. */
+    finish(asset) {
+      if (this.missing(asset)) {
+        this.checking = true;
+        return;
+      }
+      this.checking = false;
+      this.openKey = '';
+    },
+
+    /** True when a required detail is still empty. */
+    missing(asset) {
+      const empty = (value) => value === null || value === undefined || value === '';
+      if (!asset.is_purchase && (empty(asset.name) || empty(asset.asset_type) || empty(asset.declared_value))) {
+        return true;
+      }
+      if (this.requiresCollateral && asset.collateral && asset.collateral.enabled) {
+        const insurance = asset.collateral.insurance || {};
+        if (['type', 'status', 'provider', 'premium', 'premium_frequency'].some((key) => empty(insurance[key]))) {
+          return true;
+        }
+        if (this.isPolicy(asset) && empty(insurance.reference)) return true;
+      }
+      return false;
+    },
+
+    /** One line under the item's name: its type and value. */
+    summaryOf(asset) {
+      const parts = [];
+      const type = this.lookupLabel('asset_type', asset.asset_type);
+      if (type) parts.push(type);
+      if (asset.declared_value !== null && asset.declared_value !== undefined && asset.declared_value !== '') {
+        parts.push(this.money(asset.declared_value));
+      }
+      if (this.isCollateral(asset)) parts.push('Secures the loan');
+      return parts.join(' · ');
+    },
+
+    iconFor(asset) {
+      if (this.isVehicle(asset)) return 'mdi-car-outline';
+      if (this.isProperty(asset)) return 'mdi-home-outline';
+      return 'mdi-diamond-stone';
     },
 
     remove(index) {
@@ -644,17 +794,5 @@ export default {
 </script>
 
 <style scoped>
-.subheading {
-  margin: 16px 0 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.purchase-summary {
-  margin-bottom: 12px;
-}
-
-.lien-note {
-  margin: 8px 0 12px;
-}
+/* Styled in the main form's stylesheet (.item-card, .choice, .soft-box, ...). */
 </style>

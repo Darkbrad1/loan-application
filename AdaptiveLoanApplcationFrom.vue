@@ -1,340 +1,329 @@
 <template>
     <main class="adaptive-form" :style="brandStyle">
-        <!-- Success receipt shown after a verified submission -->
-        <section v-if="receipt" class="receipt">
-            <div class="receipt-icon"><v-icon>mdi-check</v-icon></div>
-            <p class="eyebrow">Application submitted</p>
-            <h1>We have your request</h1>
-            <template v-if="receipt.number">
-                <p>
-                    Keep this reference number. You'll need it if you contact
-                    us about your application.
-                </p>
-                <strong class="reference-card">{{ receipt.number }}</strong>
-            </template>
-            <p v-else class="reference-pending">
-                Your reference number is still being assigned. Contact us if
-                you need it before we get in touch.
-            </p>
-            <el-button type="primary" @click="reset"
-                >Start another application</el-button
-            >
-        </section>
-
-        <template v-else>
-            <!-- Company header driven by system branding configuration -->
-            <header class="app-header">
+        <!-- Header: the logo, name, and colours come from the system configuration -->
+        <header class="topbar">
+            <div class="topbar-inner">
                 <div class="brand">
-                    <div v-if="companyLogo" class="brand-logo">
-                        <img :src="companyLogo" alt="Company logo" />
-                    </div>
-                    <strong>{{ companyName }}</strong>
+                    <img v-if="companyLogo" :src="companyLogo" :alt="companyName" class="brand-logo" />
+                    <span class="brand-name">{{ companyName }}</span>
                 </div>
-                <div class="header-actions">
+                <div class="topbar-side">
                     <!-- Testing only: fills each step with sample data -->
-                    <label v-if="testModeAvailable" class="test-switch">
-                        <el-switch
-                            :model-value="testMode"
-                            @update:model-value="toggleTestMode"
-                        />
+                    <label v-if="testModeAvailable" class="test-toggle">
+                        <el-switch :model-value="testMode" size="small" @update:model-value="toggleTestMode" />
                         <span>Test mode</span>
                     </label>
-                    <label v-if="testMode" class="test-switch">
-                        <el-switch
-                            :model-value="testKeepDraft"
-                            @update:model-value="toggleTestKeepDraft"
-                        />
-                        <span>Remember draft on reload</span>
+                    <label v-if="testMode" class="test-toggle">
+                        <el-switch :model-value="testKeepDraft" size="small" @update:model-value="toggleTestKeepDraft" />
+                        <span>Remember draft</span>
                     </label>
-                    <span>Secure loan application</span>
+                    <span v-if="formData.id && !receipt" class="saved-chip">
+                        <v-icon size="16">mdi-cloud-check-outline</v-icon>
+                        <span>Saved</span>
+                    </span>
                 </div>
-            </header>
+            </div>
+        </header>
 
-            <div class="layout">
-                <!-- Left rail: the main parts of the form (hidden on phones) -->
-                <aside class="path">
-                    <p class="eyebrow">Your application</p>
-                    <ol>
-                        <li
-                            v-for="(stepItem, stepIndex) in path"
-                            :key="stepItem.id"
-                            :class="{
-                                active: stepIndex === step,
-                                done: stepIndex < step,
-                            }"
-                        >
-                            <span>
-                                <v-icon v-if="stepIndex < step" size="small"
-                                    >mdi-check</v-icon
-                                >
-                                <template v-else>{{ stepIndex + 1 }}</template>
-                            </span>
-                            <div>
-                                <b>{{ stepItem.title }}</b>
-                            </div>
-                        </li>
-                    </ol>
-                </aside>
+        <!-- After sending: a clear receipt -->
+        <section v-if="receipt" class="page">
+            <div class="panel receipt">
+                <div class="receipt-icon"><v-icon size="40">mdi-check</v-icon></div>
+                <h1 class="screen-title">Application sent</h1>
+                <p class="screen-help">
+                    Thank you. We'll look at your application and contact you soon.
+                </p>
+                <template v-if="receipt.number">
+                    <p class="receipt-label">Your reference number</p>
+                    <strong class="reference-card">{{ receipt.number }}</strong>
+                    <p class="hint">Keep this number. You'll need it if you contact us.</p>
+                </template>
+                <p v-else class="hint">
+                    Your reference number is still being assigned. Contact us if you need it before we get in touch.
+                </p>
+                <button type="button" class="btn btn-secondary" @click="reset">
+                    Start another application
+                </button>
+            </div>
+        </section>
 
-                <!-- Center: one short screen at a time -->
-                <section class="workspace">
-                    <p class="progress-label">
-                        Part {{ step + 1 }} of {{ path.length }}: {{ current.title }}
+        <section v-else class="page">
+            <!-- Where they are: a short label and one bar per part -->
+            <div v-if="currentScreen.kind !== 'welcome'" class="progress-block">
+                <button v-if="!isFirstScreen" type="button" class="back-link" :disabled="saving" @click="back">
+                    <v-icon size="20">mdi-chevron-left</v-icon>
+                    Back
+                </button>
+                <p class="progress-label">
+                    Part {{ step + 1 }} of {{ path.length }}
+                    <span>· {{ current.title }}</span>
+                </p>
+                <div class="progress-segments" aria-hidden="true">
+                    <span v-for="(stepItem, stepIndex) in path" :key="stepItem.id" class="segment">
+                        <i :style="{ width: segmentFill(stepIndex) }"></i>
+                    </span>
+                </div>
+            </div>
+
+            <el-form label-position="top" class="panel" @submit.prevent>
+                <!-- Welcome: what to have ready, before starting -->
+                <div v-if="currentScreen.kind === 'welcome'" class="welcome">
+                    <div class="welcome-icon"><v-icon size="36">mdi-hand-wave-outline</v-icon></div>
+                    <h1 class="screen-title">Apply for a loan</h1>
+                    <p class="screen-help">
+                        It takes about 15 minutes. Your answers are saved as you go, so you can stop and come back.
                     </p>
-                    <div class="progress">
-                        <i :style="{ width: progressWidth }"></i>
-                    </div>
+                    <p class="welcome-subtitle">Have these ready</p>
+                    <ul class="ready-list">
+                        <li><v-icon>mdi-card-account-details-outline</v-icon> A photo ID, like a passport or driver's licence</li>
+                        <li><v-icon>mdi-numeric</v-icon> Your NIS number</li>
+                        <li><v-icon>mdi-file-document-outline</v-icon> A recent payslip or proof of income</li>
+                        <li><v-icon>mdi-credit-card-outline</v-icon> Details of any loans or cards you're paying</li>
+                    </ul>
+                </div>
 
-                    <div class="heading">
-                        <h1>{{ currentScreen.title }}</h1>
-                        <p v-if="currentScreen.help">{{ currentScreen.help }}</p>
-                    </div>
+                <template v-else>
+                    <h1 class="screen-title">{{ currentScreen.title }}</h1>
+                    <p v-if="currentScreen.help" class="screen-help">{{ currentScreen.help }}</p>
+                </template>
 
-                    <el-alert
-                        v-if="alert.text"
-                        :title="alert.text"
-                        :type="alert.type"
-                        :closable="false"
-                        show-icon
-                        class="alert"
+                <!-- Problems with this screen, in one place -->
+                <div v-if="alert.text" class="notice" :class="`notice-${alert.type}`" role="alert">
+                    <v-icon size="22">{{ alert.type === 'success' ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline' }}</v-icon>
+                    <span>{{ alert.text }}</span>
+                </div>
+
+                <!-- A Yes/No question. "No" skips the section after it. -->
+                <div v-if="currentScreen.kind === 'gate'" class="gate" role="radiogroup">
+                    <button
+                        v-for="option in [{ value: true, label: 'Yes', icon: 'mdi-check' }, { value: false, label: 'No', icon: 'mdi-close' }]"
+                        :key="option.label"
+                        type="button"
+                        role="radio"
+                        class="gate-option"
+                        :class="{ selected: answers[currentScreen.answer] === option.value }"
+                        :aria-checked="answers[currentScreen.answer] === option.value"
+                        @click="answer(currentScreen.answer, option.value)"
+                    >
+                        <span class="radio-mark"><v-icon size="18">{{ option.icon }}</v-icon></span>
+                        <span>{{ option.label }}</span>
+                    </button>
+                    <p
+                        v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
+                        class="gate-warning"
+                    >
+                        <v-icon size="20">mdi-alert-outline</v-icon>
+                        {{ gateWarning(currentScreen.answer) }}
+                    </p>
+                </div>
+
+                    <AdaptiveLoanProductSection
+                        v-else-if="currentScreen.kind === 'loan'"
+                        :loans="loans"
+                        :products="productsForLoan"
+                        :loan-category="formData.loan_category"
+                        :loan-type-id="formData.loan_type_id"
+                        @select-category="chooseLoan"
+                        @select-product="selectProduct"
                     />
 
-                    <el-form label-position="top" class="card" @submit.prevent>
-                        <!-- A Yes/No question. "No" skips the section after it. -->
-                        <div v-if="currentScreen.kind === 'gate'" class="gate">
-                            <button
-                                type="button"
-                                class="gate-option"
-                                :class="{ selected: answers[currentScreen.answer] === true }"
-                                @click="answer(currentScreen.answer, true)"
-                            >
-                                <v-icon>mdi-check-circle-outline</v-icon>
-                                <span>Yes</span>
-                            </button>
-                            <button
-                                type="button"
-                                class="gate-option"
-                                :class="{ selected: answers[currentScreen.answer] === false }"
-                                @click="answer(currentScreen.answer, false)"
-                            >
-                                <v-icon>mdi-close-circle-outline</v-icon>
-                                <span>No</span>
-                            </button>
-                            <p
-                                v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
-                                class="gate-warning"
-                            >
-                                {{ gateWarning(currentScreen.answer) }}
-                            </p>
-                        </div>
+                    <!-- The other people on the loan, or the references -->
+                    <AdaptiveLoanApplicantsSection
+                        v-else-if="currentScreen.kind === 'people' || currentScreen.kind === 'references'"
+                        :screen="currentScreen.kind"
+                        :primary="formData.primary"
+                        :parties="formData.parties"
+                        :references="formData.references"
+                        :lookups="lookups"
+                        :resource-props="resourceProps"
+                        :show-errors="showErrors"
+                        @update:parties="formData.parties = $event"
+                        @update:references="formData.references = $event"
+                        @request-add="addApplicant"
+                        @request-remove="removeApplicant"
+                    />
 
-                        <AdaptiveLoanProductSection
-                            v-else-if="currentScreen.kind === 'loan'"
-                            :loans="loans"
-                            :products="productsForLoan"
-                            :loan-category="formData.loan_category"
-                            :loan-type-id="formData.loan_type_id"
-                            @select-category="chooseLoan"
-                            @select-product="selectProduct"
-                        />
+                    <!-- One part of one person's details -->
+                    <AdaptiveLoanApplicantEditor
+                        v-else-if="currentScreen.kind === 'person' && currentPerson"
+                        :key="currentScreen.id"
+                        :model-value="currentPerson"
+                        :screen="currentScreen.part"
+                        :is-primary="currentScreen.personKey === formData.primary.client_key"
+                        :show-errors="showErrors"
+                        :lookups="lookups"
+                        :resource-props="resourceProps"
+                        :minimum-identifications="minimumIdentifications"
+                        :deductions="deductionsByApplicant[currentScreen.personKey] || null"
+                        :document-scopes="documentScopes"
+                        :uploading-key="uploadingDocumentKey"
+                        :documents-disabled="documentsDisabled"
+                        @update:model-value="updatePerson(currentScreen.personKey, $event)"
+                        @stage-file="stageDocument"
+                        @remove-file="removeStagedDocument"
+                        @request-file-upload="uploadScopedDocument"
+                        @file-rejected="handleRejectedDocument"
+                    />
 
-                        <!-- The other people on the loan, or the references -->
-                        <AdaptiveLoanApplicantsSection
-                            v-else-if="currentScreen.kind === 'people' || currentScreen.kind === 'references'"
-                            :screen="currentScreen.kind"
-                            :primary="formData.primary"
-                            :parties="formData.parties"
-                            :references="formData.references"
-                            :lookups="lookups"
-                            :resource-props="resourceProps"
-                            :show-errors="showErrors"
-                            @update:parties="formData.parties = $event"
-                            @update:references="formData.references = $event"
-                            @request-add="addApplicant"
-                            @request-remove="removeApplicant"
-                        />
+                    <AdaptiveLoanRequestSection
+                        v-else-if="currentScreen.kind === 'request'"
+                        :screen="currentScreen.part"
+                        :show-errors="showErrors"
+                        :model-value="requestData"
+                        :loan-category="formData.loan_category"
+                        :selected-product="selectedProduct"
+                        :lookups="lookups"
+                        :application-props="applicationProps"
+                        :resource-props="resourceProps"
+                        :amount-minimum="amountMinimum"
+                        :amount-maximum="amountMaximum"
+                        :term-minimum="termMinimum"
+                        :term-maximum="termMaximum"
+                        @update:model-value="patchRequest"
+                    />
 
-                        <!-- One part of one person's details -->
-                        <AdaptiveLoanApplicantEditor
-                            v-else-if="currentScreen.kind === 'person' && currentPerson"
-                            :key="currentScreen.id"
-                            :model-value="currentPerson"
-                            :screen="currentScreen.part"
-                            :is-primary="currentScreen.personKey === formData.primary.client_key"
-                            :show-errors="showErrors"
-                            :lookups="lookups"
-                            :resource-props="resourceProps"
-                            :minimum-identifications="minimumIdentifications"
-                            :deductions="deductionsByApplicant[currentScreen.personKey] || null"
-                            :document-scopes="documentScopes"
-                            :uploading-key="uploadingDocumentKey"
-                            :documents-disabled="documentsDisabled"
-                            @update:model-value="updatePerson(currentScreen.personKey, $event)"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
+                    <AdaptiveLoanAssetsSection
+                        v-else-if="currentScreen.kind === 'assets'"
+                        :model-value="formData.assets"
+                        :party-options="partyOptions"
+                        :primary-party-id="toId(formData.primary.party_id) || ''"
+                        :third-party-owner-ids="thirdPartyOwnerPartyIds"
+                        :requires-collateral="requiresCollateral"
+                        :liens="liensByAsset"
+                        :show-errors="showErrors"
+                        :lookups="lookups"
+                        :resource-props="resourceProps"
+                        @update:model-value="formData.assets = $event"
+                        :document-scopes="documentScopes"
+                        :uploading-key="uploadingDocumentKey"
+                        :documents-disabled="documentsDisabled"
+                        @stage-file="stageDocument"
+                        @remove-file="removeStagedDocument"
+                        @request-file-upload="uploadScopedDocument"
+                        @file-rejected="handleRejectedDocument"
+                    />
 
-                        <AdaptiveLoanRequestSection
-                            v-else-if="currentScreen.kind === 'request'"
-                            :screen="currentScreen.part"
-                            :show-errors="showErrors"
-                            :model-value="requestData"
-                            :loan-category="formData.loan_category"
-                            :selected-product="selectedProduct"
-                            :lookups="lookups"
-                            :application-props="applicationProps"
-                            :resource-props="resourceProps"
-                            :amount-minimum="amountMinimum"
-                            :amount-maximum="amountMaximum"
-                            :term-minimum="termMinimum"
-                            :term-maximum="termMaximum"
-                            @update:model-value="patchRequest"
-                        />
+                    <!--
+                    Liability types are LiabilityType records. Revolving
+                    types (credit cards, overdrafts) require a credit limit
+                    and show an assessed repayment based on a % of the limit.
+                    -->
+                    <AdaptiveLoanLiabilitiesSection
+                        v-else-if="currentScreen.kind === 'liabilities'"
+                        :model-value="formData.liabilities"
+                        :application-party-options="applicationPartyOptions"
+                        :primary-link-id="toId(formData.primary.application_party_id) || ''"
+                        :liability-types="liabilityTypes"
+                        :default-revolving-rate="defaultRevolvingRate"
+                        :asset-options="assetOptions"
+                        :show-errors="showErrors"
+                        :lookups="lookups"
+                        :resource-props="resourceProps"
+                        @update:model-value="formData.liabilities = $event"
+                        :document-scopes="documentScopes"
+                        :uploading-key="uploadingDocumentKey"
+                        :documents-disabled="documentsDisabled"
+                        @stage-file="stageDocument"
+                        @remove-file="removeStagedDocument"
+                        @request-file-upload="uploadScopedDocument"
+                        @file-rejected="handleRejectedDocument"
+                    />
 
-                        <AdaptiveLoanAssetsSection
-                            v-else-if="currentScreen.kind === 'assets'"
-                            :model-value="formData.assets"
-                            :party-options="partyOptions"
-                            :primary-party-id="toId(formData.primary.party_id) || ''"
-                            :third-party-owner-ids="thirdPartyOwnerPartyIds"
-                            :requires-collateral="requiresCollateral"
-                            :liens="liensByAsset"
-                            :show-errors="showErrors"
-                            :lookups="lookups"
-                            :resource-props="resourceProps"
-                            @update:model-value="formData.assets = $event"
-                            :document-scopes="documentScopes"
-                            :uploading-key="uploadingDocumentKey"
-                            :documents-disabled="documentsDisabled"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
+                    <!--
+                    Expense types are ExpenseType records, filtered by the
+                    selected loan category and user_selectable.
+                    -->
+                    <AdaptiveLoanExpensesSection
+                        v-else-if="currentScreen.kind === 'expenses'"
+                        :model-value="formData.expenses"
+                        :application-party-options="applicationPartyOptions"
+                        :has-others="applicationPartyOptions.length > 1"
+                        :expense-type-options="expenseTypeOptions"
+                        :expense-types="expenseTypes"
+                        :loan-category-label="loanCategoryLabel"
+                        :projected-expenses="projectedInsuranceExpenses"
+                        :show-errors="showErrors"
+                        :lookups="lookups"
+                        :resource-props="resourceProps"
+                        @update:model-value="formData.expenses = $event"
+                        :document-scopes="documentScopes"
+                        :uploading-key="uploadingDocumentKey"
+                        :documents-disabled="documentsDisabled"
+                        @stage-file="stageDocument"
+                        @remove-file="removeStagedDocument"
+                        @request-file-upload="uploadScopedDocument"
+                        @file-rejected="handleRejectedDocument"
+                    />
 
-                        <!--
-                        Liability types are LiabilityType records. Revolving
-                        types (credit cards, overdrafts) require a credit limit
-                        and show an assessed repayment based on a % of the limit.
-                        -->
-                        <AdaptiveLoanLiabilitiesSection
-                            v-else-if="currentScreen.kind === 'liabilities'"
-                            :model-value="formData.liabilities"
-                            :application-party-options="applicationPartyOptions"
-                            :primary-link-id="toId(formData.primary.application_party_id) || ''"
-                            :liability-types="liabilityTypes"
-                            :default-revolving-rate="defaultRevolvingRate"
-                            :asset-options="assetOptions"
-                            :show-errors="showErrors"
-                            :lookups="lookups"
-                            :resource-props="resourceProps"
-                            @update:model-value="formData.liabilities = $event"
-                            :document-scopes="documentScopes"
-                            :uploading-key="uploadingDocumentKey"
-                            :documents-disabled="documentsDisabled"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
+                    <!--
+                    Application-level documents only. Applicant, asset,
+                    liability, expense, and collateral documents are
+                    uploaded on their own screens.
+                    -->
+                    <AdaptiveLoanDocumentRequirements
+                        v-else-if="currentScreen.kind === 'documents'"
+                        standalone
+                        title="Documents for this loan"
+                        :description="`Please upload these for your ${formData.loan_name || 'loan'}.`"
+                        :scope="documentScopes.application"
+                        :uploading-key="uploadingDocumentKey"
+                        :disabled="documentsDisabled"
+                        @stage-file="stageDocument"
+                        @remove-file="removeStagedDocument"
+                        @request-file-upload="uploadScopedDocument"
+                        @file-rejected="handleRejectedDocument"
+                    />
 
-                        <!--
-                        Expense types are ExpenseType records, filtered by the
-                        selected loan category and user_selectable.
-                        -->
-                        <AdaptiveLoanExpensesSection
-                            v-else-if="currentScreen.kind === 'expenses'"
-                            :model-value="formData.expenses"
-                            :application-party-options="applicationPartyOptions"
-                            :has-others="applicationPartyOptions.length > 1"
-                            :expense-type-options="expenseTypeOptions"
-                            :expense-types="expenseTypes"
-                            :loan-category-label="loanCategoryLabel"
-                            :projected-expenses="projectedInsuranceExpenses"
-                            :show-errors="showErrors"
-                            :lookups="lookups"
-                            :resource-props="resourceProps"
-                            @update:model-value="formData.expenses = $event"
-                            :document-scopes="documentScopes"
-                            :uploading-key="uploadingDocumentKey"
-                            :documents-disabled="documentsDisabled"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
+                    <!-- Final step: check everything before sending -->
+                    <AdaptiveLoanReviewSection
+                        v-else-if="currentScreen.kind === 'review'"
+                        :application="formData"
+                        :applicants="allApplicants"
+                        :requires-collateral="requiresCollateral"
+                        :summary="reviewSummary"
+                        @edit-step="goToStep"
+                    />
 
-                        <!--
-                        Application-level documents only. Applicant, asset,
-                        liability, expense, and collateral documents are
-                        uploaded on their own screens.
-                        -->
-                        <AdaptiveLoanDocumentRequirements
-                            v-else-if="currentScreen.kind === 'documents'"
-                            standalone
-                            title="Documents for this loan"
-                            :description="`Please upload these for your ${formData.loan_name || 'loan'}.`"
-                            :scope="documentScopes.application"
-                            :uploading-key="uploadingDocumentKey"
-                            :disabled="documentsDisabled"
-                            @stage-file="stageDocument"
-                            @remove-file="removeStagedDocument"
-                            @request-file-upload="uploadScopedDocument"
-                            @file-rejected="handleRejectedDocument"
-                        />
+                <footer class="actions">
+                    <button
+                        v-if="currentScreen.kind === 'welcome'"
+                        type="button"
+                        class="btn btn-primary"
+                        @click="next"
+                    >
+                        Start my application
+                        <v-icon size="22">mdi-arrow-right</v-icon>
+                    </button>
+                    <button
+                        v-else-if="!isLastScreen"
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="saving || documentsLoading"
+                        @click="next"
+                    >
+                        <v-icon v-if="saving" size="22" class="spin">mdi-loading</v-icon>
+                        {{ saving ? 'Saving' : 'Continue' }}
+                        <v-icon v-if="!saving" size="22">mdi-arrow-right</v-icon>
+                    </button>
+                    <button
+                        v-else
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="saving"
+                        @click="submit"
+                    >
+                        <v-icon v-if="saving" size="22" class="spin">mdi-loading</v-icon>
+                        {{ saving ? 'Sending' : 'Send my application' }}
+                        <v-icon v-if="!saving" size="22">mdi-send</v-icon>
+                    </button>
+                </footer>
+            </el-form>
 
-                        <!-- Final step: check everything before sending -->
-                        <AdaptiveLoanReviewSection
-                            v-else-if="currentScreen.kind === 'review'"
-                            :application="formData"
-                            :applicants="allApplicants"
-                            :requires-collateral="requiresCollateral"
-                            :summary="reviewSummary"
-                            @edit-step="goToStep"
-                        />
-
-                        <footer class="form-footer">
-                            <span v-if="isFirstScreen"></span>
-                            <el-button
-                                v-else
-                                size="large"
-                                :disabled="saving"
-                                @click="back"
-                            >
-                                <v-icon start>mdi-arrow-left</v-icon>
-                                Back
-                            </el-button>
-                            <el-button
-                                v-if="!isLastScreen"
-                                type="primary"
-                                size="large"
-                                :loading="saving || documentsLoading"
-                                @click="next"
-                            >
-                                Next
-                                <v-icon end>mdi-arrow-right</v-icon>
-                            </el-button>
-                            <el-button
-                                v-else
-                                type="success"
-                                size="large"
-                                :loading="saving"
-                                @click="submit"
-                            >
-                                Send my application
-                            </el-button>
-                        </footer>
-                    </el-form>
-
-                    <p v-if="formData.id" class="save-note">
-                        <v-icon size="small">mdi-content-save-check-outline</v-icon>
-                        Your answers are saved as you go.
-                    </p>
-                </section>
-            </div>
-        </template>
+            <p class="page-foot">
+                <v-icon size="16">mdi-lock-outline</v-icon>
+                Your information is kept private and secure.
+            </p>
+        </section>
     </main>
 </template>
 
@@ -828,10 +817,19 @@ export default {
     computed: {
         /** CSS custom properties derived from the tenant's branding. */
         brandStyle() {
+            const brand = this.primaryColor || "#1178bd";
+            const accent = this.secondaryColor || brand;
             return {
-                "--brand": this.primaryColor || "#1178bd",
-                "--accent": this.secondaryColor || "#f7a31f",
-                "--logo-bg": this.logoBackground || "#fff",
+                "--brand": brand,
+                "--brand-ink": this.readableTextOn(brand),
+                // Brand-coloured text on white: darkened when the brand is light.
+                "--brand-text":
+                    this.readableTextOn(brand) === "#ffffff" ? brand : this.tint(brand, -0.55),
+                "--brand-soft": this.tint(brand, 0.82),
+                "--brand-tint": this.tint(brand, 0.92),
+                "--accent": accent,
+                "--accent-ink": this.readableTextOn(accent),
+                "--logo-bg": this.logoBackground || "transparent",
             };
         },
 
@@ -1816,6 +1814,65 @@ export default {
             this.screenIndex = screenIndex;
             this.showErrors = false;
             this.scrollToTop();
+        },
+
+        /**
+         * How much of one part's progress bar is filled: full for finished
+         * parts, partly for the current part (by screen), empty after it.
+         */
+        segmentFill(index) {
+            if (index < this.step) return "100%";
+            if (index > this.step) return "0%";
+            const total = Math.max(this.screens.length, 1);
+            const done = Math.min(this.screenIndex, total - 1) + 1;
+            return `${Math.round((done / total) * 100)}%`;
+        },
+
+        /** A colour mixed with white (amount 0 to 1), for soft backgrounds. */
+        tint(color, amount) {
+            const hex = String(color || "").trim().replace("#", "");
+            const full =
+                hex.length === 3
+                    ? hex
+                          .split("")
+                          .map((c) => c + c)
+                          .join("")
+                    : hex;
+            if (!/^[0-9a-f]{6}$/i.test(full)) return "#eef4fb";
+            // A negative amount mixes with black instead (a darker shade).
+            const mix = (start) => {
+                const value = parseInt(full.slice(start, start + 2), 16);
+                const target = amount < 0 ? 0 : 255;
+                return Math.round(value + (target - value) * Math.abs(amount))
+                    .toString(16)
+                    .padStart(2, "0");
+            };
+            return `#${mix(0)}${mix(2)}${mix(4)}`;
+        },
+
+        /**
+         * Black or white, whichever is easier to read on a colour, so text on
+         * the system's brand colours always has enough contrast.
+         */
+        readableTextOn(color) {
+            const hex = String(color || "").trim().replace("#", "");
+            const full =
+                hex.length === 3
+                    ? hex
+                          .split("")
+                          .map((c) => c + c)
+                          .join("")
+                    : hex;
+            if (!/^[0-9a-f]{6}$/i.test(full)) return "#ffffff";
+            const channel = (start) => {
+                const value = parseInt(full.slice(start, start + 2), 16) / 255;
+                return value <= 0.03928
+                    ? value / 12.92
+                    : Math.pow((value + 0.055) / 1.055, 2.4);
+            };
+            const luminance =
+                0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+            return luminance > 0.4 ? "#111827" : "#ffffff";
         },
 
         scrollToTop() {
@@ -4207,14 +4264,18 @@ export default {
             const form = this.formData;
 
             if (stepId === "loan") {
-                return [
+                // A welcome screen first, until a draft has been saved.
+                const welcome = form.id
+                    ? []
+                    : [{ id: "welcome", kind: "welcome", title: "", help: "" }];
+                return welcome.concat([
                     {
                         id: "loan",
                         kind: "loan",
                         title: "What kind of loan do you need?",
                         help: "Choose the type of loan, then the loan that fits you best.",
                     },
-                ];
+                ]);
             }
 
             if (stepId === "parties") {
@@ -4253,8 +4314,8 @@ export default {
                         id: "request-main",
                         kind: "request",
                         part: "main",
-                        title: "How much would you like to borrow?",
-                        help: "Tell us the amount, how long you need to pay it back, and what it's for.",
+                        title: "Your loan",
+                        help: "How much you need, how long to pay it back, and what it's for.",
                     },
                 ];
                 const details = {
@@ -4281,7 +4342,7 @@ export default {
                     kind: "assets",
                     title: "Things you own",
                     help: this.requiresCollateral
-                        ? "This loan needs something valuable to secure it, like the vehicle or property. Tick \"Use this to secure the loan\" on it."
+                        ? "This loan needs something valuable to secure it, like the vehicle or property you're buying."
                         : "Add each valuable thing you own, like a house, land, a vehicle, or savings.",
                 };
                 // A secured loan always needs an asset, so there's no question.
@@ -6160,22 +6221,25 @@ export default {
 </script>
 
 <style scoped>
-:global(body) {
-    margin: 0;
-    background: #f4f7fb;
-    font-family: Inter, system-ui, sans-serif;
-}
+/*
+ * One stylesheet for the whole form (the section components are styled here
+ * too, through :deep). Colours come from the system configuration via
+ * brandStyle: --brand (primary), --accent (secondary), and a readable text
+ * colour for each. Layout uses flex only.
+ */
 
 .adaptive-form {
     /* ---- Design tokens ---- */
-    --brand: #1178bd;
-    --brand-soft: #eff8ff;
-    --accent: #f7a31f;
-
-    --ink: #172033;
-    --ink-2: #334155;
-    --muted: #64748b;
-    --muted-2: #94a3b8;
+    --ink: #111827;
+    --ink-2: #374151;
+    --muted: #4b5563;
+    --muted-2: #6b7280;
+    --line: #d1d5db;
+    --border: #e5e7eb;
+    --surface: #ffffff;
+    --surface-soft: #f9fafb;
+    --surface-muted: #f3f4f6;
+    --page: #f4f6f8;
 
     --success: #15803d;
     --success-dark: #166534;
@@ -6185,25 +6249,18 @@ export default {
     --danger: #b91c1c;
     --danger-soft: #fee2e2;
     --danger-border: #fecaca;
-    --warn: #92400e;
-    --warn-soft: #fef3c7;
-    --info: #1d4ed8;
-    --info-soft: #dbeafe;
+    --warn: #9a3412;
+    --warn-soft: #fff7ed;
+    --info: #1e40af;
+    --info-soft: #eff6ff;
 
-    --border: #dfe7ec;
-    --surface: #fff;
-    --surface-soft: #fbfdfe;
-    --surface-muted: #f8fafc;
+    --fs-xs: 13px;
+    --fs-sm: 14px;
+    --fs-md: 16px;
+    --fs-lg: 18px;
+    --fs-xl: 22px;
+    --fs-2xl: 28px;
 
-    /* Type scale */
-    --fs-xs: 11px; /* helpers, badges, kickers */
-    --fs-sm: 12px; /* labels, secondary text */
-    --fs-md: 13px; /* body */
-    --fs-lg: 18px; /* sub-section titles */
-    --fs-xl: 21px; /* section titles */
-    --fs-2xl: 28px; /* page title */
-
-    /* Spacing scale */
     --sp-1: 4px;
     --sp-2: 8px;
     --sp-3: 12px;
@@ -6211,168 +6268,213 @@ export default {
     --sp-5: 20px;
     --sp-6: 28px;
 
-    /* Radii */
-    --r-sm: 10px;
+    --r-sm: 8px;
     --r-md: 12px;
     --r-lg: 16px;
     --r-xl: 20px;
 
+    /* Element Plus picks these up for focus rings and selected states */
+    --el-color-primary: var(--brand);
+    --el-color-primary-light-3: var(--brand);
+    --el-color-primary-light-5: var(--brand-soft);
+    --el-color-primary-light-7: var(--brand-soft);
+    --el-color-primary-light-8: var(--brand-tint);
+    --el-color-primary-light-9: var(--brand-tint);
+    --el-color-primary-dark-2: var(--brand);
+    --el-font-size-base: 16px;
+    --el-border-radius-base: 10px;
+
     min-height: 100vh;
     color: var(--ink);
-    background: #f4f7fb;
+    background: var(--page);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
 }
 
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4);
+/* ---- Header ---- */
+
+.topbar {
+    border-top: 4px solid var(--brand);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
 }
 
-.test-switch {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 10px;
-    border: 1px dashed rgba(255, 255, 255, 0.7);
-    border-radius: 6px;
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
-.app-header {
+.topbar-inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--sp-4) max(24px, calc((100% - 1280px) / 2));
-    color: #fff;
-    background: var(--brand);
+    gap: var(--sp-4);
+    max-width: 960px;
+    min-height: 68px;
+    margin: 0 auto;
+    padding: var(--sp-2) var(--sp-5);
 }
 
 .brand {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    min-width: 0;
 }
 
 .brand-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 112px;
-    height: 52px;
-    padding: var(--sp-1);
-    overflow: hidden;
+    display: block;
+    max-width: 150px;
+    max-height: 44px;
+    padding: 2px;
     border-radius: var(--r-sm);
     background: var(--logo-bg);
-}
-
-.brand-logo img {
-    display: block;
-    max-width: 100%;
-    max-height: 100%;
     object-fit: contain;
 }
 
-.layout {
+.brand-name {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.topbar-side {
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 24px;
-    max-width: 1280px;
-    margin: auto;
-    padding: 32px 24px;
-}
-
-.path,
-.summary {
-    position: sticky;
-    top: var(--sp-5);
-    align-self: start;
-}
-
-.path {
-    flex: 0 0 220px;
-    max-height: calc(100vh - 40px);
-    overflow: auto;
-}
-
-/* Shared kicker style */
-.eyebrow,
-:deep(.document-section .eyebrow),
-:deep(.document-section .scope-kicker) {
-    margin: 0 0 var(--sp-2);
-    color: var(--brand);
-    font-size: var(--fs-xs);
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.path ol {
-    padding: 0;
-    margin: var(--sp-4) 0;
-    list-style: none;
-}
-
-.path li {
-    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: var(--sp-3);
-    padding-bottom: var(--sp-5);
-    color: var(--muted-2);
 }
 
-.path li > span {
+.test-toggle {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    flex: 0 0 auto;
-    border: 1px solid #cbd5e1;
-    border-radius: 50%;
-    background: var(--surface);
+    gap: var(--sp-2);
+    padding: 2px 10px;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: 999px;
+    font-size: var(--fs-xs);
+    cursor: pointer;
+}
+
+.saved-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    color: var(--success-dark);
+    border-radius: 999px;
+    background: var(--success-soft);
     font-size: var(--fs-sm);
+    font-weight: 600;
 }
 
-.path li b,
-.path li small {
-    display: block;
+/* ---- Page and panel ---- */
+
+.page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: var(--sp-6) var(--sp-5) 48px;
 }
 
-.path li b {
+.panel {
+    padding: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.04);
+}
+
+.screen-title {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-2xl);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+.screen-help {
+    margin: 0 0 var(--sp-6);
+    color: var(--muted);
+    font-size: var(--fs-lg);
+}
+
+.hint {
+    margin: var(--sp-2) 0 0;
+    color: var(--muted);
     font-size: var(--fs-md);
 }
 
-.path li small {
-    font-size: var(--fs-xs);
+.page-foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: var(--sp-5) 0 0;
+    color: var(--muted-2);
+    font-size: var(--fs-sm);
 }
 
-.path li.active {
-    color: var(--brand);
+/* ---- Progress ---- */
+
+.progress-block {
+    margin-bottom: var(--sp-5);
 }
 
-.path li.active > span {
-    color: #fff;
-    border-color: var(--brand);
-    background: var(--brand);
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 0 var(--sp-3) -6px;
+    padding: 6px 8px 6px 2px;
+    color: var(--brand-text);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    cursor: pointer;
 }
 
-.path li.done > span {
-    color: var(--brand);
-    border-color: var(--brand);
-    background: var(--brand-soft);
+.back-link:hover {
+    background: var(--brand-tint);
 }
 
-.progress,
-:deep(.document-section .progress-track) {
+.back-link:focus-visible,
+.btn:focus-visible,
+:deep(.choice:focus-visible),
+.gate-option:focus-visible {
+    outline: 3px solid var(--brand);
+    outline-offset: 2px;
+}
+
+.progress-label {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink-2);
+    font-size: var(--fs-md);
+    font-weight: 700;
+}
+
+.progress-label span {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.progress-segments {
+    display: flex;
+    gap: 6px;
+}
+
+.segment {
+    flex: 1 1 0;
     height: 6px;
     overflow: hidden;
     border-radius: 999px;
-    background: #e5edf2;
+    background: #e5e7eb;
 }
 
-.progress i,
-:deep(.document-section .progress-track i) {
+.segment i {
     display: block;
     height: 100%;
     border-radius: inherit;
@@ -6380,390 +6482,703 @@ export default {
     transition: width 0.3s ease;
 }
 
-:deep(.document-section .progress-track) {
-    margin-bottom: var(--sp-4);
-}
+/* ---- Messages ---- */
 
-.heading {
-    padding: var(--sp-6) 0 var(--sp-4);
-}
-
-.heading h1 {
-    margin: 0 0 var(--sp-2);
-    font-size: var(--fs-2xl);
-}
-
-.heading p:not(.eyebrow) {
-    margin: 0;
-    color: var(--muted);
-}
-
-.alert {
-    margin-bottom: var(--sp-4);
-}
-
-/* ---- Short screens: easy to read and tap ---- */
-
-.workspace {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 720px;
-}
-
-.progress-label {
-    margin: 0 0 var(--sp-2);
-    color: var(--muted);
-    font-size: var(--fs-sm, 14px);
+.notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin: 0 0 var(--sp-5);
+    padding: 14px 16px;
+    border: 1px solid;
+    border-left-width: 5px;
+    border-radius: var(--r-md);
+    font-size: var(--fs-md);
     font-weight: 600;
 }
 
-.save-note {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: var(--sp-3) 0 0;
-    color: var(--muted);
-    font-size: 14px;
+.notice-warning,
+.notice-error {
+    color: var(--danger);
+    border-color: var(--danger-border);
+    border-left-color: var(--danger);
+    background: #fef2f2;
 }
 
-/* Big Yes / No buttons */
-.gate {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-4);
+.notice-info {
+    color: var(--info);
+    border-color: #bfdbfe;
+    border-left-color: var(--info);
+    background: var(--info-soft);
 }
 
-.gate-option {
+.notice-success {
+    color: var(--success-dark);
+    border-color: var(--success-border);
+    border-left-color: var(--success);
+    background: var(--success-bg);
+}
+
+/* ---- Buttons ---- */
+
+.actions {
     display: flex;
+    margin-top: 36px;
+}
+
+.btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    flex: 1 1 200px;
-    min-height: 88px;
-    padding: var(--sp-5);
-    color: var(--ink);
-    border: 2px solid #cbd5e1;
-    border-radius: var(--r-xl);
-    background: var(--surface);
-    font-size: 22px;
+    gap: var(--sp-2);
+    min-height: 56px;
+    padding: 0 28px;
+    border: 2px solid transparent;
+    border-radius: var(--r-md);
+    font-size: var(--fs-lg);
     font-weight: 700;
     cursor: pointer;
+    transition: filter 0.15s, background 0.15s;
 }
 
-.gate-option:hover {
-    border-color: var(--brand);
-}
-
-.gate-option.selected {
-    border-color: var(--brand);
-    background: var(--brand-soft);
-    color: var(--brand);
-}
-
-.gate-option .v-icon {
-    font-size: 28px;
-}
-
-.gate-warning {
-    flex: 1 1 100%;
-    width: 100%;
-    margin: 0;
-    color: #b54708;
-    font-weight: 600;
-}
-
-/* Larger labels and boxes, one clear question each */
-.card :deep(.el-form-item__label) {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.4;
-}
-
-.card :deep(.el-input__wrapper),
-.card :deep(.el-select__wrapper) {
-    min-height: 44px;
-    font-size: 16px;
-}
-
-.card :deep(.el-form-item__error) {
-    font-size: 14px;
-    position: static;
-    padding-top: 4px;
-}
-
-.card :deep(.helper) {
-    display: block;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-.form-footer :deep(.el-button) {
-    min-width: 140px;
-    font-size: 16px;
-}
-
-.card {
-    padding: var(--sp-6);
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
-    background: var(--surface);
-    box-shadow: 0 18px 40px #10243d0a;
-}
-
-.form-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    margin-top: var(--sp-6);
-    padding-top: var(--sp-5);
-    border-top: 1px solid var(--border);
-}
-
-.form-footer span {
-    margin-right: auto;
-    color: var(--muted);
-    font-size: var(--fs-xs);
-}
-
-.summary {
-    padding: var(--sp-5);
-    color: #fff;
-    border-radius: var(--r-lg);
+.btn-primary {
+    flex: 1 1 auto;
+    color: var(--brand-ink);
     background: var(--brand);
 }
 
-.summary .eyebrow {
-    color: #fff;
-    opacity: 0.78;
+.btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
 }
 
-.summary > div {
-    padding: var(--sp-3) 0;
-    border-bottom: 1px solid #ffffff33;
-}
-
-.summary > div:last-child {
-    border: 0;
-}
-
-.summary span,
-.summary strong {
-    display: block;
-}
-
-.summary span {
-    font-size: var(--fs-xs);
-    opacity: 0.75;
-}
-
-.summary strong {
-    margin-top: var(--sp-1);
-    font-size: var(--fs-md);
-}
-
-.mono {
-    font-family: ui-monospace, monospace;
-}
-
-.receipt {
-    max-width: 560px;
-    margin: 80px auto;
-    padding: 44px;
-    text-align: center;
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
+.btn-secondary {
+    color: var(--brand-text);
+    border-color: var(--brand);
     background: var(--surface);
 }
 
+.btn:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.spin {
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---- Welcome ---- */
+
+.welcome-icon,
 .receipt-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    margin: 0 auto var(--sp-4);
-    color: #fff;
+    width: 72px;
+    height: 72px;
+    margin-bottom: var(--sp-5);
+    color: var(--brand-text);
     border-radius: 50%;
-    background: var(--success);
+    background: var(--brand-tint);
 }
 
-.reference-pending {
-    margin: var(--sp-5) 0;
-    padding: var(--sp-4);
-    color: var(--ink-2);
-    border-radius: var(--r-sm);
-    background: var(--surface-muted);
+.welcome-subtitle {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+}
+
+.ready-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ready-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: var(--surface-soft);
+    font-size: var(--fs-md);
+}
+
+.ready-list .v-icon {
+    color: var(--brand-text);
+}
+
+/* ---- Receipt ---- */
+
+.receipt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.receipt .receipt-icon {
+    color: var(--success);
+    background: var(--success-soft);
+}
+
+.receipt-label {
+    margin: var(--sp-5) 0 var(--sp-2);
+    color: var(--muted);
+    font-weight: 600;
 }
 
 .reference-card {
     display: block;
-    margin: var(--sp-5) 0;
-    padding: var(--sp-4);
-    color: var(--brand);
-    border-radius: var(--r-sm);
-    background: var(--brand-soft);
+    padding: 14px 24px;
+    border: 2px dashed var(--brand);
+    border-radius: var(--r-md);
+    background: var(--brand-tint);
     font-family: ui-monospace, monospace;
+    font-size: var(--fs-xl);
+    letter-spacing: 0.04em;
 }
 
-/* ---- Shared child-component layout ---- */
+.receipt .btn {
+    margin-top: var(--sp-6);
+}
 
-:deep(.loan-grid) {
+/* ---- Yes / No questions ---- */
+
+.gate {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--sp-3);
 }
 
-:deep(.loan-grid button) {
-    flex: 1 1 240px;
-}
-
-:deep(.loan-grid button) {
+.gate-option,
+:deep(.choice) {
     display: flex;
-    min-height: 132px;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: var(--sp-4);
-    cursor: pointer;
-    text-align: left;
-    border: 1px solid var(--border);
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 60px;
+    padding: 14px 18px;
+    color: var(--ink);
+    border: 2px solid var(--line);
     border-radius: var(--r-md);
-    background: var(--surface-soft);
-    transition:
-        border-color 0.2s,
-        background 0.2s;
+    background: var(--surface);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
 }
 
-:deep(.loan-grid button:hover),
-:deep(.loan-grid button.selected) {
-    border: 2px solid var(--brand);
-    background: var(--brand-soft);
+:deep(.choice) {
+    min-height: 56px;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.35;
 }
 
-:deep(.loan-grid .v-icon) {
-    color: var(--brand);
+:deep(.choice.selected) {
+    font-weight: 600;
 }
 
-:deep(.loan-grid b) {
-    margin: var(--sp-3) 0 var(--sp-1);
+.gate-option {
+    min-height: 68px;
+    font-size: var(--fs-xl);
 }
 
-:deep(.loan-grid small),
-:deep(.helper),
-:deep(.collection-header p),
-:deep(.context p) {
+.gate-option:hover,
+:deep(.choice:hover) {
+    border-color: var(--brand);
+}
+
+.gate-option.selected,
+:deep(.choice.selected) {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+    box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.radio-mark,
+:deep(.choice-mark) {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: transparent;
+    border: 2px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+}
+
+.selected .radio-mark,
+:deep(.choice.selected .choice-mark) {
+    color: var(--brand-ink);
+    border-color: var(--brand);
+    background: var(--brand);
+}
+
+:deep(.choice-mark.square) {
+    border-radius: 6px;
+}
+
+.gate-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
+    padding: 12px 14px;
+    color: var(--warn);
+    border-radius: var(--r-md);
+    background: var(--warn-soft);
+    font-size: var(--fs-md);
+    font-weight: 600;
+}
+
+/* Answer cards used in the sections: a column, or a row for short answers */
+:deep(.choice-list) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+:deep(.choice-list.inline) {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+:deep(.choice-list.inline .choice) {
+    flex: 1 1 120px;
+    width: auto;
+}
+
+:deep(.choice small) {
+    display: block;
+    margin-top: 2px;
     color: var(--muted);
+    font-size: var(--fs-sm);
+    font-weight: 400;
 }
 
+/* ---- Form fields (Element Plus and Saturn's FormField) ---- */
+
+:deep(.el-form-item) {
+    margin-bottom: 26px;
+}
+
+:deep(.el-form-item__label) {
+    height: auto !important;
+    margin-bottom: 8px !important;
+    padding: 0 !important;
+    color: var(--ink) !important;
+    font-size: var(--fs-md) !important;
+    font-weight: 600;
+    line-height: 1.4 !important;
+}
+
+:deep(.el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label::before) {
+    display: none;
+}
+
+:deep(.el-form-item__content) {
+    flex-wrap: wrap;
+    line-height: 1.5;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-textarea__inner) {
+    min-height: 52px;
+    padding: 4px 14px;
+    border-radius: 10px;
+    box-shadow: 0 0 0 1.5px var(--line) inset;
+    font-size: 17px;
+}
+
+:deep(.el-textarea__inner) {
+    padding: 12px 14px;
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-select__wrapper.is-focused),
+:deep(.el-textarea__inner:focus) {
+    box-shadow: 0 0 0 2px var(--brand) inset;
+}
+
+:deep(.el-input__inner) {
+    font-size: 17px;
+}
+
+:deep(.el-form-item.is-error .el-input__wrapper),
+:deep(.el-form-item.is-error .el-select__wrapper) {
+    box-shadow: 0 0 0 2px var(--danger) inset;
+}
+
+:deep(.el-form-item__error) {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 6px;
+    color: var(--danger);
+    font-size: var(--fs-md);
+    font-weight: 600;
+}
+
+:deep(.el-select),
+:deep(.el-date-editor),
+:deep(.el-input-number) {
+    width: 100% !important;
+}
+
+:deep(.el-date-editor.el-input),
+:deep(.el-date-editor.el-input__wrapper),
+:deep(.el-input-number),
+:deep(.el-input-number .el-input) {
+    height: auto;
+    min-height: 52px;
+}
+
+:deep(.el-input-number .el-input__wrapper) {
+    padding-left: 14px;
+    padding-right: 50px;
+}
+
+:deep(.el-input-number .el-input__inner) {
+    text-align: left;
+}
+
+:deep(.el-checkbox) {
+    height: auto;
+    min-height: 48px;
+    white-space: normal;
+}
+
+:deep(.el-checkbox__label) {
+    font-size: var(--fs-lg);
+    font-weight: 600;
+}
+
+:deep(.el-checkbox__inner) {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+    border-radius: 6px;
+}
+
+:deep(.el-checkbox__inner::after) {
+    top: 3px;
+    left: 7px;
+    width: 6px;
+    height: 11px;
+    border-width: 2px;
+}
+
+/* Helper text sits on its own line under the box */
+:deep(.helper) {
+    display: block;
+    flex: 1 1 100%;
+    width: 100%;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: var(--fs-sm);
+    line-height: 1.45;
+}
+
+:deep(.helper.invalid),
+:deep(.invalid) {
+    color: var(--danger);
+}
+
+:deep(.valid) {
+    color: var(--success);
+}
+
+/* Two boxes side by side when there's room; one under the other on phones */
 :deep(.field-grid) {
     display: flex;
     flex-wrap: wrap;
     column-gap: var(--sp-4);
 }
 
-/* Two boxes side by side; each drops to its own line on phones */
 :deep(.field-grid > *) {
-    flex: 0 1 calc(50% - var(--sp-4) / 2);
+    flex: 1 1 240px;
     min-width: 0;
 }
 
-/* Helper text always sits on its own line under the box */
-:deep(.el-form-item__content .helper) {
-    flex: 1 1 100%;
+:deep(.field-grid > .wide) {
+    flex-basis: 100%;
 }
 
-:deep(.context),
+/* A plain question heading inside a screen */
+:deep(.question) {
+    margin: 0 0 10px;
+    color: var(--ink);
+    font-size: var(--fs-md);
+    font-weight: 600;
+}
+
+:deep(.question-block) {
+    margin-bottom: 26px;
+}
+
+:deep(.subheading) {
+    margin: var(--sp-6) 0 var(--sp-3);
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+}
+
+/* "+ Add a tax number" and similar: extras hidden until asked for */
+:deep(.more-link) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 var(--sp-5);
+    padding: 6px 0;
+    color: var(--brand-text);
+    border: 0;
+    background: transparent;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ---- Lists of things (IDs, assets, debts, bills, people) ---- */
+
 :deep(.item-card) {
-    margin-top: var(--sp-5);
+    margin-bottom: var(--sp-4);
     padding: var(--sp-5);
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+}
+
+/* No extra gap under the last question in a card */
+:deep(.item-card > .el-form-item:last-child),
+:deep(.item-card > .field-grid:last-child > .el-form-item) {
+    margin-bottom: 0;
+}
+
+:deep(.item-card.open) {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+:deep(.item-card.needs-work) {
+    border-color: var(--danger);
+}
+
+:deep(.item-head) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+:deep(.item-card.open .item-head) {
+    margin-bottom: var(--sp-5);
+    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--border);
+}
+
+:deep(.item-icon) {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    color: var(--brand-text);
     border-radius: var(--r-md);
-    background: var(--surface-soft);
+    background: var(--brand-tint);
 }
 
-:deep(.context h3) {
-    margin: 0 0 var(--sp-3);
+:deep(.item-text) {
+    flex: 1 1 160px;
+    min-width: 0;
 }
 
-:deep(.helper) {
+:deep(.item-text strong) {
     display: block;
-    width: 100%;
-    margin-top: var(--sp-1);
-    font-size: var(--fs-xs);
+    font-size: var(--fs-lg);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
-/* Assessed repayment note under a revolving liability's credit limit */
-:deep(.assessed-note) {
-    flex: 1 1 100%;
-    margin: calc(var(--sp-2) * -1) 0 var(--sp-4);
-    padding: var(--sp-2) var(--sp-3);
-    color: var(--info);
-    border-radius: var(--r-sm);
-    background: var(--info-soft);
+:deep(.item-text span) {
+    display: block;
+    color: var(--muted);
     font-size: var(--fs-sm);
 }
 
-:deep(.helper.invalid) {
+:deep(.item-text .needs) {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+:deep(.item-actions) {
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--sp-1);
+    margin-left: auto;
+}
+
+:deep(.link-btn) {
+    padding: 8px 10px;
+    color: var(--brand-text);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+:deep(.link-btn:hover) {
+    background: var(--brand-tint);
+}
+
+:deep(.link-btn.danger) {
     color: var(--danger);
 }
 
-:deep(.pane-actions) {
-    display: flex;
-    justify-content: flex-end;
+:deep(.link-btn.danger:hover) {
+    background: #fef2f2;
 }
 
-:deep(.consents) {
+:deep(.item-done) {
     display: flex;
-    flex-direction: column;
+    justify-content: flex-end;
+    margin-top: var(--sp-2);
+}
+
+:deep(.small-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 20px;
+    color: var(--brand-ink);
+    border: 0;
+    border-radius: 10px;
+    background: var(--brand);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+:deep(.add-button) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: var(--sp-2);
-    margin-top: var(--sp-4);
-    padding: var(--sp-4);
-    border: 1px solid var(--border);
+    width: 100%;
+    min-height: 56px;
+    color: var(--brand-text);
+    border: 2px dashed var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+:deep(.add-button:hover) {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+}
+
+:deep(.item-tags) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+}
+
+:deep(.tag) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    color: var(--brand-text);
+    border-radius: 999px;
+    background: var(--brand-tint);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+}
+
+/* Soft boxes for summaries and notes */
+:deep(.soft-box) {
+    margin-bottom: var(--sp-5);
+    padding: var(--sp-4) var(--sp-5);
     border-radius: var(--r-md);
     background: var(--surface-muted);
 }
 
-:deep(.add-button) {
-    margin-top: var(--sp-4);
+:deep(.soft-box.info) {
+    color: var(--info);
+    background: var(--info-soft);
 }
 
-:deep(.collection-header),
-:deep(.item-title),
-:deep(.allocation-heading) {
+:deep(.soft-box.warn) {
+    color: var(--warn);
+    background: var(--warn-soft);
+}
+
+:deep(.soft-box.projected) {
+    margin-top: var(--sp-5);
+}
+
+:deep(.soft-box .question),
+:deep(.soft-box .hint) {
+    margin-top: 0;
+}
+
+:deep(.sum-row) {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
+    padding: 6px 0;
 }
 
-:deep(.collection-header h3),
-:deep(.collection-header p) {
-    margin: 0;
+:deep(.sum-row.total) {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1.5px solid var(--line);
+    font-size: var(--fs-lg);
+    font-weight: 700;
 }
 
-:deep(.collection-header p) {
-    font-size: var(--fs-sm);
+:deep(.sum-row strong) {
+    text-align: right;
+    white-space: nowrap;
 }
 
-:deep(.item-title) {
-    margin-bottom: var(--sp-4);
-}
-
+/* Who owns / who pays (allocation editor) */
 :deep(.allocation) {
-    margin-top: var(--sp-3);
-    padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: #f1f5f9;
+    margin: var(--sp-2) 0 var(--sp-5);
 }
 
 :deep(.allocation-row) {
     display: flex;
-    gap: var(--sp-3);
+    flex-wrap: wrap;
     align-items: flex-end;
+    gap: var(--sp-3);
 }
 
 :deep(.allocation-row > :first-child) {
-    flex: 1 1 60%;
+    flex: 1 1 220px;
     min-width: 0;
 }
 
@@ -6773,16 +7188,172 @@ export default {
 
 :deep(.total) {
     margin: var(--sp-2) 0 0;
-    font-size: var(--fs-sm);
+    font-size: var(--fs-md);
     font-weight: 700;
 }
 
-:deep(.valid) {
-    color: var(--success);
+/* ---- Loan cards ---- */
+
+:deep(.loan-grid) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
 }
 
-:deep(.invalid) {
-    color: var(--danger);
+:deep(.loan-card) {
+    display: flex;
+    flex: 1 1 240px;
+    align-items: center;
+    gap: var(--sp-4);
+    min-height: 88px;
+    padding: var(--sp-4) var(--sp-5);
+    color: var(--ink);
+    border: 2px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    text-align: left;
+    cursor: pointer;
+}
+
+:deep(.loan-card:hover) {
+    border-color: var(--brand);
+}
+
+:deep(.loan-card.selected) {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+    box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+:deep(.loan-card .loan-icon) {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    color: var(--brand-text);
+    border-radius: var(--r-md);
+    background: var(--brand-tint);
+}
+
+:deep(.loan-card.selected .loan-icon) {
+    color: var(--brand-ink);
+    background: var(--brand);
+}
+
+:deep(.loan-card b),
+:deep(.product-card b) {
+    display: block;
+    font-size: var(--fs-lg);
+}
+
+:deep(.loan-card small),
+:deep(.product-card small) {
+    display: block;
+    color: var(--muted);
+    font-size: var(--fs-sm);
+}
+
+:deep(.product-block) {
+    margin-top: var(--sp-6);
+}
+
+/* ---- Check your answers ---- */
+
+:deep(.check-section) {
+    margin-bottom: var(--sp-4);
+    border: 1.5px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+:deep(.check-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: 14px var(--sp-5);
+    background: var(--surface-soft);
+    border-bottom: 1px solid var(--border);
+}
+
+:deep(.check-title) {
+    margin: 0;
+    font-size: var(--fs-lg);
+    font-weight: 700;
+}
+
+:deep(.check-item) {
+    padding: var(--sp-3) var(--sp-5);
+}
+
+:deep(.check-item + .check-item) {
+    border-top: 1px solid var(--border);
+}
+
+:deep(.check-heading) {
+    margin: 0 0 var(--sp-1);
+    font-weight: 700;
+}
+
+:deep(.check-row) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2px var(--sp-4);
+    padding: 6px 0;
+}
+
+:deep(.check-label) {
+    flex: 1 1 180px;
+    color: var(--muted);
+}
+
+:deep(.check-value) {
+    flex: 1 1 180px;
+    font-weight: 600;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 640px) {
+    .page {
+        padding: var(--sp-4) var(--sp-3) 40px;
+    }
+
+    .panel {
+        padding: 22px 18px;
+        border-radius: var(--r-lg);
+    }
+
+    .screen-title {
+        font-size: 24px;
+    }
+
+    .screen-help {
+        font-size: var(--fs-md);
+    }
+
+    .brand-logo + .brand-name {
+        display: none;
+    }
+
+    .test-toggle span,
+    .saved-chip span {
+        display: none;
+    }
+
+    .topbar-side {
+        flex-wrap: nowrap;
+        gap: var(--sp-2);
+    }
+
+    :deep(.check-value) {
+        text-align: left;
+    }
 }
 
 /* ---- Document upload section ---- */
@@ -6837,7 +7408,7 @@ export default {
 }
 
 :deep(.document-section .overall-progress strong) {
-    color: var(--brand);
+    color: var(--brand-text);
     font-size: var(--fs-lg);
 }
 
@@ -6873,7 +7444,7 @@ export default {
 
 :deep(.document-section .scope-tabs button:hover:not(:disabled)),
 :deep(.document-section .scope-tabs button.active) {
-    color: var(--brand);
+    color: var(--brand-text);
     border-color: var(--brand);
     background: var(--brand-soft);
 }
@@ -7035,7 +7606,7 @@ export default {
     width: 38px;
     height: 38px;
     flex: 0 0 auto;
-    color: var(--brand);
+    color: var(--brand-text);
     border-radius: var(--r-sm);
     background: var(--brand-soft);
 }
@@ -7106,7 +7677,7 @@ export default {
 }
 
 :deep(.document-section .upload-symbol) {
-    color: var(--brand);
+    color: var(--brand-text);
 }
 
 :deep(.document-section .drop-zone strong) {
@@ -7116,7 +7687,7 @@ export default {
 }
 
 :deep(.document-section .drop-zone u) {
-    color: var(--brand);
+    color: var(--brand-text);
     text-underline-offset: 2px;
 }
 
@@ -7152,7 +7723,7 @@ export default {
     width: 34px;
     height: 34px;
     flex: 0 0 auto;
-    color: var(--brand);
+    color: var(--brand-text);
     border-radius: var(--r-sm);
     background: var(--surface);
 }
@@ -7241,45 +7812,6 @@ export default {
     margin: var(--sp-4) 0;
 }
 
-/* ---- Estimated statutory deductions (applicant editor) ---- */
-
-:deep(.deduction-summary) {
-    margin-top: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--info-soft);
-    border-radius: var(--r-md);
-    background: #f5f9ff;
-}
-
-:deep(.deduction-summary .deduction-row) {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding: var(--sp-1) 0;
-    font-size: var(--fs-sm);
-}
-
-:deep(.deduction-summary .deduction-row small) {
-    display: block;
-    color: var(--muted);
-    font-size: var(--fs-xs);
-}
-
-:deep(.deduction-summary .deduction-row.net) {
-    margin-top: var(--sp-1);
-    padding-top: var(--sp-2);
-    border-top: 1px solid var(--info-soft);
-    font-weight: 700;
-}
-
-:deep(.deduction-summary > small) {
-    display: block;
-    margin-top: var(--sp-2);
-    color: var(--muted);
-    font-size: var(--fs-xs);
-}
-
 /* ---- Documents inside a section (applicant tab or item card) ---- */
 
 :deep(.item-documents) {
@@ -7327,95 +7859,6 @@ export default {
     border-radius: var(--r-sm);
     background: var(--warn-soft);
     font-size: var(--fs-sm);
-}
-
-/* ---- Saturn/Element Plus controls ---- */
-
-:deep(.el-select),
-:deep(.el-date-editor),
-:deep(.el-input-number) {
-    width: 100%;
-}
-
-:deep(.el-form-item__label) {
-    color: var(--ink-2);
-    font-size: 15px !important;
-    font-weight: 600;
-}
-
-:deep(.el-button--primary) {
-    --el-button-bg-color: var(--accent);
-    --el-button-border-color: var(--accent);
-    --el-button-hover-bg-color: var(--accent);
-    --el-button-hover-border-color: var(--accent);
-    --el-button-text-color: #fff;
-    --el-button-hover-text-color: #fff;
-    font-weight: 600;
-}
-
-@media (max-width: 1100px) {
-    .path {
-        flex-basis: 200px;
-    }
-
-    .form-footer :deep(.el-button) {
-        flex: 1;
-    }
-
-    .summary {
-        display: none;
-    }
-}
-
-@media (max-width: 720px) {
-    .layout {
-        display: block;
-        padding: var(--sp-5) var(--sp-4);
-    }
-
-    .path {
-        display: none;
-    }
-
-    .card {
-        padding: var(--sp-5);
-    }
-
-    :deep(.field-grid > *),
-    :deep(.loan-grid button) {
-        flex-basis: 100%;
-    }
-
-    :deep(.allocation-row) {
-        flex-wrap: wrap;
-    }
-
-    .app-header {
-        padding: var(--sp-3) var(--sp-4);
-    }
-
-    .brand-logo {
-        width: 86px;
-        height: 42px;
-    }
-
-    .heading h1 {
-        font-size: 24px;
-    }
-
-    .form-footer {
-        flex-wrap: wrap;
-    }
-
-    .form-footer span {
-        order: 4;
-        width: 100%;
-    }
-
-    .receipt {
-        margin: 40px var(--sp-4);
-        padding: var(--sp-6) var(--sp-5);
-    }
 }
 
 @media (max-width: 640px) {

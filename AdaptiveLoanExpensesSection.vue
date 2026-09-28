@@ -1,19 +1,26 @@
 <template>
   <section>
-    <p v-if="!draft.length" class="helper">Nothing added yet.</p>
-
-    <!-- One card per declared expense -->
+    <!-- One card per bill: a short summary, or the details while editing -->
     <article
       v-for="(item, index) in draft"
       :key="item.client_key"
       class="item-card"
+      :class="{ open: isOpen(item), 'needs-work': !isOpen(item) && showErrors && missing(item) }"
     >
-      <div class="item-title">
-        <strong>{{ title(item, index) }}</strong>
-        <el-button text type="danger" @click="remove(index)">Remove</el-button>
+      <div class="item-head">
+        <span class="item-icon"><v-icon>mdi-receipt-text-outline</v-icon></span>
+        <div class="item-text">
+          <strong>{{ title(item, index) }}</strong>
+          <span v-if="!isOpen(item) && missing(item)" class="needs">Some details are missing</span>
+          <span v-else>{{ summaryOf(item) }}</span>
+        </div>
+        <div class="item-actions">
+          <button v-if="!isOpen(item)" type="button" class="link-btn" @click="openItem(item)">Change</button>
+          <button type="button" class="link-btn danger" @click="remove(index)">Remove</button>
+        </div>
       </div>
 
-      <div class="field-grid">
+      <template v-if="isOpen(item)">
         <!--
           Options are ExpenseType records filtered by the parent to the
           selected loan category. Grouped when the types define a group.
@@ -21,7 +28,7 @@
         <el-form-item label="What is it for?" required :error="need(item.expense_type)">
           <el-select
             :model-value="item.expense_type"
-            placeholder="Choose one"
+            placeholder="Choose or type to search"
             filterable
             @update:model-value="set(index, 'expense_type', $event)"
           >
@@ -33,13 +40,8 @@
               :value="item.expense_type"
               disabled
             />
-
             <template v-if="hasGroups">
-              <el-option-group
-                v-for="group in groupedOptions"
-                :key="group.label"
-                :label="group.label"
-              >
+              <el-option-group v-for="group in groupedOptions" :key="group.label" :label="group.label">
                 <el-option
                   v-for="option in group.options"
                   :key="option.value"
@@ -58,11 +60,9 @@
             </template>
           </el-select>
           <small v-if="isInapplicable(item)" class="helper invalid">
-            This doesn't apply to a {{ loanCategoryLabel }}. Choose something
-            else or remove it.
+            This doesn't apply to a {{ loanCategoryLabel }}. Choose something else or remove it.
           </small>
         </el-form-item>
-
         <el-form-item label="How much? (EC$)" required :error="need(item.amount)">
           <FormField
             :model-value="item.amount"
@@ -71,88 +71,102 @@
             @update:model-value="set(index, 'amount', $event)"
           />
         </el-form-item>
-
         <el-form-item label="How often?">
+          <template v-if="choices('expense_frequency')">
+            <div class="choice-list inline" role="radiogroup">
+              <button
+                v-for="option in choices('expense_frequency')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice"
+                :class="{ selected: item.frequency === option.value }"
+                :aria-checked="item.frequency === option.value"
+                @click="set(index, 'frequency', option.value)"
+              >
+                <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="item.frequency"
+              :property="field('Expense', 'frequency', 'How often?', 'select')"
+              :form="item"
+              @update:model-value="set(index, 'frequency', $event)"
+            />
+          </template>
+        </el-form-item>
+
+        <!-- Only asked when someone else is borrowing too -->
+        <el-form-item v-if="hasOthers" label="Who pays it?" required :error="item.is_household ? '' : need(item.application_party_id)">
+          <div class="choice-list" role="radiogroup">
+            <button
+              v-for="option in [{ value: householdValue, label: 'Shared by the household' }].concat(applicationPartyOptions)"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice"
+              :class="{ selected: (item.is_household ? householdValue : item.application_party_id) === option.value }"
+              :aria-checked="(item.is_household ? householdValue : item.application_party_id) === option.value"
+              @click="setPayer(index, option.value)"
+            >
+              <span class="choice-mark"><v-icon size="16">mdi-check</v-icon></span>
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="Name" v-if="item.expense_name || nameFor[item.client_key]">
           <FormField
-            :model-value="item.frequency"
-            :property="field('Expense', 'frequency', 'How often?', 'select')"
+            :model-value="item.expense_name"
+            :property="field('Expense', 'expense_name', 'Name', 'input')"
             :form="item"
-            @update:model-value="set(index, 'frequency', $event)"
+            @update:model-value="set(index, 'expense_name', $event)"
           />
         </el-form-item>
+        <button v-else type="button" class="more-link" @click="nameFor[item.client_key] = true">
+          <v-icon size="20">mdi-plus</v-icon>
+          Give it a name
+        </button>
 
-        <!--
-          Only asked when someone else is borrowing too. The form decides the
-          choices (the household or this application's borrowers), so it's
-          an el-select.
-        -->
-        <el-form-item v-if="hasOthers" label="Who pays it?" required :error="item.is_household ? '' : need(item.application_party_id)">
-          <el-select
-            :model-value="item.is_household ? householdValue : item.application_party_id"
-            placeholder="Choose one"
-            @update:model-value="setPayer(index, $event)"
-          >
-            <el-option label="Shared by the household" :value="householdValue" />
-            <el-option
-              v-for="option in applicationPartyOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-      </div>
-
-      <el-button
-        v-if="!item.expense_name && !nameFor[item.client_key]"
-        text
-        type="primary"
-        @click="nameFor[item.client_key] = true"
-      >
-        + Give it a name
-      </el-button>
-      <el-form-item v-else label="Name">
-        <FormField
-          :model-value="item.expense_name"
-          :property="field('Expense', 'expense_name', 'Name', 'input')"
-          :form="item"
-          @update:model-value="set(index, 'expense_name', $event)"
+        <!-- Required documents for this bill; uploads unlock once it's complete -->
+        <AdaptiveLoanDocumentRequirements
+          :scope="documentScopes[`expense:${item.client_key}`]"
+          :uploading-key="uploadingKey"
+          :disabled="documentsDisabled"
+          @stage-file="$emit('stage-file', $event)"
+          @remove-file="$emit('remove-file', $event)"
+          @request-file-upload="$emit('request-file-upload', $event)"
+          @file-rejected="$emit('file-rejected', $event)"
         />
-      </el-form-item>
 
-      <!-- Required documents for this expense; uploads unlock once it's complete -->
-      <AdaptiveLoanDocumentRequirements
-        :scope="documentScopes[`expense:${item.client_key}`]"
-        :uploading-key="uploadingKey"
-        :disabled="documentsDisabled"
-        @stage-file="$emit('stage-file', $event)"
-        @remove-file="$emit('remove-file', $event)"
-        @request-file-upload="$emit('request-file-upload', $event)"
-        @file-rejected="$emit('file-rejected', $event)"
-      />
+        <div class="item-done">
+          <button type="button" class="small-btn" @click="finish(item)">
+            <v-icon size="20">mdi-check</v-icon>
+            Done
+          </button>
+        </div>
+      </template>
     </article>
 
-    <el-button type="primary" plain size="large" @click="add">
-      <v-icon start>mdi-plus</v-icon>
+    <button type="button" class="add-button" @click="add">
+      <v-icon>mdi-plus</v-icon>
       Add {{ draft.length ? 'another bill' : 'a bill' }}
-    </el-button>
+    </button>
 
-    <!-- Worked out from the insurance on collateral; can't be edited here -->
-    <section v-if="projectedExpenses.length" class="context">
-      <h3>Insurance we've added for you</h3>
-      <p class="helper">
-        This is the insurance you told us about on the thing securing the loan.
-        To change it, go back to "Things you own".
+    <!-- Worked out from the insurance on collateral; can't be changed here -->
+    <div v-if="projectedExpenses.length" class="soft-box projected">
+      <p class="question">Insurance we've added for you</p>
+      <p class="hint">
+        This is the insurance on the thing securing the loan. To change it, go back to "Things you own".
       </p>
-      <div
-        v-for="item in projectedExpenses"
-        :key="item.asset_key"
-        class="projected-row"
-      >
+      <div v-for="item in projectedExpenses" :key="item.asset_key" class="sum-row">
         <span>{{ item.name }}</span>
         <strong>{{ money(item.monthly) }} a month</strong>
       </div>
-    </section>
+    </div>
   </section>
 </template>
 
@@ -259,12 +273,22 @@ export default {
       nameFor: {},
       // The "Shared by the household" choice in "Who pays it?".
       householdValue: '__household__',
+      // The one item being edited (the rest fold up into a summary).
+      openKey: '',
+      // True after "Done" is pressed on an item with missing details.
+      checking: false,
     };
   },
 
   mounted() {
     // They said they have bills, so start with one to fill in.
-    if (!this.draft.length) this.add();
+    if (!this.draft.length) {
+      this.add();
+      return;
+    }
+    // Open the first item that still needs details, if any.
+    const unfinished = this.draft.find((item) => this.missing(item));
+    this.openKey = unfinished ? unfinished.client_key : '';
     // With only one borrower, every bill is theirs.
     if (!this.hasOthers && this.soleLink) {
       let changed = false;
@@ -325,6 +349,14 @@ export default {
         this.draft = this.copy(value);
       },
     },
+    // After a failed Continue, open the first item that's missing details.
+    showErrors(value) {
+      if (!value) return;
+      const open = this.draft.find((item) => this.isOpen(item));
+      if (open && this.missing(open)) return;
+      const unfinished = this.draft.find((item) => this.missing(item));
+      if (unfinished) this.openKey = unfinished.client_key;
+    },
   },
 
   methods: {
@@ -375,7 +407,7 @@ export default {
 
     /** "This is needed" under an empty required box, after a failed Next. */
     need(value) {
-      if (!this.showErrors) return '';
+      if (!this.showErrors && !this.checking) return '';
       return value === null || value === undefined || value === '' ? 'This is needed' : '';
     },
 
@@ -489,7 +521,50 @@ export default {
         is_household: false,
         document_ids: [],
       });
+      this.openKey = this.draft[this.draft.length - 1].client_key;
+      this.checking = false;
       this.notify();
+    },
+
+    // ---- Fold-up cards ----
+
+    /** True when an item's details are showing. */
+    isOpen(item) {
+      return this.openKey === item.client_key;
+    },
+
+    openItem(item) {
+      this.openKey = item.client_key;
+      this.checking = false;
+    },
+
+    /** "Done": folds the item up, or points out what's missing. */
+    finish(item) {
+      if (this.missing(item)) {
+        this.checking = true;
+        return;
+      }
+      this.checking = false;
+      this.openKey = '';
+    },
+
+    /** True when a required detail is still empty. */
+    missing(item) {
+      const empty = (value) => value === null || value === undefined || value === '';
+      if (empty(item.expense_type) || empty(item.amount)) return true;
+      if (this.hasOthers && !item.is_household && empty(item.application_party_id)) return true;
+      return false;
+    },
+
+    /** One line under the item's name. */
+    summaryOf(item) {
+      const empty = (value) => value === null || value === undefined || value === '';
+      const parts = [];
+      if (!empty(item.amount)) parts.push(this.money(item.amount));
+      const frequency = this.lookup('expense_frequency').find((option) => option.value === item.frequency);
+      if (frequency) parts.push(frequency.label.toLowerCase());
+      else if (item.frequency) parts.push(String(item.frequency).toLowerCase());
+      return parts.join(' ');
     },
 
     remove(index) {
@@ -501,10 +576,5 @@ export default {
 </script>
 
 <style scoped>
-.projected-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 4px 0;
-}
+/* Styled in the main form's stylesheet (.item-card, .choice, .soft-box, ...). */
 </style>
