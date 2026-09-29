@@ -279,9 +279,21 @@ A Party can be a person or a business, so Party keeps its business fields.
 - **Business details** live on the business's own Party.
 - **Review screen:** our own full review (not `ResourceViewInline`).
 - **Consent forms** will be emailed by a workflow after submitting (see Next up).
+- **Every party joins an application through ApplicationParty**, never linked straight to the Application, so the application keeps what was true when the person applied. The business on a business loan is a Party with an ApplicationParty whose role is **`Business Borrower`**; `Application.business_party` is removed. Facts that matter to the decision and can change later (housing, dependants, PEP, job and pay, the business's revenue and employees) stay on ApplicationParty.
+- **`ApplicationParty.partysnapshot`** is filled by a Saturn workflow, not the form.
+- **Loan categories** will be a `LoanCategory` resource (code, name, description, icon, interest rate range, `is_revolving`, active, order), linked from `LoanType.loan_category`. Each LoanType has a `default_interest_rate` inside its category's range.
+- **Interest rate:** `Application.interest_rate` and `interest_rate_type` are for staff overrides; the form never writes them. Estimates use the override if set, otherwise the product default. Overrides outside the range need privilege escalation, handled in Saturn, not the form.
+- **Applicants don't see an estimated monthly payment.**
+- **Credit cards and overdrafts** ask for a limit in its own field, `Application.requested_credit_limit` (not `requested_loan_amount`).
+- **New categories planned:** credit card, overdraft, student loan.
 
 ### Decisions still waiting on the developer
 
+- **Credit cards:** the credit union's own, or issued through a partner? (Decides which card details to ask.)
+- **Student loans:** is a guarantor always required, or only when the student has no income? (The planned `LoanType.requires_guarantor` setting can cover either.)
+- **Guarantors' share of the loan** (`ApplicationParty.ownership_percentage`): a share, or 0%?
+- **Business loans:** is the person applying still "Primary Applicant", or a director or authorised signatory?
+- **Which of `LoanType.category`, `Application.business_party`, `Party.years_at_address` were removed in Saturn:** the form still uses all three and must be updated.
 1. **Income tax rates:** 10% or 15% for the middle band, and 30% or 28% for the top band. Sources disagree; confirm with the Inland Revenue Division.
 2. **Minimum IDs:** 1 or 2.
 3. **AML and declaration questions:** confirm the set with the compliance officer.
