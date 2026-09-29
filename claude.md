@@ -196,6 +196,16 @@ The developer then added the fields for membership, other income, monthly equiva
 
 **Not set up in Saturn yet (as of the last session):** the ExpenseType changes (turn off Interest expense and Bad debt, add the Utilities and Insurance types, add `COLLATERAL_INSURANCE`). Until `COLLATERAL_INSURANCE` exists, projected insurance expenses are saved with no expense type, by name only. Revolving types use 3%.
 
+### Link lists Saturn fills itself (the form must not write them)
+
+Saturn fills these lists automatically from the records that point to them, so the form never sets them:
+- `Asset.owners`, `Party.assets`: from `AssetOwnership` (`asset`, `party`)
+- `Liability.owners`: from `LiabilityResponsibility` (`liability`)
+- `Application.collateral`: from `Collateral.application`
+- `ApplicationParty.liability_ids`, `ApplicationParty.expense_ids`: from `LiabilityResponsibility.application_party` and `Expense.applicationpartiesid`
+
+A Party can be a person or a business, so Party keeps its business fields.
+
 ## Business rules
 
 - **Revolving credit** (credit cards, overdrafts): the assessed repayment is `credit_limit × rate`. The rate is the type's `revolving_rate`, falling back to `DEFAULT_REVOLVING_RATE` (3%).
