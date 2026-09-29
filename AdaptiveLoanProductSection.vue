@@ -1,7 +1,7 @@
 <template>
   <section>
     <!-- Loan types (personal, auto, home, business) as big cards -->
-    <div class="loan-grid flex flex-wrap gap-3" role="radiogroup" aria-label="Type of loan">
+    <div class="loan-grid gap-3" role="radiogroup" aria-label="Type of loan">
       <button
         v-for="loan in loans"
         :key="loan.id"
@@ -12,7 +12,7 @@
         :aria-checked="loanCategory === loan.id"
         @click="$emit('select-category', loan.id)"
       >
-        <span class="loan-icon flex items-center justify-center rounded-lg" :style="['width:52px;min-width:52px;max-width:52px;height:52px;min-height:52px;flex:0 0 52px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box', (loanCategory === loan.id) ? 'background:var(--brand);color:var(--brand-ink)' : 'background:var(--brand-tint);color:var(--brand-text)']"><v-icon size="28">{{ loan.icon }}</v-icon></span>
+        <span class="loan-icon flex items-center justify-center rounded-lg" :style="['width:52px;min-width:52px;max-width:52px;height:52px;min-height:52px;flex:0 0 52px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box', (loanCategory === loan.id) ? 'background:var(--brand-tint);color:var(--brand-ink)' : 'background:var(--brand-tint);color:var(--brand-text)']"><v-icon size="28">{{ loan.icon }}</v-icon></span>
         <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">
           <b class="card-title block text-lg font-bold">{{ loan.title }}</b>
           <small class="card-note block text-sm text-gray-600">{{ loan.note }}</small>

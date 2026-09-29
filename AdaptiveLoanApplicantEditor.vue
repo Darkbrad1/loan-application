@@ -3,7 +3,7 @@
     <!-- ===== Someone who co-owns what secures the loan, but isn't borrowing ===== -->
     <template v-if="show('owner')">
       <el-form-item label="Is this a person or a business?">
-        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+        <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
           <button
             v-for="option in ownerKindOptions"
             :key="String(option.value)"
@@ -47,7 +47,7 @@
       </div>
       <el-form-item label="How are they related to you?" required :error="need(draft.relationship_to_applicant)">
         <template v-if="choices('relationship_to_applicant')">
-          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('relationship_to_applicant')"
               :key="String(option.value)"
@@ -139,7 +139,7 @@
       </el-form-item>
       <el-form-item label="Are you married?">
         <template v-if="choices('marital_status')">
-          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('marital_status')"
               :key="String(option.value)"
@@ -197,7 +197,7 @@
       </div>
       <el-form-item label="Do you own or rent your home?" required :error="need(draft.housing_status)">
         <template v-if="choices('housing_status')">
-          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('housing_status')"
               :key="String(option.value)"
@@ -292,7 +292,7 @@
     <!-- ===== Membership and citizenship ===== -->
     <template v-if="show('membership')">
       <el-form-item label="Are you a member of the credit union?">
-        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+        <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes, I am a member' }, { value: false, label: 'Not yet' }]"
             :key="String(option.value)"
@@ -386,7 +386,7 @@
         class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
         <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
-          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;flex:0 0 44px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-card-account-details-outline</v-icon></span>
+          <span class="item-icon flex flex-col items-center justify-center rounded-lg" style="width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;flex:0 0 44px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-card-account-details-outline</v-icon></span>
           <div class="item-text" style="flex:1 1 160px;min-width:0">
             <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ identificationTitle(row, index) }}</strong>
             <span class="item-sub block text-sm text-gray-600" v-if="row.is_primary && draft.identifications.length > 1">Your main ID</span>
@@ -412,7 +412,7 @@
         </div>
         <el-form-item label="Type of ID" required :error="need(row.identification_type)">
           <template v-if="choices('identification_type')">
-            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+            <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('identification_type')"
                 :key="String(option.value)"
@@ -547,7 +547,7 @@
       <template v-if="showEmploymentDetails">
         <el-form-item label="Type of job" required :error="need(draft.employment_type)">
           <template v-if="choices('employment_type')">
-            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+            <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('employment_type')"
                 :key="String(option.value)"
@@ -646,7 +646,7 @@
       </el-form-item>
       <el-form-item label="How often are you paid?" v-if="Number(draft.gross_pay) > 0" required :error="need(draft.pay_frequency)">
         <template v-if="choices('pay_frequency')">
-          <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
             <button
               v-for="option in choices('pay_frequency')"
               :key="String(option.value)"
@@ -702,7 +702,7 @@
 
       <!-- Other income: asked as Yes/No first -->
       <el-form-item label="Do you get money from anywhere else?">
-        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+        <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
             :key="String(option.value)"
@@ -737,7 +737,7 @@
           </div>
           <el-form-item label="Where does it come from?" required :error="need(income.income_type)">
             <template v-if="choices('income_type')">
-              <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+              <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
                 <button
                   v-for="option in choices('income_type')"
                   :key="String(option.value)"
@@ -802,7 +802,7 @@
         <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">The guarantee</p>
         <el-form-item label="Type of guarantee" required :error="need(draft.guarantee_type)">
           <template v-if="choices('guarantee_type')">
-            <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+            <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
               <button
                 v-for="option in choices('guarantee_type')"
                 :key="String(option.value)"
@@ -842,7 +842,7 @@
     <template v-if="show('declarations')">
       <div v-for="question in declarationQuestions" :key="question.key" class="question-block mb-6">
         <p class="question mb-3 text-base font-semibold" style="color:#111827">{{ question.text }}</p>
-        <div class="choice-list inline flex flex-wrap gap-3 w-full" role="radiogroup">
+        <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
           <button
             v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
             :key="String(option.value)"
