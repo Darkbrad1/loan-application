@@ -8,7 +8,7 @@
       :style="['border-width:2px;border-style:solid', isOpen(item) ? 'border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)' : (!isOpen(item) && showErrors && missing(item)) ? 'border-color:#b91c1c' : 'border-color:#e5e7eb']"
     >
       <div class="item-head flex flex-wrap items-center gap-3" :style="isOpen(item) ? 'margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb' : ''">
-        <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-receipt-text-outline</v-icon></span>
+        <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;flex:0 0 44px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-receipt-text-outline</v-icon></span>
         <div class="item-text" style="flex:1 1 160px;min-width:0">
           <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ title(item, index) }}</strong>
           <span v-if="!isOpen(item) && missing(item)" class="needs block text-sm font-semibold text-red-700">Some details are missing</span>
@@ -86,12 +86,12 @@
                 type="button"
                 role="radio"
                 class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
-                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (item.frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (item.frequency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                 :aria-checked="item.frequency === option.value"
                 @click="set(index, 'frequency', option.value)"
               >
-                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (item.frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
-                <span>{{ option.label }}</span>
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (item.frequency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
               </button>
             </div>
           </template>
@@ -114,12 +114,12 @@
               type="button"
               role="radio"
               class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
-              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
               :aria-checked="(item.is_household ? householdValue : item.application_party_id) === option.value"
               @click="setPayer(index, option.value)"
             >
-              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
-              <span>{{ option.label }}</span>
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', ((item.is_household ? householdValue : item.application_party_id) === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
             </button>
           </div>
         </el-form-item>

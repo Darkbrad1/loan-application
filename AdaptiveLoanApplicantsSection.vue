@@ -8,7 +8,7 @@
         class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
         <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
-          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-account-outline</v-icon></span>
+          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;flex:0 0 44px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)"><v-icon>mdi-account-outline</v-icon></span>
           <div class="item-text" style="flex:1 1 160px;min-width:0">
             <strong class="item-name block text-lg font-bold" style="line-height:1.3;overflow-wrap:anywhere">{{ personName(person) || `Person ${index + 1}` }}</strong>
             <span class="item-sub block text-sm text-gray-600" v-if="roleLabel(person.role)">{{ roleLabel(person.role) }}</span>
@@ -26,12 +26,12 @@
               type="button"
               role="radio"
               class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
-              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;color:#111827;line-height:1.35', (person.role === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (person.role === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
               :aria-checked="person.role === option.value"
               @click="setPerson(index, 'role', option.value)"
             >
-              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (person.role === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
-              <span>
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (person.role === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">
                 {{ option.label }}
                 <small v-if="roleHelp(option.value)" class="choice-note block text-sm text-gray-600 font-normal">{{ roleHelp(option.value) }}</small>
               </span>
@@ -76,7 +76,7 @@
         class="item-card open mb-4 p-5 bg-white rounded-lg" style="border:2px solid var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"
       >
         <div class="item-head head-open flex flex-wrap items-center gap-3" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">
-          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;height:44px;flex:0 0 auto;background:var(--brand-tint);color:var(--brand-text)">
+          <span class="item-icon flex items-center justify-center rounded-lg" style="width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;flex:0 0 44px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)">
             <v-icon>{{ row.reference_type === 'Next of kin' ? 'mdi-home-heart' : 'mdi-account-voice' }}</v-icon>
           </span>
           <div class="item-text" style="flex:1 1 160px;min-width:0">

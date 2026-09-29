@@ -28,7 +28,7 @@
         <!-- After sending: a clear receipt -->
         <section v-if="receipt" class="page px-3 pt-6 pb-12" style="max-width:680px;margin:0 auto">
             <div class="panel receipt bg-white p-5 md:p-8 shadow flex flex-col items-center text-center" style="border:1px solid #e5e7eb;border-radius:20px">
-                <div class="receipt-icon flex items-center justify-center rounded-full mb-5 bg-green-100 text-green-700" style="width:72px;height:72px"><v-icon size="40">mdi-check</v-icon></div>
+                <div class="receipt-icon flex items-center justify-center rounded-full mb-5 bg-green-100 text-green-700" style="width:72px;min-width:72px;max-width:72px;height:72px;min-height:72px;flex:0 0 72px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box"><v-icon size="40">mdi-check</v-icon></div>
                 <h1 class="screen-title text-2xl md:text-3xl font-bold mb-2" style="line-height:1.25;color:#111827">Application sent</h1>
                 <p class="screen-help text-base md:text-lg text-gray-600 mb-6">
                     Thank you. We'll look at your application and contact you soon.
@@ -68,7 +68,7 @@
             <el-form label-position="top" size="large" class="panel bg-white p-5 md:p-8 shadow" style="border:1px solid #e5e7eb;border-radius:20px" @submit.prevent>
                 <!-- Welcome: what to have ready, before starting -->
                 <div v-if="currentScreen.kind === 'welcome'" class="welcome">
-                    <div class="welcome-icon flex items-center justify-center rounded-full mb-5" style="width:72px;height:72px;background:var(--brand-tint);color:var(--brand-text)"><v-icon size="36">mdi-hand-wave-outline</v-icon></div>
+                    <div class="welcome-icon flex items-center justify-center rounded-full mb-5" style="width:72px;min-width:72px;max-width:72px;height:72px;min-height:72px;flex:0 0 72px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;background:var(--brand-tint);color:var(--brand-text)"><v-icon size="36">mdi-hand-wave-outline</v-icon></div>
                     <h1 class="screen-title text-2xl md:text-3xl font-bold mb-2" style="line-height:1.25;color:#111827">Apply for a loan</h1>
                     <p class="screen-help text-base md:text-lg text-gray-600 mb-6">
                         It takes about 15 minutes. Your answers are saved as you go, so you can stop and come back.
@@ -101,12 +101,12 @@
                         type="button"
                         role="radio"
                         class="gate-option flex items-center gap-4 w-full px-5 py-4 rounded-lg text-xl font-semibold text-left"
-                        :style="['min-height:68px;border-width:2px;border-style:solid;cursor:pointer;color:#111827', (answers[currentScreen.answer] === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                        :style="['min-height:68px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827', (answers[currentScreen.answer] === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
                         :aria-checked="answers[currentScreen.answer] === option.value"
                         @click="answer(currentScreen.answer, option.value)"
                     >
-                        <span class="radio-mark flex items-center justify-center rounded-full" :style="['width:26px;height:26px;flex:0 0 auto;border-width:2px;border-style:solid', (answers[currentScreen.answer] === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="18">{{ option.icon }}</v-icon></span>
-                        <span>{{ option.label }}</span>
+                        <span class="radio-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (answers[currentScreen.answer] === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="18">{{ option.icon }}</v-icon></span>
+                        <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
                     </button>
                     <p
                         v-if="answers[currentScreen.answer] === false && gateWarning(currentScreen.answer)"
