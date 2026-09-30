@@ -703,3 +703,22 @@ The developer asked whether `preferred_contact_method` belongs on ApplicationPar
 **Answer:** Everyone, including Third Party Owners. (The reply was "q1a q1a"; read as Q1 a, Q2 a.)
 
 Done in Saturn (2026-09-30): the developer moved `preferred_contact_method` from Application to ApplicationParty.
+
+
+## Round 8
+
+The developer asked whether `Application.loan_name` is needed when `loan_type_id` already points at the loan type. This reopens Round 4, Q6.
+
+Facts found before this round:
+
+- `loan_type_id` is the link to the LoanType record. `loan_name` is a copy of that record's `name`, taken when the applicant picks it. The applicant never types it.
+- The form uses the name for three things: the words on screen ("Please upload these for your Auto loan"), the review heading, and finding the document groups (`application-<loan name>`, `applicant-<loan name>`). It can read all three from the linked loan type instead.
+- `loan_category` is the same kind of copy: the linked loan type already has `loan_category`.
+- The Saturn guide in the repo doesn't say whether a staff list of applications can show a linked record's name as a column.
+
+❓ **Q1** - **Keep the copies of the loan type's name and category?**:
+
+- [ ] Remove `loan_name` and `loan_category` from Application; the form and staff read them from the linked loan type
+- [ ] Keep both as a record of what the applicant picked
+
+➡️ Remove both, if Saturn's staff list can show the loan type's name through the link. Nothing in the form needs the copies, and a copy can drift from the real record. Keep them only if staff lists can't show linked names, because staff would otherwise see just an ID.
