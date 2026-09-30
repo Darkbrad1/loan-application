@@ -321,6 +321,34 @@
             :form="draft"
             @update:model-value="set('business_name', $event)"
           />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The name it's registered under.</small>
+        </el-form-item>
+        <el-form-item label="What's your position in the business?" required :error="need(draft.business_signing_authority)">
+          <FormField
+            :model-value="draft.business_signing_authority"
+            :property="fields.business_signing_authority"
+            :form="draft"
+            @update:model-value="set('business_signing_authority', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example Owner, Director, Partner, or Manager.</small>
+        </el-form-item>
+        <el-form-item label="Trading name">
+          <FormField
+            :model-value="draft.business_trading_name"
+            :property="fields.business_trading_name"
+            :form="draft"
+            @update:model-value="set('business_trading_name', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Only if it trades under a different name. Leave it empty if it's the same.</small>
+        </el-form-item>
+        <el-form-item label="What does the business do?">
+          <FormField
+            :model-value="draft.business_industry"
+            :property="fields.business_industry"
+            :form="draft"
+            @update:model-value="set('business_industry', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example "Retail", "Construction", or "Farming".</small>
         </el-form-item>
         <el-form-item label="Type of business">
           <template v-if="choices('business_type')">
@@ -356,6 +384,22 @@
               :property="fields.business_registration_number"
               :form="draft"
               @update:model-value="set('business_registration_number', $event)"
+            />
+          </el-form-item>
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Business licence number">
+            <FormField
+              :model-value="draft.business_license_number"
+              :property="fields.business_license_number"
+              :form="draft"
+              @update:model-value="set('business_license_number', $event)"
+            />
+          </el-form-item>
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Website">
+            <FormField
+              :model-value="draft.business_website"
+              :property="fields.business_website"
+              :form="draft"
+              @update:model-value="set('business_website', $event)"
             />
           </el-form-item>
           <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Date it started">
@@ -701,7 +745,12 @@ const FIELDS = [
     ["source_of_funds_details", "Down payment details", "textarea", "Application", "source_of_funds_details"],
     ["seller_type", "Seller type", "select", "Application", "seller_type"],
     ["seller_name", "Seller name", "input", "Application", "seller_name"],
-    ["business_name", "Business name", "input", "Party", "business_name"],
+    ["business_name", "Business name", "input", "Party", "legal_name"],
+    ["business_signing_authority", "Your position in the business", "input", "ApplicationParty", "signing_authority"],
+    ["business_trading_name", "Trading name", "input", "Party", "trading_name"],
+    ["business_industry", "What the business does", "input", "Party", "industry"],
+    ["business_license_number", "Business licence number", "input", "Party", "business_license_number"],
+    ["business_website", "Website", "input", "Party", "website"],
     ["business_registration_number", "Registration number", "input", "Party", "registration_number"],
     ["business_type", "Business type", "select", "Party", "business_type"],
     ["business_incorporation_date", "Incorporation date", "date", "Party", "incorporation_date"],

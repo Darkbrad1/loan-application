@@ -530,6 +530,8 @@ const createEmptyApplicant = (role = "") => ({
     first_name: "",
     last_name: "",
     business_name: "",
+    // Business loans, Primary Applicant only: their position in the business.
+    signing_authority: "",
     // Third Party Owners only: how they're related to the primary applicant.
     relationship_to_applicant: "",
     email: "",
@@ -714,7 +716,15 @@ const createEmptyApplication = () => ({
     // ApplicationParty with the role "Business Borrower".
     business_party_id: null,
     business_application_party_id: null,
+    // Saved on the Party as legal_name.
     business_name: "",
+    // Saved on the Primary Applicant's ApplicationParty (signing_authority).
+    business_signing_authority: "",
+    // Optional. An empty trading name means the same as the legal name.
+    business_trading_name: "",
+    business_industry: "",
+    business_license_number: "",
+    business_website: "",
     business_registration_number: "",
     business_type: "",
     business_incorporation_date: "",
@@ -1104,6 +1114,11 @@ export default {
                 seller_type: form.seller_type,
                 seller_name: form.seller_name,
                 business_name: form.business_name,
+                business_signing_authority: form.business_signing_authority,
+                business_trading_name: form.business_trading_name,
+                business_industry: form.business_industry,
+                business_license_number: form.business_license_number,
+                business_website: form.business_website,
                 business_registration_number: form.business_registration_number,
                 business_type: form.business_type,
                 business_incorporation_date: form.business_incorporation_date,
@@ -1300,6 +1315,11 @@ export default {
                             ["Property type", form.property_type],
                             ["Property value", form.property_value ? money(form.property_value) : ""],
                             ["Business", form.business_name],
+                            ["Your position", this.loanKind === "organization" ? form.business_signing_authority : ""],
+                            ["Trading name", form.business_trading_name],
+                            ["What the business does", form.business_industry],
+                            ["Licence number", form.business_license_number],
+                            ["Website", form.business_website],
                             ["Registration number", form.business_registration_number],
                             ["Business type", form.business_type],
                             ["Employees", form.business_employee_count],
@@ -2753,6 +2773,8 @@ export default {
                 if (this.loanKind === "organization") {
                     this.fillBlanks(form, {
                         business_name: "Test Business Ltd",
+                        business_signing_authority: "Director",
+                        business_industry: "Retail",
                         business_registration_number: "TEST-REG-001",
                         business_type: this.testOption("business_type", null),
                         business_incorporation_date: "2015-06-01",
@@ -4293,6 +4315,9 @@ export default {
             if (this.loanKind === "organization" && !form.business_name) {
                 return "Please enter the business name.";
             }
+            if (this.loanKind === "organization" && !form.business_signing_authority) {
+                return "Please tell us your position in the business.";
+            }
             if (this.loanKind === "credit_card" && !form.name_on_card) {
                 return "Please enter the name to print on the card.";
             }
@@ -5060,8 +5085,11 @@ export default {
             }
             form.business_party_id = await this.upsert("Party", form.business_party_id, {
                 kind: "ORGANIZATION",
-                business_name: form.business_name,
                 legal_name: form.business_name,
+                trading_name: form.business_trading_name,
+                industry: form.business_industry,
+                business_license_number: form.business_license_number,
+                website: form.business_website,
                 registration_number: form.business_registration_number,
                 business_type: form.business_type,
                 incorporation_date: form.business_incorporation_date || null,
@@ -5071,6 +5099,8 @@ export default {
                 party: this.toId(form.business_party_id),
                 role: BUSINESS_BORROWER_ROLE,
                 relationship_status: "Active",
+                // The business owes the money, so it holds the whole loan.
+                ownership_percentage: 100,
                 is_primary_contact: false,
                 // The business's figures when it applied (the Party keeps
                 // the latest employee count too).
@@ -5107,7 +5137,7 @@ export default {
                     kind: isBusiness ? "ORGANIZATION" : "PERSON",
                     first_name: isBusiness ? "" : person.first_name,
                     last_name: isBusiness ? "" : person.last_name,
-                    business_name: isBusiness ? person.business_name : "",
+                    legal_name: isBusiness ? person.business_name : "",
                     email: person.email,
                     phone: person.phone,
                 };
@@ -5170,9 +5200,11 @@ export default {
          * A person's share of the loan (ApplicationParty.ownership_percentage).
          * The borrowers (the primary applicant and any co-borrowers) share it
          * evenly, and the shares always add up to 100. Guarantors and Third
-         * Party Owners aren't borrowing, so they get 0.
+         * Party Owners aren't borrowing, so they get 0. On a business loan the
+         * Business Borrower holds the whole loan, so every person gets 0.
          */
         loanShareOf(person, isPrimary) {
+            if (this.loanKind === "organization") return 0;
             if (!isPrimary && (this.isGuarantor(person) || this.isThirdPartyOwner(person))) {
                 return 0;
             }
@@ -5233,6 +5265,11 @@ export default {
                 // This person's share of the loan (see loanShareOf).
                 ownership_percentage: this.loanShareOf(person, isPrimary),
                 is_primary_contact: isPrimary,
+                // Business loans: the Primary Applicant's position in the business.
+                signing_authority:
+                    isPrimary && this.loanKind === "organization"
+                        ? this.formData.business_signing_authority
+                        : "",
                 relationship_to_applicant: "",
                 housing_status: person.housing_status,
                 number_of_dependants: person.number_of_dependants,
@@ -6126,7 +6163,7 @@ export default {
                 const people = [];
                 let businessLink = null;
                 for (const link of links) {
-                    const partyId = this.toId(link.party || link.party_id);
+                    const partyId = this.toId(link.party);
                     if (!partyId) continue;
                     if (
                         String(link.role || "").trim().toLowerCase() ===
@@ -6198,7 +6235,8 @@ export default {
                                     : "PERSON",
                             first_name: party.first_name || "",
                             last_name: party.last_name || "",
-                            business_name: party.business_name || "",
+                            business_name: party.legal_name || "",
+                            signing_authority: link.signing_authority || "",
                             relationship_to_applicant:
                                 link.relationship_to_applicant || "",
                             email: party.email || "",
@@ -6289,6 +6327,7 @@ export default {
                     ) || people[0];
 
                 if (primaryApplicant) form.primary = primaryApplicant;
+                form.business_signing_authority = form.primary.signing_authority || "";
                 form.parties = people.filter(
                     (person) =>
                         person !== primaryApplicant &&
@@ -6355,11 +6394,7 @@ export default {
                 );
 
                 // --- Rebuild the business (business loans) ---
-                // Drafts saved before the Business Borrower role linked the
-                // business straight to the application (business_party).
-                const businessId = businessLink
-                    ? this.toId(businessLink.party || businessLink.party_id)
-                    : this.toId(record.business_party);
+                const businessId = businessLink ? this.toId(businessLink.party) : null;
                 form.business_party_id = businessId;
                 form.business_application_party_id = businessLink
                     ? this.toId(businessLink)
@@ -6368,7 +6403,11 @@ export default {
                     const business = (await this.byIds("Party", [businessId]))[0];
                     if (business) {
                         Object.assign(form, {
-                            business_name: business.business_name || business.legal_name || "",
+                            business_name: business.legal_name || "",
+                            business_trading_name: business.trading_name || "",
+                            business_industry: business.industry || "",
+                            business_license_number: business.business_license_number || "",
+                            business_website: business.website || "",
                             business_registration_number:
                                 business.registration_number || "",
                             business_type: business.business_type || "",

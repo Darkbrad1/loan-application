@@ -22,7 +22,7 @@
       <el-form-item v-if="draft.kind === 'ORGANIZATION'" label="Business name" required :error="need(draft.business_name)">
         <FormField
           :model-value="draft.business_name"
-          :property="field('Party', 'business_name', 'Business name', 'input')"
+          :property="field('Party', 'legal_name', 'Business name', 'input')"
           :form="draft"
           @update:model-value="set('business_name', $event)"
         />
