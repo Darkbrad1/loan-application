@@ -6705,9 +6705,12 @@ export default {
         },
 
         /**
-         * Final submission: validates all applicants and documents, saves,
-         * marks the application submitted, triggers the post-submit workflow,
-         * then re-reads the record to verify before showing a receipt.
+         * Final submission: validates all applicants and documents, saves the
+         * draft, then runs the submit workflow, which sets the status,
+         * submitted_at, and application_number together (and gives a number
+         * only when there's none, so a retry never gets a second one). The
+         * record is re-read to confirm before the receipt shows. If anything
+         * fails, the application stays a draft and Send can be pressed again.
          */
         async submit() {
             const allApplicantsValid = this.allApplicants.every(
@@ -6758,12 +6761,8 @@ export default {
                 await this.saveDraft(true);
 
                 const resource = new Resource(this, "Application");
-                await this.upsert("Application", this.formData.id, {
-                    status: "submitted",
-                    submitted_at: new Date().toISOString(),
-                });
 
-                // Submit workflow: also assigns the application number.
+                // Submit workflow: sets the status, date, and number.
                 await new Resource(this).request(
                     "post",
                     `/workflows/execute/MXHGYH/${this.formData.id}`,
@@ -6790,7 +6789,11 @@ export default {
                 localStorage.removeItem(this.draftKey("draft_app_id"));
                 localStorage.removeItem(this.draftKey("draft_step"));
             } catch (error) {
-                this.warn("Submission could not be verified.", "error");
+                console.error("[Loan form] Sending failed", error);
+                this.warn(
+                    "We couldn't send your application. Please try again.",
+                    "error",
+                );
             } finally {
                 this.saving = false;
             }
