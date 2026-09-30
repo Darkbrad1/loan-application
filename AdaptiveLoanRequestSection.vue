@@ -459,7 +459,7 @@
             :form="draft"
             @update:model-value="set('linked_account_number', $event)"
           />
-          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The account number, from your passbook or statement.</small>
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">It must be an account in your name. A joint account is fine. The number is on your passbook or statement.</small>
         </el-form-item>
         <el-form-item label="Would you like to secure it with your savings?">
           <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">

@@ -4302,6 +4302,9 @@ export default {
             if (this.isRevolving && form.is_secured_by_savings) {
                 const savings = Number(form.secured_savings_amount);
                 if (!savings) return "Please enter how much of your savings to hold against it.";
+                if (savings > Number(form.requested_credit_limit)) {
+                    return "The savings held can't be more than the limit you asked for.";
+                }
             }
             if (this.loanKind === "student") {
                 if (!form.institution_name) return "Please enter the name of the school.";
