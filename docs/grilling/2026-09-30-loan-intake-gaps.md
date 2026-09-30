@@ -701,3 +701,5 @@ The developer asked whether `preferred_contact_method` belongs on ApplicationPar
 ➡️ Everyone, including Third Party Owners. Staff may need to reach an owner about the collateral, and it's one tap.
 
 **Answer:** Everyone, including Third Party Owners. (The reply was "q1a q1a"; read as Q1 a, Q2 a.)
+
+Done in Saturn (2026-09-30): the developer moved `preferred_contact_method` from Application to ApplicationParty.
