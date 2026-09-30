@@ -465,6 +465,8 @@ Facts found before this round:
 
 ➡️ The `LoanType` field. Each lender sets it in Saturn with no code change, and it's one new number property (the form already loads every `LoanType` field).
 
+**Answer:** The `LoanType` field, empty means 1.
+
 ---
 
 ❓ **Q2** - **Revolving rate per lender**: Each lender already sets `revolving_rate` on its own liability types. Do we still need a per-lender default in the code?
@@ -473,6 +475,8 @@ Facts found before this round:
 - [ ] Yes: a per-lender constant
 
 ➡️ No. If Q1 and Q2 both go this way, the code is identical for every lender, and every lender difference lives in Saturn (records and SystemConfiguration). ADR 0001 would then be rewritten to say that, and the "table of lender settings" question goes away.
+
+**Answer:** No: 3% stays as one fallback for every lender.
 
 ---
 
@@ -483,6 +487,8 @@ Facts found before this round:
 
 ➡️ That's right.
 
+**Answer:** That's right.
+
 ---
 
 ❓ **Q4** - **Are real applicants using the form yet?**: Removing old fields safely depends on whether any real application uses them.
@@ -491,6 +497,8 @@ Facts found before this round:
 - [ ] Yes, it's live somewhere
 
 ➡️ No. Test mode is still switched on in the code.
+
+**Answer:** No, only test applications so far.
 
 ---
 
@@ -501,6 +509,8 @@ Facts found before this round:
 - [ ] `LoanCategory.property` (unused)
 
 ➡️ All three. Each has a partner field that already does the job. (Two more depend on Q4: `Application.business_party` and `LoanType.category`, the old versions of the Business Borrower link and `loan_category`. They're for Round 5.)
+
+**Answer:** All three.
 
 ---
 
@@ -515,6 +525,8 @@ Facts found before this round:
 
 ➡️ Keep all of them. Removing them loses either history or the figures staff read at a glance.
 
+**Answer:** Keep all of them.
+
 ---
 
 ❓ **Q7** - **Exactly what happens with a retired loan type**: Stated precisely: when a draft is restored and its loan type's status isn't Active (empty counts as Active), the form opens the first step with "The loan you picked, <name>, isn't offered any more. Please choose another." The loan type, amount, term, and limit are cleared, as when switching category. Everything else in the draft stays. The applicant can't go past the first step until they pick an active loan type.
@@ -523,3 +535,43 @@ Facts found before this round:
 - [ ] Not quite (say what's different)
 
 ➡️ That's right.
+
+**Answer:** That's right.
+
+
+## Round 5
+
+ADR 0001 is rewritten and accepted: one install per lender, the same code for every lender, and every lender difference in Saturn records.
+
+Facts found before this round:
+
+- Restoring a draft still reads two old things: `Application.business_party` (before the Business Borrower link) and `party_id` on ApplicationParty and PartyIdentification (before `party`).
+- The form also understands old category codes such as `home`, `auto`, `vehicle`, `business`, and `card`. These are other names a lender might give a `LoanCategory` code, not old data.
+
+❓ **Q1** - **Removing the old fields**: With only test applications so far, should `Application.business_party` and `LoanType.category` (the old text category) be deleted in Saturn, and the form stop reading them and `party_id` when restoring?
+
+- [ ] Yes, remove all of it; old test drafts may lose their business or category
+- [ ] Keep reading them for now
+
+➡️ Yes, remove it. There's no real data to protect, and every old path left in is code that has to keep working. The old category codes (`auto`, `home`, and so on) stay, since they aren't old data.
+
+---
+
+❓ **Q2** - **Exactly who the number of IDs applies to**: Stated precisely: the chosen loan type's `minimum_identifications` (empty means 1) applies to the Primary Applicant, every co-borrower, and every Guarantor. Third Party Owners give no IDs. The NIS card doesn't count toward the number. If the applicant switches loan type after entering IDs, the new number is checked the next time they press Continue.
+
+- [ ] That's right
+- [ ] Not quite (say what's different)
+
+➡️ That's right.
+
+---
+
+❓ **Q3** - **The exact wording for the overdraft and savings rules**: Stated precisely:
+
+- Under "Which account is the overdraft for?": "It must be an account in your name. A joint account is fine."
+- If the savings amount is more than the limit: "The savings held can't be more than the limit you asked for."
+
+- [ ] Use this wording
+- [ ] Change it (say how)
+
+➡️ Use this wording. It's short, and it says what to do.
