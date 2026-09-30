@@ -70,7 +70,7 @@ export default {
       type: Array,
       default: () => [],
     },
-    /** Code of the selected LoanCategory, e.g. 'AUTOMOTIVE'. */
+    /** Currently selected category ID, e.g. 'auto'. */
     loanCategory: {
       type: String,
       default: '',

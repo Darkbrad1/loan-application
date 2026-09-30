@@ -121,7 +121,7 @@
                         v-else-if="currentScreen.kind === 'loan'"
                         :loans="loans"
                         :products="productsForLoan"
-                        :loan-category="selectedCategory ? selectedCategory.id : ''"
+                        :loan-category="formData.loan_category"
                         :loan-type-id="formData.loan_type_id"
                         @select-category="chooseLoan"
                         @select-product="selectProduct"
@@ -170,8 +170,7 @@
                         :screen="currentScreen.part"
                         :show-errors="showErrors"
                         :model-value="requestData"
-                        :loan-category="loanKind"
-                        :revolving="isRevolving"
+                        :loan-category="formData.loan_category"
                         :selected-product="selectedProduct"
                         :lookups="lookups"
                         :application-props="applicationProps"
@@ -411,67 +410,6 @@ const APPLICANT_PARTS = [
 /** Applicant roles with their own meaning in the form. */
 const GUARANTOR_ROLE = "Guarantor";
 
-/** ApplicationParty role of the business on a business (ORGANIZATION) loan. */
-const BUSINESS_BORROWER_ROLE = "Business Borrower";
-
-/**
- * LoanCategory codes (and older codes still on saved drafts) mapped to the
- * kind of loan the form uses to choose its screens. Codes are matched without
- * regard to case, spaces, or dashes.
- */
-const CATEGORY_KINDS = {
-    property: "property",
-    home: "property",
-    automotive: "automotive",
-    auto: "automotive",
-    vehicle: "automotive",
-    personal: "personal",
-    organization: "organization",
-    organisation: "organization",
-    business: "organization",
-    credit_card: "credit_card",
-    creditcard: "credit_card",
-    card: "credit_card",
-    overdraft: "overdraft",
-    student: "student",
-    student_loan: "student",
-    education: "student",
-};
-
-/** Loan kinds that give a limit to draw on, with no term (revolving credit). */
-const REVOLVING_KINDS = ["credit_card", "overdraft"];
-
-/** The form's kind for a LoanCategory code, e.g. "PROPERTY" -> "property". */
-function categoryKind(code) {
-    const key = String(code || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[\s-]+/g, "_");
-    return CATEGORY_KINDS[key] || key;
-}
-
-/**
- * Used only when no LoanCategory records can be loaded: the four original
- * categories, with Saturn's codes.
- */
-const FALLBACK_CATEGORIES = [
-    { code: "PERSONAL", name: "Personal loan", description: "For personal needs", icon: "mdi-account-cash" },
-    { code: "AUTOMOTIVE", name: "Auto loan", description: "To buy a vehicle", icon: "mdi-car" },
-    { code: "PROPERTY", name: "Home loan", description: "To buy or fix up a home", icon: "mdi-home" },
-    { code: "ORGANIZATION", name: "Business loan", description: "For your business", icon: "mdi-storefront" },
-];
-
-/** An icon for each kind, when the LoanCategory record has none. */
-const KIND_ICONS = {
-    personal: "mdi-account-cash",
-    automotive: "mdi-car",
-    property: "mdi-home",
-    organization: "mdi-storefront",
-    credit_card: "mdi-credit-card-outline",
-    overdraft: "mdi-bank-transfer",
-    student: "mdi-school-outline",
-};
-
 /**
  * Generates a unique client-side key for list rows that have no server ID yet.
  */
@@ -579,8 +517,7 @@ const createEmptyApplicant = (role = "") => ({
     pep_details: "",
     // Housing. The previous address is asked for under 2 years at this one.
     housing_status: "",
-    // The date they moved to their current address (Party.address_since).
-    address_since: "",
+    years_at_address: null,
     previous_address: "",
     previous_parish: "",
     previous_country: DEFAULT_COUNTRY,
@@ -714,33 +651,9 @@ const createEmptyApplication = () => ({
     source_of_funds_details: "",
     seller_type: "",
     seller_name: "",
-    // Credit cards and overdrafts: the limit asked for (instead of an
-    // amount and term), and how the card or overdraft is set up.
-    requested_credit_limit: null,
-    is_secured_by_savings: false,
-    secured_savings_amount: null,
-    linked_account_number: "",
-    name_on_card: "",
-    card_collection_method: "",
-    // Student loans: the school, the course, and the costs.
-    institution_name: "",
-    institution_country: "",
-    program_name: "",
-    program_level: "",
-    student_id_number: "",
-    enrollment_start_date: "",
-    expected_graduation_date: "",
-    tuition_amount: null,
-    tuition_currency: "",
-    other_study_costs: null,
-    disbursement_schedule: "",
-    pay_to_institution: false,
-    grace_period_months: null,
     // Business-loan-specific fields. Saved on the business's own Party
-    // (kind ORGANIZATION), joined to the application through an
-    // ApplicationParty with the role "Business Borrower".
+    // (kind ORGANIZATION), linked through Application.business_party.
     business_party_id: null,
-    business_application_party_id: null,
     business_name: "",
     business_registration_number: "",
     business_type: "",
@@ -869,14 +782,35 @@ export default {
                 reference_relationship: [],
                 source_of_funds: [],
                 seller_type: [],
-                card_collection_method: [],
-                program_level: [],
-                tuition_currency: [],
-                disbursement_schedule: [],
             },
 
-            // LoanCategory records (see the loans computed property)
-            loanCategoryRecords: [],
+            // Top-level loan categories shown on step 1
+            loans: [
+                {
+                    id: "personal",
+                    title: "Personal loan",
+                    note: "For personal needs",
+                    icon: "mdi-account-cash",
+                },
+                {
+                    id: "auto",
+                    title: "Auto loan",
+                    note: "To buy a vehicle",
+                    icon: "mdi-car",
+                },
+                {
+                    id: "home",
+                    title: "Home loan",
+                    note: "To buy or fix up a home",
+                    icon: "mdi-home",
+                },
+                {
+                    id: "business",
+                    title: "Business loan",
+                    note: "For your business",
+                    icon: "mdi-storefront",
+                },
+            ],
         };
     },
 
@@ -920,68 +854,13 @@ export default {
                 .filter(Boolean);
         },
 
-        /**
-         * The loan categories on step 1, from the LoanCategory records
-         * (active ones, in sort_order), or the four original ones when none
-         * can be loaded. Each is { id: its code, recordId, kind, title, note,
-         * icon, isRevolving }.
-         */
-        loans() {
-            const records = this.loanCategoryRecords.length
-                ? this.loanCategoryRecords
-                : FALLBACK_CATEGORIES;
-            return records.map((record) => {
-                const kind = categoryKind(record.code);
-                return {
-                    id: String(record.code || ""),
-                    recordId: this.toId(record) || null,
-                    kind,
-                    title: record.name || record.code,
-                    note: record.description || "",
-                    icon: record.icon || KIND_ICONS[kind] || "mdi-cash",
-                    isRevolving:
-                        this.toBool(record.is_revolving, false) ||
-                        REVOLVING_KINDS.includes(kind),
-                };
-            });
-        },
-
-        /** The chosen loan category (from loans), or null. */
-        selectedCategory() {
-            const kind = categoryKind(this.formData.loan_category);
-            if (!kind) return null;
-            return this.loans.find((loan) => loan.kind === kind) || null;
-        },
-
-        /**
-         * The kind of loan chosen: property, automotive, personal,
-         * organization, credit_card, overdraft, or student. The screens and
-         * rules follow this, not the category's name.
-         */
-        loanKind() {
-            return categoryKind(this.formData.loan_category);
-        },
-
-        /** Credit cards and overdrafts: a limit to draw on, with no term. */
-        isRevolving() {
-            return Boolean(
-                (this.selectedCategory && this.selectedCategory.isRevolving) ||
-                    REVOLVING_KINDS.includes(this.loanKind),
-            );
-        },
-
-        /**
-         * Products in the selected category, matched through
-         * LoanType.loan_category (a link to LoanCategory), or by the older
-         * text category on products not yet linked.
-         */
+        /** Products filtered down to the selected loan category. */
         productsForLoan() {
-            return this.productsIn(this.selectedCategory);
-        },
-
-        /** Products that need a guarantor (LoanType.requires_guarantor). */
-        requiresGuarantor() {
-            return this.toBool(this.selectedProduct?.requires_guarantor, false);
+            return this.products.filter(
+                (product) =>
+                    String(product.category || "").toLowerCase() ===
+                    this.formData.loan_category,
+            );
         },
 
         /** The full product record matching the selected loan type ID. */
@@ -996,8 +875,10 @@ export default {
 
         /** Human-readable name of the selected loan category, e.g. "personal loan". */
         loanCategoryLabel() {
-            const loan = this.selectedCategory;
-            return loan ? String(loan.title).toLowerCase() : "this loan";
+            const loan = this.loans.find(
+                (item) => item.id === this.formData.loan_category,
+            );
+            return loan ? loan.title.toLowerCase() : "this loan";
         },
 
         /**
@@ -1033,10 +914,10 @@ export default {
             return this.selectedProduct && maximum > 0 ? maximum : 600;
         },
 
-        /** Auto and property loans (or explicitly secured products) need collateral. */
+        /** Auto and home loans (or explicitly secured products) need collateral. */
         requiresCollateral() {
             return (
-                ["automotive", "property"].includes(this.loanKind) ||
+                ["auto", "home"].includes(this.formData.loan_category) ||
                 Boolean(this.selectedProduct?.secured === true)
             );
         },
@@ -1077,25 +958,6 @@ export default {
         requestData() {
             const form = this.formData;
             return {
-                requested_credit_limit: form.requested_credit_limit,
-                is_secured_by_savings: form.is_secured_by_savings,
-                secured_savings_amount: form.secured_savings_amount,
-                linked_account_number: form.linked_account_number,
-                name_on_card: form.name_on_card,
-                card_collection_method: form.card_collection_method,
-                institution_name: form.institution_name,
-                institution_country: form.institution_country,
-                program_name: form.program_name,
-                program_level: form.program_level,
-                student_id_number: form.student_id_number,
-                enrollment_start_date: form.enrollment_start_date,
-                expected_graduation_date: form.expected_graduation_date,
-                tuition_amount: form.tuition_amount,
-                tuition_currency: form.tuition_currency,
-                other_study_costs: form.other_study_costs,
-                disbursement_schedule: form.disbursement_schedule,
-                pay_to_institution: form.pay_to_institution,
-                grace_period_months: form.grace_period_months,
                 requested_loan_amount: form.requested_loan_amount,
                 requested_loan_term: form.requested_loan_term,
                 repayment_frequency: form.repayment_frequency,
@@ -1275,34 +1137,15 @@ export default {
                     {
                         heading: form.loan_name || "Loan",
                         rows: rows([
-                            ["Limit", this.isRevolving && form.requested_credit_limit ? money(form.requested_credit_limit) : ""],
-                            ["Amount", this.isRevolving ? "" : money(form.requested_loan_amount)],
+                            ["Amount", money(form.requested_loan_amount)],
                             [
                                 "Term",
-                                !this.isRevolving && form.requested_loan_term
+                                form.requested_loan_term
                                     ? `${form.requested_loan_term} months`
                                     : "",
                             ],
-                            ["Repayment frequency", this.isRevolving ? "" : form.repayment_frequency],
+                            ["Repayment frequency", form.repayment_frequency],
                             ["Purpose", form.loan_purpose],
-                            ["Name on the card", this.loanKind === "credit_card" ? form.name_on_card : ""],
-                            ["How to get the card", this.loanKind === "credit_card" ? label("card_collection_method", form.card_collection_method) : ""],
-                            ["Account", this.isRevolving ? form.linked_account_number : ""],
-                            [
-                                "Secured by savings",
-                                this.isRevolving && form.is_secured_by_savings
-                                    ? money(form.secured_savings_amount)
-                                    : "",
-                            ],
-                            ["School", this.loanKind === "student" ? [form.institution_name, label("country", form.institution_country)].filter(Boolean).join(", ") : ""],
-                            ["Course", this.loanKind === "student" ? [form.program_name, label("program_level", form.program_level)].filter(Boolean).join(", ") : ""],
-                            ["Student ID", this.loanKind === "student" ? form.student_id_number : ""],
-                            ["Course dates", this.loanKind === "student" ? [form.enrollment_start_date, form.expected_graduation_date].filter(Boolean).join(" to ") : ""],
-                            ["Tuition fees", this.loanKind === "student" && form.tuition_amount ? `${Number(form.tuition_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${form.tuition_currency || ""}`.trim() : ""],
-                            ["Other study costs", this.loanKind === "student" && form.other_study_costs ? money(form.other_study_costs) : ""],
-                            ["Payout schedule", this.loanKind === "student" ? label("disbursement_schedule", form.disbursement_schedule) : ""],
-                            ["Paid to the school", this.loanKind === "student" && form.pay_to_institution ? "Yes" : ""],
-                            ["Grace period", this.loanKind === "student" && form.grace_period_months ? `${form.grace_period_months} months` : ""],
                             ["Purchase price", form.purchase_price ? money(form.purchase_price) : ""],
                             ["Down payment", form.down_payment_amount ? money(form.down_payment_amount) : ""],
                             ["Source of down payment", form.source_of_funds],
@@ -1348,7 +1191,7 @@ export default {
                             ["Date of birth", person.date_of_birth],
                             ["Address", [person.address, person.parish, person.country].filter(Boolean).join(", ")],
                             ["Housing", label("housing_status", person.housing_status)],
-                            ["Living there since", person.address_since],
+                            ["Years at address", person.years_at_address],
                             ["Dependants", person.number_of_dependants],
                             ["Citizenship", label("country", person.citizenship)],
                             ["Residency", label("residency_status", person.residency_status)],
@@ -1950,20 +1793,8 @@ export default {
 
         /** Under 2 years at the current address, so the previous one is asked for. */
         needsPreviousAddress(person) {
-            const years = this.yearsSince(person.address_since);
-            return years !== null && years < 2;
-        },
-
-        /**
-         * "" unless the chosen product needs a guarantor
-         * (LoanType.requires_guarantor) and nobody on the loan is one.
-         */
-        guarantorIssue() {
-            if (!this.requiresGuarantor) return "";
-            if (this.formData.parties.some((person) => this.isGuarantor(person))) {
-                return "";
-            }
-            return `${this.formData.loan_name || "This loan"} needs a guarantor. Please add someone with the role "Guarantor".`;
+            const years = person.years_at_address;
+            return years !== null && years !== undefined && years !== "" && Number(years) < 2;
         },
 
         /** What's missing from one other-income row, or "". */
@@ -2084,8 +1915,8 @@ export default {
          */
         syncPurchaseAsset() {
             const form = this.formData;
-            const isAuto = this.loanKind === "automotive";
-            const isHome = this.loanKind === "property";
+            const isAuto = form.loan_category === "auto";
+            const isHome = form.loan_category === "home";
             const price = Number(form.purchase_price);
             let asset = this.purchaseAsset();
 
@@ -2315,7 +2146,7 @@ export default {
             if (!type) return false;
             return (
                 !type.applies_to.length ||
-                type.applies_to.some((code) => categoryKind(code) === this.loanKind)
+                type.applies_to.includes(this.formData.loan_category)
             );
         },
 
@@ -2324,20 +2155,7 @@ export default {
             Object.assign(this.formData, patch);
         },
 
-        /** The products in one loan category (an entry of loans), or []. */
-        productsIn(category) {
-            if (!category) return [];
-            return this.products.filter((product) => {
-                const linked = this.toId(product.loan_category);
-                if (linked && category.recordId) return linked === category.recordId;
-                return categoryKind(product.category) === category.kind;
-            });
-        },
-
-        /**
-         * Switching categories clears the product and dependent values. The
-         * category's code (e.g. "PROPERTY") is what's saved.
-         */
+        /** Switching categories clears the product and dependent values. */
         chooseLoan(category) {
             Object.assign(this.formData, {
                 loan_category: category,
@@ -2345,7 +2163,6 @@ export default {
                 loan_name: "",
                 requested_loan_amount: null,
                 requested_loan_term: null,
-                requested_credit_limit: null,
             });
             // Only one loan of this type: choose it for them.
             if (this.productsForLoan.length === 1) {
@@ -2536,15 +2353,14 @@ export default {
 
             if (id === "loan") {
                 if (!form.loan_category) {
-                    // An auto loan exercises collateral too, when it has products.
-                    const withProducts = this.loans.filter(
-                        (loan) => this.productsIn(loan).length > 0,
+                    // An auto loan exercises collateral too, when one exists.
+                    const categories = this.products.map((product) =>
+                        String(product.category || "").toLowerCase(),
                     );
-                    const pick =
-                        withProducts.find((loan) => loan.kind === "automotive") ||
-                        withProducts[0] ||
-                        this.loans[0];
-                    if (pick) this.chooseLoan(pick.id);
+                    const category = categories.includes("auto")
+                        ? "auto"
+                        : categories[0] || "personal";
+                    this.chooseLoan(category);
                 }
                 if (!this.toId(form.loan_type_id) && this.productsForLoan.length) {
                     this.selectProduct(this.toId(this.productsForLoan[0]));
@@ -2552,15 +2368,11 @@ export default {
             }
 
             if (id === "parties") {
-                // Just the one applicant, unless someone was already added,
-                // or the product needs a guarantor (one is added below).
-                if (this.requiresGuarantor && !form.parties.length) {
-                    form.parties.push(createEmptyApplicant(GUARANTOR_ROLE));
-                }
+                // Just the one applicant, unless someone was already added.
                 if (this.answers.others === null) {
                     this.answers.others = form.parties.length > 0;
                 }
-                const sample = {
+                this.fillBlanks(primary, {
                     first_name: "Test",
                     last_name: "Applicant",
                     email: "test.applicant@example.com",
@@ -2575,7 +2387,7 @@ export default {
                     citizenship: this.testOption("country", /grenada/i, DEFAULT_COUNTRY),
                     residency_status: this.testOption("residency_status", /citizen/i, "Citizen"),
                     housing_status: this.testOption("housing_status", /rent/i, "Rent"),
-                    address_since: "2019-03-01",
+                    years_at_address: 5,
                     number_of_dependants: 1,
                     employment_status: this.testOption("employment_status", /^employed/i),
                     employment_type: this.testOption("employment_type", /permanent/i, "Permanent"),
@@ -2584,42 +2396,11 @@ export default {
                     job_title: "Clerk",
                     gross_pay: 6000,
                     pay_frequency: this.testOption("pay_frequency", /^monthly/i, "Monthly"),
-                };
-                this.fillBlanks(primary, sample);
-                const people = [primary];
-                form.parties.forEach((person) => {
-                    if (!this.isGuarantor(person)) return;
-                    this.fillBlanks(
-                        person,
-                        Object.assign({}, sample, {
-                            first_name: "Test",
-                            last_name: "Guarantor",
-                            email: "test.guarantor@example.com",
-                            phone: "473-555-0103",
-                            nis_number: "TEST654321",
-                            member_number: "M-TEST-002",
-                            guarantee_type: this.testOption("guarantee_type", /full/i),
-                            guarantee_amount: 10000,
-                        }),
-                    );
-                    if (!person.identifications.length) {
-                        person.identifications.push(createEmptyIdentification(true));
-                    }
-                    this.fillBlanks(person.identifications[0], {
-                        identification_type: this.testOption("identification_type", /passport/i),
-                        identification_number: "TEST-0002",
-                        issuing_country: DEFAULT_COUNTRY,
-                        issue_date: "2022-01-10",
-                        expiry_date: "2032-01-10",
-                    });
-                    people.push(person);
                 });
-                people.forEach((person) => {
-                    person.is_member = true;
-                    person.consent_accuracy_confirmation = true;
-                    person.consent_credit_check = true;
-                    person.consent_data_processing = true;
-                });
+                primary.is_member = true;
+                primary.consent_accuracy_confirmation = true;
+                primary.consent_credit_check = true;
+                primary.consent_data_processing = true;
 
                 const relationship = (pattern, fallback) =>
                     this.testOption("reference_relationship", pattern, fallback);
@@ -2666,35 +2447,7 @@ export default {
                     repayment_frequency: this.testOption("repayment_frequency", /month/i),
                     loan_purpose: "Test application created in test mode.",
                 });
-                if (this.isRevolving) {
-                    this.fillBlanks(form, {
-                        requested_credit_limit: Math.min(
-                            this.amountMaximum,
-                            Math.max(this.amountMinimum, 5000),
-                        ),
-                        linked_account_number: "TEST-ACCT-0001",
-                    });
-                }
-                if (this.loanKind === "credit_card") {
-                    this.fillBlanks(form, {
-                        name_on_card: "TEST APPLICANT",
-                        card_collection_method: this.testOption("card_collection_method", /branch/i),
-                    });
-                }
-                if (this.loanKind === "student") {
-                    this.fillBlanks(form, {
-                        institution_name: "Test University",
-                        institution_country: DEFAULT_COUNTRY,
-                        program_name: "Test Studies",
-                        program_level: this.testOption("program_level", /bachelor|degree/i),
-                        enrollment_start_date: "2026-09-01",
-                        expected_graduation_date: "2030-06-30",
-                        tuition_amount: 20000,
-                        tuition_currency: this.testOption("tuition_currency", /xcd|ec/i),
-                        disbursement_schedule: this.testOption("disbursement_schedule", /semester|term/i),
-                    });
-                }
-                if (this.loanKind === "automotive") {
+                if (form.loan_category === "auto") {
                     this.fillBlanks(form, {
                         vehicle_make: "Toyota",
                         vehicle_model: "Corolla",
@@ -2706,7 +2459,7 @@ export default {
                         seller_name: "Test Motors Ltd",
                     });
                 }
-                if (this.loanKind === "property") {
+                if (form.loan_category === "home") {
                     this.fillBlanks(form, {
                         property_address: "5 Test Road, St. George's",
                         property_type: this.testOption("property_type", /house|single/i),
@@ -2717,16 +2470,16 @@ export default {
                         seller_name: "Test Seller",
                     });
                 }
-                if (this.loanKind === "automotive" || this.loanKind === "property") {
+                if (form.loan_category === "auto" || form.loan_category === "home") {
                     this.fillBlanks(form, {
                         source_of_funds: this.testOption("source_of_funds", /savings/i, "Savings"),
                         seller_type: this.testOption(
                             "seller_type",
-                            this.loanKind === "automotive" ? /dealer/i : /private/i,
+                            form.loan_category === "auto" ? /dealer/i : /private/i,
                         ),
                     });
                 }
-                if (this.loanKind === "organization") {
+                if (form.loan_category === "business") {
                     this.fillBlanks(form, {
                         business_name: "Test Business Ltd",
                         business_registration_number: "TEST-REG-001",
@@ -3364,13 +3117,8 @@ export default {
         async linkApplicantsToApplication() {
             const partyLinks = this.allApplicants
                 .map((person) => this.toId(person.application_party_id))
-                .concat(
-                    this.loanKind === "organization"
-                        ? [this.toId(this.formData.business_application_party_id)]
-                        : [],
-                )
                 .filter(Boolean);
-            const links = { parties: partyLinks };
+            const links = { parties: partyLinks, application_parties: partyLinks };
 
             if (this.formData.id) {
                 await this.upsert("Application", this.formData.id, links);
@@ -3774,7 +3522,6 @@ export default {
                 collateralProps,
                 incomeProps,
                 referenceProps,
-                categoryRows,
             ] = await Promise.all([
                 safeList("LoanType"),
                 safeList("LiabilityType"),
@@ -3789,15 +3536,9 @@ export default {
                 safeLoadProps("Collateral"),
                 safeLoadProps("IncomeSource"),
                 safeLoadProps("Reference"),
-                safeList("LoanCategory"),
             ]);
 
             this.products = this.toList(products);
-            // Active categories in sort_order; the four original ones are
-            // used when none load (see the loans computed property).
-            this.loanCategoryRecords = this.activeSortedTypes(categoryRows).filter(
-                (row) => String(row.code || "").trim() !== "",
-            );
             this.applicationProps = this.toList(applicationProps);
             this.resourceProps = {
                 Application: this.toList(applicationProps),
@@ -3894,10 +3635,6 @@ export default {
                 reference_relationship: this.options(referenceProps, "relationship"),
                 source_of_funds: this.options(applicationProps, "source_of_funds"),
                 seller_type: this.options(applicationProps, "seller_type"),
-                card_collection_method: this.options(applicationProps, "card_collection_method"),
-                program_level: this.options(applicationProps, "program_level"),
-                tuition_currency: this.options(applicationProps, "tuition_currency"),
-                disbursement_schedule: this.options(applicationProps, "disbursement_schedule"),
             });
         },
 
@@ -4104,11 +3841,8 @@ export default {
                 if (this.isGrenada(person.country) && !person.parish) {
                     return "Please choose the parish.";
                 }
-                if (!person.address_since) {
-                    return "When did you move to this address?";
-                }
-                if (String(person.address_since).slice(0, 10) > this.today()) {
-                    return "The date you moved there can't be in the future.";
+                if (blank(person.years_at_address)) {
+                    return "How many years have you lived at this address?";
                 }
                 if (this.needsPreviousAddress(person) && !person.previous_address) {
                     return "You've lived here under 2 years, so please enter the previous address.";
@@ -4200,23 +3934,9 @@ export default {
             );
         },
 
-        /**
-         * What's missing from the amount, term, and purpose, or "". Credit
-         * cards and overdrafts ask for a limit instead of an amount and term.
-         */
+        /** What's missing from the amount, term, and purpose, or "". */
         requestMainIssue() {
             const form = this.formData;
-            if (this.isRevolving) {
-                const limit = Number(form.requested_credit_limit);
-                if (!limit) return "Please enter the limit you'd like.";
-                if (limit < this.amountMinimum || limit > this.amountMaximum) {
-                    return `The limit must be between ${this.money(
-                        this.amountMinimum,
-                    )} and ${this.money(this.amountMaximum)}.`;
-                }
-                if (!form.loan_purpose) return "Please tell us what you'll use it for.";
-                return "";
-            }
             const amount = Number(form.requested_loan_amount);
             const term = Number(form.requested_loan_term);
             if (!amount) return "Please enter how much you'd like to borrow.";
@@ -4251,32 +3971,8 @@ export default {
             ) {
                 return "Please describe where the down payment is coming from.";
             }
-            if (this.loanKind === "organization" && !form.business_name) {
+            if (form.loan_category === "business" && !form.business_name) {
                 return "Please enter the business name.";
-            }
-            if (this.loanKind === "credit_card" && !form.name_on_card) {
-                return "Please enter the name to print on the card.";
-            }
-            if (this.loanKind === "overdraft" && !form.linked_account_number) {
-                return "Please enter the account the overdraft is for.";
-            }
-            if (this.isRevolving && form.is_secured_by_savings) {
-                const savings = Number(form.secured_savings_amount);
-                if (!savings) return "Please enter how much of your savings to hold against it.";
-            }
-            if (this.loanKind === "student") {
-                if (!form.institution_name) return "Please enter the name of the school.";
-                if (!form.program_name) return "Please enter the name of the course.";
-                if (!form.expected_graduation_date) {
-                    return "Please enter when you expect to finish.";
-                }
-                if (
-                    form.enrollment_start_date &&
-                    form.expected_graduation_date <= form.enrollment_start_date
-                ) {
-                    return "The finish date must be after the start date.";
-                }
-                if (!Number(form.tuition_amount)) return "Please enter the tuition fees.";
             }
             return "";
         },
@@ -4352,9 +4048,6 @@ export default {
                         : this.applicantIssue(person);
                     if (issue) return `${name}: ${issue}`;
                 }
-
-                const guarantorIssue = this.guarantorIssue();
-                if (guarantorIssue) return guarantorIssue;
 
                 for (const row of form.references || []) {
                     if (!row.name || !row.relationship || !row.phone) {
@@ -4600,9 +4293,7 @@ export default {
                         kind: "gate",
                         answer: "others",
                         title: "Is anyone else on this loan?",
-                        help: this.requiresGuarantor
-                            ? "This loan needs a guarantor, so please answer Yes and add them. You can also add someone borrowing with you, or someone who co-owns what secures it."
-                            : "For example, someone borrowing with you, someone guaranteeing the loan, or someone who co-owns what secures it.",
+                        help: "For example, someone borrowing with you, someone guaranteeing the loan, or someone who co-owns what secures it.",
                     },
                 ]);
                 if (this.answers.others) {
@@ -4631,25 +4322,16 @@ export default {
                         id: "request-main",
                         kind: "request",
                         part: "main",
-                        title: this.isRevolving
-                            ? this.loanKind === "overdraft"
-                                ? "Your overdraft"
-                                : "Your credit card"
-                            : "Your loan",
-                        help: this.isRevolving
-                            ? "The limit you'd like, and what you'll use it for."
-                            : "How much you need, how long to pay it back, and what it's for.",
+                        title: "Your loan",
+                        help: "How much you need, how long to pay it back, and what it's for.",
                     },
                 ];
                 const details = {
-                    automotive: ["The vehicle", "Tell us about the vehicle and who you're buying it from."],
-                    property: ["The property", "Tell us about the property and who you're buying it from."],
-                    organization: ["Your business", "Tell us about the business the loan is for."],
-                    credit_card: ["Your card", "A few details for your card."],
-                    overdraft: ["Your overdraft", "Which account it's for, and how it's secured."],
-                    student: ["Your studies", "Tell us about your school, your course, and the costs."],
+                    auto: ["The vehicle", "Tell us about the vehicle and who you're buying it from."],
+                    home: ["The property", "Tell us about the property and who you're buying it from."],
+                    business: ["Your business", "Tell us about the business the loan is for."],
                 };
-                const extra = details[this.loanKind];
+                const extra = details[form.loan_category];
                 if (extra) {
                     screens.push({
                         id: "request-details",
@@ -4840,16 +4522,10 @@ export default {
          */
         screenIssue(screen) {
             if (screen.kind === "gate") {
-                if (
-                    this.answers[screen.answer] === null ||
+                return this.answers[screen.answer] === null ||
                     this.answers[screen.answer] === undefined
-                ) {
-                    return "Please choose Yes or No.";
-                }
-                if (screen.answer === "others" && !this.answers.others) {
-                    return this.guarantorIssue();
-                }
-                return "";
+                    ? "Please choose Yes or No."
+                    : "";
             }
             if (screen.kind === "person") {
                 const person = this.allApplicants.find(
@@ -4873,8 +4549,6 @@ export default {
                         String(person.role).toLowerCase() === "primary applicant",
                 );
                 if (missingRole) return "Choose how each person is involved.";
-                const guarantorIssue = this.guarantorIssue();
-                if (guarantorIssue) return guarantorIssue;
             }
             if (screen.kind === "request") {
                 return screen.part === "main"
@@ -4912,9 +4586,7 @@ export default {
 
         /**
          * Builds the Application resource payload. Only fields relevant to the
-         * chosen kind of loan (vehicle, property, card, overdraft, studies) are
-         * included. The business on a business loan is saved separately as a
-         * "Business Borrower" ApplicationParty (see saveBusinessParty).
+         * chosen loan category (auto/home/business) are included.
          */
         appPayload() {
             const form = this.formData;
@@ -4926,53 +4598,14 @@ export default {
                 loan_category: form.loan_category,
                 loan_type_id: this.toId(form.loan_type_id),
                 loan_name: form.loan_name,
+                requested_loan_amount: form.requested_loan_amount,
+                requested_loan_term: form.requested_loan_term,
+                repayment_frequency: form.repayment_frequency,
                 loan_purpose: form.loan_purpose,
                 documents: form.document_ids.map(this.toId).filter(Boolean),
             };
 
-            // Credit cards and overdrafts have a limit, not an amount and term.
-            // (Application.interest_rate and interest_rate_type are staff
-            // overrides, so the form never sends them.)
-            if (this.isRevolving) {
-                Object.assign(payload, {
-                    requested_credit_limit: form.requested_credit_limit,
-                    is_secured_by_savings: !!form.is_secured_by_savings,
-                    secured_savings_amount: form.is_secured_by_savings
-                        ? form.secured_savings_amount
-                        : null,
-                    linked_account_number: form.linked_account_number,
-                });
-                if (this.loanKind === "credit_card") {
-                    Object.assign(payload, {
-                        name_on_card: form.name_on_card,
-                        card_collection_method: form.card_collection_method,
-                    });
-                }
-            } else {
-                Object.assign(payload, {
-                    requested_loan_amount: form.requested_loan_amount,
-                    requested_loan_term: form.requested_loan_term,
-                    repayment_frequency: form.repayment_frequency,
-                });
-            }
-            if (this.loanKind === "student") {
-                Object.assign(payload, {
-                    institution_name: form.institution_name,
-                    institution_country: form.institution_country,
-                    program_name: form.program_name,
-                    program_level: form.program_level,
-                    student_id_number: form.student_id_number,
-                    enrollment_start_date: form.enrollment_start_date,
-                    expected_graduation_date: form.expected_graduation_date,
-                    tuition_amount: form.tuition_amount,
-                    tuition_currency: form.tuition_currency,
-                    other_study_costs: form.other_study_costs,
-                    disbursement_schedule: form.disbursement_schedule,
-                    grace_period_months: form.grace_period_months,
-                    pay_to_institution: !!form.pay_to_institution,
-                });
-            }
-            if (this.loanKind === "automotive") {
+            if (form.loan_category === "auto") {
                 Object.assign(payload, {
                     vehicle_make: form.vehicle_make,
                     vehicle_model: form.vehicle_model,
@@ -4980,7 +4613,7 @@ export default {
                     vehicle_condition: form.vehicle_condition,
                 });
             }
-            if (this.loanKind === "property") {
+            if (form.loan_category === "home") {
                 Object.assign(payload, {
                     property_address: form.property_address,
                     property_type: form.property_type,
@@ -4989,7 +4622,7 @@ export default {
             }
             // Purchase details (auto and home). The down payment's source is
             // an anti-money-laundering question.
-            if (this.loanKind === "automotive" || this.loanKind === "property") {
+            if (form.loan_category === "auto" || form.loan_category === "home") {
                 const hasDownPayment = Number(form.down_payment_amount) > 0;
                 Object.assign(payload, {
                     purchase_price: form.purchase_price,
@@ -5002,21 +4635,23 @@ export default {
                     seller_name: form.seller_name,
                 });
             }
+            // The business itself is its own Party (see saveBusinessParty).
+            if (form.loan_category === "business") {
+                payload.business_party = this.toId(form.business_party_id);
+            }
+
             return payload;
         },
 
         /**
          * Saves the business on a business loan as its own Party (kind
-         * ORGANIZATION), joined to the application by an ApplicationParty
-         * with the role "Business Borrower" (a Party is never linked straight
-         * to the Application). Returns that ApplicationParty's ID, or null.
-         * Party records are shared, so the business is never deleted by the
-         * form.
+         * ORGANIZATION) and returns its ID. Party records are shared, so the
+         * business is never deleted by the form.
          */
         async saveBusinessParty() {
             const form = this.formData;
-            if (this.loanKind !== "organization" || !form.business_name) {
-                return null;
+            if (form.loan_category !== "business" || !form.business_name) {
+                return this.toId(form.business_party_id);
             }
             form.business_party_id = await this.upsert("Party", form.business_party_id, {
                 kind: "ORGANIZATION",
@@ -5027,18 +4662,7 @@ export default {
                 incorporation_date: form.business_incorporation_date || null,
                 number_of_employees: form.business_employee_count,
             });
-            form.business_application_party_id = await this.upsert(
-                "ApplicationParty",
-                form.business_application_party_id,
-                {
-                    party: this.toId(form.business_party_id),
-                    party_id: this.toId(form.business_party_id),
-                    role: BUSINESS_BORROWER_ROLE,
-                    relationship_status: "Active",
-                    is_primary_contact: false,
-                },
-            );
-            return form.business_application_party_id;
+            return form.business_party_id;
         },
 
         /** Identity data stored on the Party resource (shared across applications). */
@@ -5074,7 +4698,7 @@ export default {
                 citizenship: person.citizenship,
                 residency_status: person.residency_status,
                 tin: person.tin,
-                address_since: person.address_since || null,
+                years_at_address: person.years_at_address,
                 previous_address: this.needsPreviousAddress(person)
                     ? person.previous_address
                     : "",
@@ -5111,28 +4735,6 @@ export default {
          * Employment, consent, and per-applicant document data stored on the
          * ApplicationParty link record. (No longer dependent on Application ID).
          */
-        /**
-         * A person's share of the loan (ApplicationParty.ownership_percentage).
-         * The borrowers (the primary applicant and any co-borrowers) share it
-         * evenly, and the shares always add up to 100. Guarantors and Third
-         * Party Owners aren't borrowing, so they get 0.
-         */
-        loanShareOf(person, isPrimary) {
-            if (!isPrimary && (this.isGuarantor(person) || this.isThirdPartyOwner(person))) {
-                return 0;
-            }
-            const borrowers = [this.formData.primary].concat(
-                this.formData.parties.filter(
-                    (other) => !this.isGuarantor(other) && !this.isThirdPartyOwner(other),
-                ),
-            );
-            const count = borrowers.length || 1;
-            const even = Math.floor((100 / count) * 100) / 100;
-            // The primary applicant takes any rounding left over (e.g. 33.34).
-            if (isPrimary) return Math.round((100 - even * (count - 1)) * 100) / 100;
-            return even;
-        },
-
         applicationPartyPayload(person, isPrimary) {
             // Third Party Owners aren't borrowing: no employment, income,
             // deductions, or consents are asked for or kept.
@@ -5142,7 +4744,6 @@ export default {
                     party_id: this.toId(person.party_id),
                     role: THIRD_PARTY_OWNER_ROLE,
                     relationship_status: "Active",
-                    ownership_percentage: 0,
                     is_primary_contact: false,
                     relationship_to_applicant: person.relationship_to_applicant,
                     employment_status: "",
@@ -5177,8 +4778,6 @@ export default {
                 party_id: this.toId(person.party_id),
                 role: isPrimary ? "Primary Applicant" : person.role,
                 relationship_status: "Active",
-                // This person's share of the loan (see loanShareOf).
-                ownership_percentage: this.loanShareOf(person, isPrimary),
                 is_primary_contact: isPrimary,
                 relationship_to_applicant: "",
                 housing_status: person.housing_status,
@@ -5896,14 +5495,13 @@ export default {
                     partyLinks.push(await this.saveApplicant(person, false));
                 }
 
-                // The business on a business loan is its own Party, joined
-                // through a "Business Borrower" ApplicationParty.
-                const businessLink = await this.saveBusinessParty();
-                if (businessLink) partyLinks.push(businessLink);
+                // The business on a business loan is its own Party.
+                await this.saveBusinessParty();
 
                 // 2. Bundle the newly minted party IDs into the core payload
                 const payload = Object.assign(this.appPayload(), {
                     parties: partyLinks,
+                    application_parties: partyLinks,
                     documents: this.formData.document_ids,
                 });
 
@@ -6029,39 +5627,22 @@ export default {
 
                 form.id = this.toId(record);
                 form.loan_type_id = this.toId(record.loan_type_id);
-                form.is_secured_by_savings = this.toBool(record.is_secured_by_savings, false);
-                form.pay_to_institution = this.toBool(record.pay_to_institution, false);
-                ["enrollment_start_date", "expected_graduation_date"].forEach((key) => {
-                    form[key] = form[key] ? String(form[key]).slice(0, 10) : "";
-                });
-                // Older drafts may have an old category code (e.g. "auto");
-                // switch them to the matching LoanCategory's code.
-                if (this.selectedCategory) form.loan_category = this.selectedCategory.id;
                 form.document_ids = (record.documents || [])
                     .map(this.toId)
                     .filter(Boolean);
 
                 // --- Rebuild applicants ---
                 // Trust the array of IDs stored on the application record
-                const partyIds = record.parties || [];
+                const partyIds =
+                    record.parties || record.application_parties || [];
 
                 const links = await this.byIds("ApplicationParty", partyIds);
 
-                // Join each link record with its Party record. The business
-                // on a business loan is a "Business Borrower" link, not a
-                // person, so it's kept aside and restored further down.
+                // Join each link record with its Party record.
                 const people = [];
-                let businessLink = null;
                 for (const link of links) {
                     const partyId = this.toId(link.party || link.party_id);
                     if (!partyId) continue;
-                    if (
-                        String(link.role || "").trim().toLowerCase() ===
-                        BUSINESS_BORROWER_ROLE.toLowerCase()
-                    ) {
-                        businessLink = link;
-                        continue;
-                    }
 
                     const party = this.recordOf(
                         await new Resource(this, "Party").get(partyId),
@@ -6141,9 +5722,7 @@ export default {
                             citizenship: party.citizenship || "",
                             residency_status: party.residency_status || "",
                             tin: party.tin || "",
-                            address_since: party.address_since
-                                ? String(party.address_since).slice(0, 10)
-                                : "",
+                            years_at_address: party.years_at_address ?? null,
                             previous_address: party.previous_address || "",
                             previous_parish: party.previous_parish || "",
                             previous_country:
@@ -6282,15 +5861,8 @@ export default {
                 );
 
                 // --- Rebuild the business (business loans) ---
-                // Drafts saved before the Business Borrower role linked the
-                // business straight to the application (business_party).
-                const businessId = businessLink
-                    ? this.toId(businessLink.party || businessLink.party_id)
-                    : this.toId(record.business_party);
+                const businessId = this.toId(record.business_party);
                 form.business_party_id = businessId;
-                form.business_application_party_id = businessLink
-                    ? this.toId(businessLink)
-                    : null;
                 if (businessId) {
                     const business = (await this.byIds("Party", [businessId]))[0];
                     if (business) {
@@ -6556,15 +6128,6 @@ export default {
                 return this.warn(
                     "Complete every applicant and consent declaration.",
                 );
-            }
-            if (this.guarantorIssue()) {
-                this.setStep(this.path.findIndex((item) => item.id === "parties"));
-                return this.warn(this.guarantorIssue());
-            }
-            const requestIssue = this.requestMainIssue() || this.requestDetailsIssue();
-            if (requestIssue) {
-                this.setStep(this.path.findIndex((item) => item.id === "request"));
-                return this.warn(requestIssue);
             }
 
             const missing = this.firstIncompleteScope();

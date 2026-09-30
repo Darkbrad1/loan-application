@@ -223,12 +223,12 @@
         </template>
       </el-form-item>
       <div class="field-grid flex flex-wrap" style="column-gap:16px">
-        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="When did you move there?" required :error="need(draft.address_since)">
+        <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Years living there" required :error="need(draft.years_at_address)">
           <FormField
-            :model-value="draft.address_since"
-            :property="field('Party', 'address_since', 'When did you move there?', 'date')"
+            :model-value="draft.years_at_address"
+            :property="field('Party', 'years_at_address', 'Years living there', 'number')"
             :form="draft"
-            @update:model-value="set('address_since', $event, 'date')"
+            @update:model-value="set('years_at_address', $event)"
           />
         </el-form-item>
         <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="People who depend on you" required :error="need(draft.number_of_dependants)">
@@ -1081,8 +1081,8 @@ export default {
 
     /** Under 2 years at this address (matches needsPreviousAddress in the main form). */
     needsPreviousAddress() {
-      const years = this.yearsSince(this.draft.address_since);
-      return years !== null && years < 2;
+      const years = this.draft.years_at_address;
+      return years !== null && years !== undefined && years !== '' && Number(years) < 2;
     },
 
     anyDeclaration() {
