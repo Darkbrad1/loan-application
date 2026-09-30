@@ -297,7 +297,7 @@ Facts found before this round:
 - [ ] Keep it required for students
 - [ ] Optional when the work situation is Student
 
-➡️ Keep it required. Grenada issues NIS numbers to school leavers, and the lender uses the NIS card as a standard ID check.
+➡️ Optional when the work situation is Student. A student who has never worked can't get past the form otherwise, and the guarantor, who does give an NIS number, carries the repayment.
 
 ---
 
