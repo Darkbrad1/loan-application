@@ -20,7 +20,7 @@ _Avoid_: Product
 The person filling in the application. On a business loan it's the person applying on the business's behalf, with their position in the business recorded as their signing authority.
 
 **Business Borrower**:
-The business that owes the money on a business loan.
+The business that owes the money on a business loan. It holds the whole share of the loan, and the people on a business loan hold none.
 
 **Guarantor**:
 A person who promises to repay if the borrowers don't, up to a guarantee amount. A guarantor has no share of the loan.

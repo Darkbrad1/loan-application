@@ -346,6 +346,8 @@ Facts found before this round:
 
 ➡️ All three, grouped together at the top of the main form under a "Lender settings" heading, so setting up a new lender means changing only that block.
 
+**Answer:** `MINIMUM_IDENTIFICATIONS` and `DEFAULT_REVOLVING_RATE`. Not `TEST_MODE_AVAILABLE`.
+
 ---
 
 ❓ **Q2** - **Why a code constant and not a `LoanType` field**: ADR 0001 says it keeps the lender's setup with the developer and adds no Saturn fields. Is that the reason?
@@ -354,6 +356,8 @@ Facts found before this round:
 - [ ] Another reason (say which)
 
 ➡️ Only you know this one, so there's no recommendation. The ADR stays "proposed" until you answer.
+
+**Answer:** Another reason: adding and connecting a new property seemed like a hassle, but a `LoanType` field would be a good idea.
 
 ---
 
@@ -364,6 +368,8 @@ Facts found before this round:
 
 ➡️ One copy plus a table. A branch per lender means copying every fix into every branch.
 
+**Answer:** Not answered (see Round 4, Q2).
+
 ---
 
 ❓ **Q4** - **The `gccu_` draft keys**: Each lender has its own web address, so the keys never clash, but they carry one lender's name. Renaming them makes browsers forget drafts saved before the change.
@@ -373,6 +379,8 @@ Facts found before this round:
 
 ➡️ Rename to `loan_` now. Later, real applicants would lose their place.
 
+**Answer:** The prefix should be the company name from SystemConfiguration, followed by `_`.
+
 ---
 
 ❓ **Q5** - **The "Business name" box**: Since trading name is optional and empty means "same as the legal name", the main box has to be the legal name.
@@ -381,6 +389,8 @@ Facts found before this round:
 - [ ] Keep "Business name"
 
 ➡️ "Registered business name". It tells the applicant which name to type, and makes the empty trading name mean something.
+
+**Answer:** Is it necessary to have both `legal_name` and `business_name`? Keep one and remove the other, and do the same in other resources, since there are too many duplicate properties.
 
 ---
 
@@ -392,6 +402,8 @@ Facts found before this round:
 
 ➡️ Industry required, licence number optional. Some sole traders and new businesses don't have a licence number yet, and blocking them loses real applicants.
 
+**Answer:** Both optional.
+
 ---
 
 ❓ **Q7** - **The business's share of the loan**: On a business loan, the Business Borrower has no `ownership_percentage` set. The Primary Applicant gets the whole 100%, as if they were borrowing personally.
@@ -400,6 +412,8 @@ Facts found before this round:
 - [ ] Business Borrower and the Primary Applicant split it
 
 ➡️ Business Borrower 100%, people 0%. The business owes the money, and personal backing already has its own role.
+
+**Answer:** Business Borrower 100%; the people on the application 0%.
 
 ---
 
@@ -410,6 +424,8 @@ Facts found before this round:
 
 ➡️ That's right.
 
+**Answer:** That's right.
+
 ---
 
 ❓ **Q9** - **A loan type retired while someone's draft uses it**: An applicant saves a draft for "Auto loan, 5 years", staff then set its status to something other than Active, and the applicant comes back.
@@ -419,6 +435,8 @@ Facts found before this round:
 
 ➡️ They keep it and can send. They chose it while it was offered, and staff can still turn it down.
 
+**Answer:** They're told it's no longer offered and must pick another loan type.
+
 ---
 
 ❓ **Q10** - **A loan category with no active loan types**: Today it still shows as a box on the first step, and picking it leads nowhere.
@@ -427,3 +445,81 @@ Facts found before this round:
 - [ ] Show it, greyed out, with "Not available right now"
 
 ➡️ Hide it. An applicant can't do anything with it.
+
+**Answer:** Hide it.
+
+
+## Round 4
+
+Facts found before this round:
+
+- Revolving rates already live on each `LiabilityType` record (`revolving_rate`). `DEFAULT_REVOLVING_RATE` is only used when a type has no rate.
+- The company name comes from SystemConfiguration (`config.name`). When it's missing, the form shows "Loan Application".
+- Switching loan category clears the loan type, amount, term, and limit. Details that belong to another category (for example vehicle details) stay in the draft but are only saved for the category that's chosen.
+- `TEST_MODE_AVAILABLE` is still `true`, which suggests no real applicants use the form yet.
+
+❓ **Q1** - **Number of IDs on `LoanType` after all**: Round 2 chose a code constant, and you've now said a `LoanType` field would be a good idea. Which one?
+
+- [ ] A number field `LoanType.minimum_identifications`, where empty means 1
+- [ ] Keep the code constant
+
+➡️ The `LoanType` field. Each lender sets it in Saturn with no code change, and it's one new number property (the form already loads every `LoanType` field).
+
+---
+
+❓ **Q2** - **Revolving rate per lender**: Each lender already sets `revolving_rate` on its own liability types. Do we still need a per-lender default in the code?
+
+- [ ] No: keep 3% as one fallback for every lender, and each lender sets `revolving_rate` on its revolving types
+- [ ] Yes: a per-lender constant
+
+➡️ No. If Q1 and Q2 both go this way, the code is identical for every lender, and every lender difference lives in Saturn (records and SystemConfiguration). ADR 0001 would then be rewritten to say that, and the "table of lender settings" question goes away.
+
+---
+
+❓ **Q3** - **Exactly how the draft keys are named**: Stated precisely: take the company name from SystemConfiguration, make it lower case, turn anything that isn't a letter or a number into `_`, and add `_draft_app_id` and `_draft_step` (for example `grenada_credit_union_draft_app_id`). With no company name, use `loan_`. Renaming the company in SystemConfiguration makes browsers forget drafts saved before the change.
+
+- [ ] That's right
+- [ ] Not quite (say what's different)
+
+➡️ That's right.
+
+---
+
+❓ **Q4** - **Are real applicants using the form yet?**: Removing old fields safely depends on whether any real application uses them.
+
+- [ ] No, only test applications so far
+- [ ] Yes, it's live somewhere
+
+➡️ No. Test mode is still switched on in the code.
+
+---
+
+❓ **Q5** - **Duplicate fields to remove**: These pairs hold the same thing. Which of the extras should go?
+
+- [ ] `Party.business_name` (keep `legal_name`; a business Third Party Owner's name goes there too)
+- [ ] `Party.years_at_address` (keep `address_since`; the years are worked out)
+- [ ] `LoanCategory.property` (unused)
+
+➡️ All three. Each has a partner field that already does the job. (Two more depend on Q4: `Application.business_party` and `LoanType.category`, the old versions of the Business Borrower link and `loan_category`. They're for Round 5.)
+
+---
+
+❓ **Q6** - **Duplicates to keep on purpose**: These look like duplicates, but each records something the other can't.
+
+- `Application.loan_category` and `loan_name`: what the applicant chose, even if staff later rename the loan type.
+- `ApplicationParty.gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, and every `monthly_equivalent`: worked-out figures, so staff can read them without doing the maths.
+- `Party.number_of_employees` and `ApplicationParty.number_of_employees`: the business today, and the business when it applied.
+
+- [ ] Keep all of them
+- [ ] Remove some (say which)
+
+➡️ Keep all of them. Removing them loses either history or the figures staff read at a glance.
+
+---
+
+❓ **Q7** - **Exactly what happens with a retired loan type**: Stated precisely: when a draft is restored and its loan type's status isn't Active (empty counts as Active), the form opens the first step with "The loan you picked, <name>, isn't offered any more. Please choose another." The loan type, amount, term, and limit are cleared, as when switching category. Everything else in the draft stays. The applicant can't go past the first step until they pick an active loan type.
+
+- [ ] That's right
+- [ ] Not quite (say what's different)
+
+➡️ That's right.
