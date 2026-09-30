@@ -658,8 +658,8 @@ People and shares
 Other questions and fields
 
 - Ask each person's preferred contact method on their contact details screen, as answer cards from its Saturn list, saved to `ApplicationParty.preferred_contact_method`. Everyone is asked, including Third Party Owners. `Application.preferred_contact_method` is removed (see Round 7).
-- Remove from Saturn and the form: `Party.business_name` (use `legal_name`, including for business Third Party Owners), `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`. The form stops reading `party_id` when restoring.
-- Keep on purpose: `Application.loan_category` and `loan_name`, the worked-out figures (`gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, every `monthly_equivalent`), and `number_of_employees` on both Party and ApplicationParty.
+- Remove from Saturn and the form: `Party.business_name` (use `legal_name`, including for business Third Party Owners), `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`, `Application.loan_name`, `Application.loan_category` (Round 8; the form reads the name and category from the linked loan type). The form stops reading `party_id` when restoring.
+- Keep on purpose: the worked-out figures (`gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, every `monthly_equivalent`), and `number_of_employees` on both Party and ApplicationParty.
 - Documents staff ask for after sending (`DocumentRequest`) are not in the form for now (Phase 3).
 
 Sending and uploads
@@ -722,3 +722,5 @@ Facts found before this round:
 - [ ] Keep both as a record of what the applicant picked
 
 ➡️ Remove both, if Saturn's staff list can show the loan type's name through the link. Nothing in the form needs the copies, and a copy can drift from the real record. Keep them only if staff lists can't show linked names, because staff would otherwise see just an ID.
+
+**Answer:** Remove both.
