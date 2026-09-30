@@ -729,7 +729,7 @@ Facts found before this round:
 
 - Added `LoanType.minimum_identifications` (empty means 1). The seven original loan types are set to 1.
 - `employment_status` answers: Employed, Self-employed, Unemployed, Retired, Student.
-- `preferred_contact_method` answers: Phone call, WhatsApp, Email. The report says `Application.preferred_contact_method`, but Round 7 settled on ApplicationParty. To be confirmed.
+- `preferred_contact_method` answers: Phone call, WhatsApp, Email. They are on `ApplicationParty.preferred_contact_method` (confirmed by the developer).
 - Every offered loan type has status Active. Three test loan types were added: Nexa Classic Credit Card, Nexa Flex Overdraft, and Nexa Student Loan (2 IDs, guarantor required).
 - Every loan type is linked to a LoanCategory through `loan_category`. The seven category codes are normalised.
 - `revolving_rate` is 0.03 on all six revolving LiabilityType records.
@@ -737,4 +737,4 @@ Facts found before this round:
 - Submit workflow: `E6M2NS` gives a number only when `application_number` is blank. `MXHGYH` runs that first, then sets `status` to submitted and `submitted_at`.
 - Removed: `Party.business_name`, `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`, and the `AdaptiveLoanDocumentsSection` component. `AdaptiveLoanCollateralSection` is confirmed gone.
 
-Still to do in Saturn after the new form is published: remove `Application.loan_name` and `Application.loan_category` (Round 8).
+- Removed `Application.loan_name` and `Application.loan_category` (Round 8), before the new form was published. Until it is, a restored draft comes back with no loan category or loan name.
