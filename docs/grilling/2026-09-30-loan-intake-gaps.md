@@ -599,6 +599,8 @@ Facts found before this round:
 
 ➡️ Check in Saturn and change any old ones (`business` to `ORGANIZATION`, `auto` or `vehicle` to `AUTOMOTIVE`, `home` to `PROPERTY`) before the code change goes in.
 
+**Answer:** Only the new codes (or nothing).
+
 ---
 
 ❓ **Q2** - **The four built-in categories**: What should the first step show when no LoanCategory records load?
@@ -607,3 +609,69 @@ Facts found before this round:
 - [ ] Keep the four built-in categories
 
 ➡️ The message. The built-in four may not match what the lender offers, and an applicant could start an application for a loan that doesn't exist.
+
+**Answer:** The message, and no categories.
+
+
+## Settled
+
+Lenders and setup
+
+- The form serves several lenders. Each lender has its own Saturn install, and the code is the same for every lender ([ADR 0001](../adr/0001-one-install-per-lender.md)).
+- All lenders are in Grenada for now. Tax, NIS, EC$, and the parish rule stay the same for everyone.
+- Number of IDs: a new number field `LoanType.minimum_identifications`, where empty means 1. It applies to the Primary Applicant, every co-borrower, and every Guarantor. Third Party Owners give none. The NIS card doesn't count. After a loan type switch, the form checks the new number on the next Continue.
+- Revolving rate: each lender sets `revolving_rate` on its revolving liability types. 3% stays as one fallback for everyone.
+- `TEST_MODE_AVAILABLE` isn't a lender setting.
+- Draft keys in the browser: the company name from SystemConfiguration, lower case, anything not a letter or number turned into `_`, then `_draft_app_id` and `_draft_step`. With no company name, `loan_`. Renaming the company forgets older drafts.
+
+Loan categories and loan types
+
+- Only seven category codes: `PROPERTY`, `AUTOMOTIVE`, `PERSONAL`, `ORGANIZATION`, `CREDIT_CARD`, `OVERDRAFT`, `STUDENT`. The alternative codes (`auto`, `home`, `business`, `card`, and so on) are removed. `ExpenseType.applies_to` already uses only the new codes.
+- Only loan types whose `status` is "Active" show (empty counts as Active).
+- A loan category with no active loan types is hidden.
+- If no LoanCategory records load, the first step shows "We can't show our loans right now. Please try again later." with no categories. The four built-in categories are removed.
+- A restored draft whose loan type isn't Active opens on the first step with "The loan you picked, <name>, isn't offered any more. Please choose another." The loan type, amount, term, and limit are cleared, everything else stays, and the applicant can't go past the first step until they pick an active loan type.
+- Credit cards: a lender without cards switches its Credit card category off. The card questions (name on the card, how to get it) are the same for every lender.
+
+Student loans
+
+- The student loan type always needs a guarantor (`requires_guarantor` on).
+- Add "Student" to the `employment_status` list in Saturn. It works like Unemployed: no job or pay screens, no NIS deduction.
+- For a Student, the NIS number and the NIS card upload are optional. A number that is given is checked as for anyone else.
+- No check of the amount asked against tuition and other costs.
+
+Cards and overdrafts
+
+- `secured_savings_amount` can't be more than `requested_credit_limit`. Message: "The savings held can't be more than the limit you asked for."
+- The overdraft account must be the Primary Applicant's. Under the question: "It must be an account in your name. A joint account is fine."
+
+Business loans
+
+- The person applying stays "Primary Applicant". A typed question "What's your position in the business?" is saved to `ApplicationParty.signing_authority`.
+- Business Borrower gets 100% of `ownership_percentage`. The people on a business loan get 0%. A director who backs the loan personally is added as a Guarantor.
+- Ask trading name, industry (typed), licence number, and website. All four are optional. An empty trading name means the same as the legal name.
+
+People and shares
+
+- Guarantors get 0% of the loan.
+
+Other questions and fields
+
+- Ask `Application.preferred_contact_method` on the contact details screen, as answer cards from its Saturn list.
+- Remove from Saturn and the form: `Party.business_name` (use `legal_name`, including for business Third Party Owners), `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`. The form stops reading `party_id` when restoring.
+- Keep on purpose: `Application.loan_category` and `loan_name`, the worked-out figures (`gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, every `monthly_equivalent`), and `number_of_employees` on both Party and ApplicationParty.
+- Documents staff ask for after sending (`DocumentRequest`) are not in the form for now (Phase 3).
+
+Sending and uploads
+
+- The submit workflow sets `status`, `submitted_at`, and `application_number` together, and gives a number only when the application has none. If it fails, the form says "We couldn't send your application. Please try again.", the application stays a draft, and Send runs the workflow again.
+- Keep our upload card, and add `AdaptiveLoanDocumentRequirements.vue` to the repo.
+- Input boxes stay Saturn `FormField`.
+
+Rates
+
+- The top income tax rate stays 30% until IRD confirms. The World Bank says 28% since 2019.
+
+Out of scope for this session
+
+- The AML and declaration questions (need the compliance officer).
