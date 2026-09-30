@@ -738,3 +738,25 @@ Facts found before this round:
 - Removed: `Party.business_name`, `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`, and the `AdaptiveLoanDocumentsSection` component. `AdaptiveLoanCollateralSection` is confirmed gone.
 
 - Removed `Application.loan_name` and `Application.loan_category` (Round 8), before the new form was published. Until it is, a restored draft comes back with no loan category or loan name.
+
+
+## Round 9
+
+A last check of the Settled list found two questions whose "required or optional" was never set.
+
+❓ **Q1** - **Is "What's your position in the business?" required?**: It's asked of the Primary Applicant on business loans only, and saved to `signing_authority`. The four business details were made optional.
+
+- [ ] Required
+- [ ] Optional
+
+➡️ Required. It's one short answer, and staff need to know the person has the right to sign for the business before they can go further.
+
+---
+
+❓ **Q2** - **Is the preferred contact method required?**: It's asked of everyone on the application, including Third Party Owners.
+
+- [ ] Required for everyone
+- [ ] Optional for everyone
+- [ ] Required for the Primary Applicant, optional for everyone else
+
+➡️ Required for everyone. It's one tap, and it stops staff guessing how to reach each person.
