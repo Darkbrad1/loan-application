@@ -675,3 +675,25 @@ Rates
 Out of scope for this session
 
 - The AML and declaration questions (need the compliance officer).
+
+
+## Round 7
+
+The developer asked whether `preferred_contact_method` belongs on ApplicationParty rather than Application.
+
+❓ **Q1** - **Where the preferred contact method lives**: `Application.preferred_contact_method` holds one answer for the whole application. With a co-borrower or guarantor, each person may want to be reached differently.
+
+- [ ] `ApplicationParty.preferred_contact_method`: one answer per person on this application
+- [ ] `Party.preferred_contact_method`: one answer per person, kept across all their applications
+- [ ] Keep it on Application
+
+➡️ ApplicationParty. Each person answers for themselves, and it follows the project's rule that facts which can change later are kept on ApplicationParty, as they were when the person applied. `Application.preferred_contact_method` is then removed.
+
+---
+
+❓ **Q2** - **Who is asked**: Which people get the question on their contact details screen?
+
+- [ ] Everyone on the application, including Third Party Owners (their short form already asks for phone and email)
+- [ ] Everyone except Third Party Owners
+
+➡️ Everyone, including Third Party Owners. Staff may need to reach an owner about the collateral, and it's one tap.
