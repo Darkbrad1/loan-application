@@ -369,14 +369,14 @@
 
     <!-- ===== NIS number, photo ID, and their documents ===== -->
     <template v-if="show('ids')">
-      <el-form-item label="NIS number" required :error="need(draft.nis_number)">
+      <el-form-item label="NIS number" :required="!isStudent" :error="isStudent ? '' : need(draft.nis_number)">
         <FormField
           :model-value="draft.nis_number"
           :property="field('Party', 'nis_number', 'NIS number', 'input')"
           :form="draft"
           @update:model-value="set('nis_number', $event)"
         />
-        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">It's printed on your NIS card.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">{{ isStudent ? "It's printed on your NIS card. Leave it empty if you don't have one yet." : "It's printed on your NIS card." }}</small>
       </el-form-item>
 
       <p class="subheading mt-6 mb-3 text-lg font-bold" style="color:#111827">Photo ID</p>
@@ -1063,9 +1063,14 @@ export default {
       return String(this.draft.role || '').trim().toLowerCase() === 'guarantor';
     },
 
+    /** Students may leave the NIS number empty. */
+    isStudent() {
+      return String(this.draft.employment_status || '').trim().toLowerCase() === 'student';
+    },
+
     showEmploymentDetails() {
       const value = String(this.draft.employment_status || '').trim().toLowerCase();
-      return value !== 'unemployed' && value !== 'retired';
+      return value !== 'unemployed' && value !== 'retired' && value !== 'student';
     },
 
     isSelfEmployed() {

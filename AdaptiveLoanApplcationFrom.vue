@@ -415,6 +415,9 @@ const GUARANTOR_ROLE = "Guarantor";
 /** ApplicationParty role of the business on a business (ORGANIZATION) loan. */
 const BUSINESS_BORROWER_ROLE = "Business Borrower";
 
+/** Work situations with no job details and no NIS (lower case). */
+const NOT_WORKING_STATUSES = ["unemployed", "retired", "student"];
+
 /** Loan kinds that give a limit to draw on, with no term (revolving credit). */
 const REVOLVING_KINDS = ["credit_card", "overdraft"];
 
@@ -1502,7 +1505,7 @@ export default {
         documentScopeList() {
             const form = this.formData;
             const scopes = [];
-            const add = (key, kind, label, types, lockedMessage = "") => {
+            const add = (key, kind, label, types, lockedMessage = "", optionalIds = []) => {
                 if (!types.length) return;
                 scopes.push({
                     key,
@@ -1510,7 +1513,7 @@ export default {
                     label,
                     types,
                     lockedMessage,
-                    requirements: this.requirementsFor(key, types),
+                    requirements: this.requirementsFor(key, types, optionalIds),
                 });
             };
 
@@ -1539,12 +1542,19 @@ export default {
                 } else if (index > 0 && !primaryReady) {
                     locked = "Fill in your own details first.";
                 }
+                // The NIS card is optional for students.
+                const optionalIds = this.isStudent(person)
+                    ? applicantTypes
+                          .filter((type) => /\bnis\b/i.test(type.name || ""))
+                          .map(this.toId)
+                    : [];
                 add(
                     `applicant:${person.client_key}`,
                     "applicant",
                     this.applicantName(person, index),
                     applicantTypes,
                     locked,
+                    optionalIds,
                 );
 
                 // Scans for each of this applicant's identifications.
@@ -2155,12 +2165,24 @@ export default {
             }
         },
 
-        /** Unemployed and retired applicants don't need employer details. */
+        /**
+         * Unemployed, retired, and student applicants don't need employer
+         * details, and pay no NIS.
+         */
         showsEmploymentDetails(status) {
             const value = String(status || "")
                 .trim()
                 .toLowerCase();
-            return value !== "unemployed" && value !== "retired";
+            return !NOT_WORKING_STATUSES.includes(value);
+        },
+
+        /** True when the person's work situation is Student. */
+        isStudent(person) {
+            return (
+                String(person?.employment_status || "")
+                    .trim()
+                    .toLowerCase() === "student"
+            );
         },
 
         /** Sums percentage allocations (ownership/responsibility splits). */
@@ -3025,11 +3047,13 @@ export default {
             return "";
         },
 
-        /** True when every requirement in the scope has been uploaded. */
+        /** True when every required document in the scope has been uploaded. */
         scopeComplete(scope) {
             return (
                 !scope ||
-                scope.requirements.every((item) => item.status === "uploaded")
+                scope.requirements.every(
+                    (item) => item.optional || item.status === "uploaded",
+                )
             );
         },
 
@@ -3057,9 +3081,10 @@ export default {
          * Builds the requirement view models for one scope by merging each
          * attachment type's metadata with its current upload state.
          */
-        requirementsFor(scopeKey, types) {
+        requirementsFor(scopeKey, types, optionalIds = []) {
             return (types || []).map((type) => {
                 const typeId = this.toId(type);
+                const optional = optionalIds.includes(typeId);
                 const state = this.documentState[
                     this.requirementStateKey(scopeKey, typeId)
                 ] || {
@@ -3073,9 +3098,10 @@ export default {
                         key: typeId,
                         id: typeId,
                         attachmentTypeId: typeId,
-                        name: type.name || "Supporting document",
+                        name: `${type.name || "Supporting document"}${optional ? " (optional)" : ""}`,
                         description: type.description || "",
                         allowed_file_types: type.allowed_file_types || [],
+                        optional,
                     },
                     state,
                 );
@@ -3937,7 +3963,7 @@ export default {
          * Estimated monthly NIS contribution from gross monthly income.
          * Employees pay 6.25% and the self-employed 13.5%, both on income up
          * to the insurable cap. Nothing is due for the unemployed, the
-         * retired, or anyone under 16 or at pensionable age.
+         * retired, students, or anyone under 16 or at pensionable age.
          * Returns { amount, basis } where basis explains the figure.
          */
         estimateNis(person) {
@@ -3949,7 +3975,7 @@ export default {
             const age = this.ageOn(person.date_of_birth);
 
             if (gross <= 0) return { amount: 0, basis: "No income entered" };
-            if (status === "unemployed" || status === "retired") {
+            if (NOT_WORKING_STATUSES.includes(status)) {
                 return { amount: 0, basis: "Not deducted when not employed" };
             }
             if (
@@ -4138,7 +4164,10 @@ export default {
             }
 
             if (part === "ids") {
-                if (!person.nis_number) return "Please enter the NIS number.";
+                // Students may not have an NIS number yet.
+                if (!person.nis_number && !this.isStudent(person)) {
+                    return "Please enter the NIS number.";
+                }
                 const identificationIssue = this.identificationsIssue(person);
                 if (identificationIssue) return identificationIssue;
             }
@@ -4773,7 +4802,7 @@ export default {
                       home: ["Where you live", "Your home address and who lives with you."],
                       membership: ["Membership and citizenship", "Are you a member of the credit union, and where are you a citizen?"],
                       ids: ["Your NIS number and ID", "Your NIS number is on your NIS card. Then add a photo ID, like a passport or driver's licence."],
-                      job: ["Your work", "Tell us about your job, or choose unemployed or retired."],
+                      job: ["Your work", "Tell us about your job, or choose unemployed, retired, or student."],
                       pay: ["Your pay", "What you earn before tax, and any other money you receive."],
                       declarations: ["A few questions", "Please answer honestly. A \"yes\" won't stop your application."],
                       consent: ["Your agreement", "Please read and tick each box."],
