@@ -191,8 +191,12 @@ export default {
       return this.requirements.filter(this.isUploaded).length;
     },
 
+    /** Every required document is uploaded (optional ones don't count). */
     complete() {
-      return this.requirements.length > 0 && this.uploadedCount === this.requirements.length;
+      return (
+        this.requirements.length > 0 &&
+        this.requirements.every((requirement) => requirement.optional || this.isUploaded(requirement))
+      );
     },
   },
 
@@ -229,7 +233,7 @@ export default {
       if (this.isUploading(requirement)) return 'Uploading';
       if (this.hasError(requirement)) return 'Needs attention';
       if (this.hasStagedFile(requirement)) return 'Ready';
-      return 'Required';
+      return requirement?.optional ? 'Optional' : 'Required';
     },
 
     statusClass(requirement) {
@@ -321,12 +325,12 @@ export default {
           ''
         )}.`;
         this.transientErrors[this.slotKey(requirement)] = message;
-        this.$emit('file-rejected', { ...this.payloadFor(requirement), file, message });
+        this.$emit('file-rejected', Object.assign(this.payloadFor(requirement), { file, message }));
         return;
       }
 
       delete this.transientErrors[this.slotKey(requirement)];
-      this.$emit('stage-file', { ...this.payloadFor(requirement), file });
+      this.$emit('stage-file', Object.assign(this.payloadFor(requirement), { file }));
     },
 
     onBrowse(requirement, event) {
