@@ -647,7 +647,7 @@ Cards and overdrafts
 
 Business loans
 
-- The person applying stays "Primary Applicant". A typed question "What's your position in the business?" is saved to `ApplicationParty.signing_authority`.
+- The person applying stays "Primary Applicant". A typed, required question "What's your position in the business?" is saved to `ApplicationParty.signing_authority` (Round 9).
 - Business Borrower gets 100% of `ownership_percentage`. The people on a business loan get 0%. A director who backs the loan personally is added as a Guarantor.
 - Ask trading name, industry (typed), licence number, and website. All four are optional. An empty trading name means the same as the legal name.
 
@@ -657,7 +657,7 @@ People and shares
 
 Other questions and fields
 
-- Ask each person's preferred contact method on their contact details screen, as answer cards from its Saturn list, saved to `ApplicationParty.preferred_contact_method`. Everyone is asked, including Third Party Owners. `Application.preferred_contact_method` is removed (see Round 7).
+- Ask each person's preferred contact method on their contact details screen, as answer cards from its Saturn list, saved to `ApplicationParty.preferred_contact_method`. Everyone is asked, including Third Party Owners, and it's required for everyone (Round 9). `Application.preferred_contact_method` is removed (see Round 7).
 - Remove from Saturn and the form: `Party.business_name` (use `legal_name`, including for business Third Party Owners), `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`, `Application.loan_name`, `Application.loan_category` (Round 8; the form reads the name and category from the linked loan type). The form stops reading `party_id` when restoring.
 - Keep on purpose: the worked-out figures (`gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, every `monthly_equivalent`), and `number_of_employees` on both Party and ApplicationParty.
 - Documents staff ask for after sending (`DocumentRequest`) are not in the form for now (Phase 3).
@@ -751,6 +751,8 @@ A last check of the Settled list found two questions whose "required or optional
 
 ➡️ Required. It's one short answer, and staff need to know the person has the right to sign for the business before they can go further.
 
+**Answer:** Required.
+
 ---
 
 ❓ **Q2** - **Is the preferred contact method required?**: It's asked of everyone on the application, including Third Party Owners.
@@ -760,3 +762,5 @@ A last check of the Settled list found two questions whose "required or optional
 - [ ] Required for the Primary Applicant, optional for everyone else
 
 ➡️ Required for everyone. It's one tap, and it stops staff guessing how to reach each person.
+
+**Answer:** Required for everyone.
