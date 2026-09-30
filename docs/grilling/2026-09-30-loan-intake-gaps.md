@@ -555,6 +555,8 @@ Facts found before this round:
 
 ➡️ Yes, remove it. There's no real data to protect, and every old path left in is code that has to keep working. The old category codes (`auto`, `home`, and so on) stay, since they aren't old data.
 
+**Answer:** Yes, remove all of it. Also remove the alternative category codes, since they aren't used and aren't in the LoanCategory resource.
+
 ---
 
 ❓ **Q2** - **Exactly who the number of IDs applies to**: Stated precisely: the chosen loan type's `minimum_identifications` (empty means 1) applies to the Primary Applicant, every co-borrower, and every Guarantor. Third Party Owners give no IDs. The NIS card doesn't count toward the number. If the applicant switches loan type after entering IDs, the new number is checked the next time they press Continue.
@@ -563,6 +565,8 @@ Facts found before this round:
 - [ ] Not quite (say what's different)
 
 ➡️ That's right.
+
+**Answer:** That's right.
 
 ---
 
@@ -575,3 +579,31 @@ Facts found before this round:
 - [ ] Change it (say how)
 
 ➡️ Use this wording. It's short, and it says what to do.
+
+**Answer:** Use this wording.
+
+
+## Round 6
+
+Facts found before this round:
+
+- Removing the alternative codes leaves seven: `PROPERTY`, `AUTOMOTIVE`, `PERSONAL`, `ORGANIZATION`, `CREDIT_CARD`, `OVERDRAFT`, `STUDENT`. Anything else behaves like a personal loan.
+- The same code list also filters bills: `ExpenseType.applies_to` holds category codes, and a bill type only shows on a loan whose category matches one of them. The form can't see what the ExpenseType records hold. If any still say `business`, `auto`, or `home`, those bill types would disappear once the alternative codes are gone.
+- When no LoanCategory records load, the form shows four built-in categories (Personal, Auto, Home, Business). With every lender's categories set in Saturn, those four could offer loans a lender doesn't have.
+
+❓ **Q1** - **Old codes in `ExpenseType.applies_to`**: Before the alternative codes are removed, what do the ExpenseType records hold?
+
+- [ ] Only the new codes (or nothing)
+- [ ] Some old codes; I'll change them to the new ones in Saturn first
+- [ ] Not sure; I'll check in Saturn first
+
+➡️ Check in Saturn and change any old ones (`business` to `ORGANIZATION`, `auto` or `vehicle` to `AUTOMOTIVE`, `home` to `PROPERTY`) before the code change goes in.
+
+---
+
+❓ **Q2** - **The four built-in categories**: What should the first step show when no LoanCategory records load?
+
+- [ ] A message: "We can't show our loans right now. Please try again later." and no categories
+- [ ] Keep the four built-in categories
+
+➡️ The message. The built-in four may not match what the lender offers, and an applicant could start an application for a loan that doesn't exist.
