@@ -1,6 +1,12 @@
 <template>
   <section>
-    <!-- Loan types (personal, auto, home, business) as big cards -->
+    <!-- Nothing to offer: the categories couldn't be loaded, or none has a loan on offer -->
+    <p v-if="loaded && !loans.length" class="soft-box warn flex items-start gap-2 p-3 rounded-lg bg-orange-50 text-orange-800 font-semibold text-base">
+      <v-icon size="20">mdi-alert-outline</v-icon>
+      We can't show our loans right now. Please try again later.
+    </p>
+
+    <!-- Loan categories as big cards -->
     <div class="loan-grid gap-3" role="radiogroup" aria-label="Type of loan">
       <button
         v-for="loan in loans"
@@ -79,6 +85,11 @@ export default {
     loanTypeId: {
       type: String,
       default: '',
+    },
+    /** True once the parent has loaded the categories and loan types. */
+    loaded: {
+      type: Boolean,
+      default: false,
     },
   },
 

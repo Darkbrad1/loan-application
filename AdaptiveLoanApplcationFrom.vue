@@ -123,6 +123,7 @@
                         :products="productsForLoan"
                         :loan-category="selectedCategory ? selectedCategory.id : ''"
                         :loan-type-id="formData.loan_type_id"
+                        :loaded="optionsLoaded"
                         @select-category="chooseLoan"
                         @select-product="selectProduct"
                     />
@@ -414,52 +415,21 @@ const GUARANTOR_ROLE = "Guarantor";
 /** ApplicationParty role of the business on a business (ORGANIZATION) loan. */
 const BUSINESS_BORROWER_ROLE = "Business Borrower";
 
-/**
- * LoanCategory codes (and older codes still on saved drafts) mapped to the
- * kind of loan the form uses to choose its screens. Codes are matched without
- * regard to case, spaces, or dashes.
- */
-const CATEGORY_KINDS = {
-    property: "property",
-    home: "property",
-    automotive: "automotive",
-    auto: "automotive",
-    vehicle: "automotive",
-    personal: "personal",
-    organization: "organization",
-    organisation: "organization",
-    business: "organization",
-    credit_card: "credit_card",
-    creditcard: "credit_card",
-    card: "credit_card",
-    overdraft: "overdraft",
-    student: "student",
-    student_loan: "student",
-    education: "student",
-};
-
 /** Loan kinds that give a limit to draw on, with no term (revolving credit). */
 const REVOLVING_KINDS = ["credit_card", "overdraft"];
 
-/** The form's kind for a LoanCategory code, e.g. "PROPERTY" -> "property". */
+/**
+ * The form's kind for a LoanCategory code, e.g. "CREDIT_CARD" -> "credit_card".
+ * The kind picks the screens. The seven codes with their own screens are
+ * PROPERTY, AUTOMOTIVE, PERSONAL, ORGANIZATION, CREDIT_CARD, OVERDRAFT, and
+ * STUDENT; any other code gets the personal loan screens.
+ */
 function categoryKind(code) {
-    const key = String(code || "")
+    return String(code || "")
         .trim()
         .toLowerCase()
         .replace(/[\s-]+/g, "_");
-    return CATEGORY_KINDS[key] || key;
 }
-
-/**
- * Used only when no LoanCategory records can be loaded: the four original
- * categories, with Saturn's codes.
- */
-const FALLBACK_CATEGORIES = [
-    { code: "PERSONAL", name: "Personal loan", description: "For personal needs", icon: "mdi-account-cash" },
-    { code: "AUTOMOTIVE", name: "Auto loan", description: "To buy a vehicle", icon: "mdi-car" },
-    { code: "PROPERTY", name: "Home loan", description: "To buy or fix up a home", icon: "mdi-home" },
-    { code: "ORGANIZATION", name: "Business loan", description: "For your business", icon: "mdi-storefront" },
-];
 
 /** An icon for each kind, when the LoanCategory record has none. */
 const KIND_ICONS = {
@@ -479,11 +449,11 @@ const generateRowKey = (prefix = "row") =>
     `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
 /**
- * Minimum forms of identification every applicant must provide. This is
- * an institution-wide rule rather than a per-product one; change it here
- * if the credit union requires two.
+ * Forms of identification each borrower and guarantor must give when the
+ * loan type's minimum_identifications is empty. Each lender sets the number
+ * on its own loan types in Saturn. The NIS card doesn't count toward it.
  */
-const MINIMUM_IDENTIFICATIONS = 1;
+const DEFAULT_MINIMUM_IDENTIFICATIONS = 1;
 
 /**
  * Grenada statutory deduction settings, used to estimate each applicant's
@@ -806,11 +776,14 @@ export default {
             // Off by default, so reloading the page starts from the beginning.
             testKeepDraft: false,
 
-            // Institution-wide minimum, passed to the applicant editor.
-            minimumIdentifications: MINIMUM_IDENTIFICATIONS,
-
-            // Server data
+            // Server data. Every loan type, including ones no longer offered,
+            // so a restored draft can tell its loan type was retired.
             products: [],
+            // True once the loan categories and types have been loaded.
+            optionsLoaded: false,
+            // The name of a restored draft's loan type that isn't offered
+            // any more, until the applicant picks another one.
+            retiredLoanName: "",
 
             // Type resources (replace the old liability_type / expense_type
             // string lookups). Records are normalized in loadOptions().
@@ -923,16 +896,13 @@ export default {
         },
 
         /**
-         * The loan categories on step 1, from the LoanCategory records
-         * (active ones, in sort_order), or the four original ones when none
-         * can be loaded. Each is { id: its code, recordId, kind, title, note,
-         * icon, isRevolving }.
+         * The loan categories on step 1, from the active LoanCategory records
+         * in sort_order. A category with no loan type on offer is left out.
+         * Each is { id: its code, recordId, kind, title, note, icon,
+         * isRevolving }.
          */
         loans() {
-            const records = this.loanCategoryRecords.length
-                ? this.loanCategoryRecords
-                : FALLBACK_CATEGORIES;
-            return records.map((record) => {
+            const categories = this.loanCategoryRecords.map((record) => {
                 const kind = categoryKind(record.code);
                 return {
                     id: String(record.code || ""),
@@ -946,6 +916,18 @@ export default {
                         REVOLVING_KINDS.includes(kind),
                 };
             });
+            return categories.filter(
+                (category) => this.productsIn(category).length > 0,
+            );
+        },
+
+        /**
+         * How many forms of identification each borrower and guarantor must
+         * give, from the chosen loan type (empty means the default of 1).
+         */
+        minimumIdentifications() {
+            const value = Number(this.selectedProduct?.minimum_identifications);
+            return value > 0 ? Math.floor(value) : DEFAULT_MINIMUM_IDENTIFICATIONS;
         },
 
         /** The chosen loan category (from loans), or null. */
@@ -973,9 +955,8 @@ export default {
         },
 
         /**
-         * Products in the selected category, matched through
-         * LoanType.loan_category (a link to LoanCategory), or by the older
-         * text category on products not yet linked.
+         * Loan types on offer in the selected category, matched through
+         * LoanType.loan_category (a link to LoanCategory).
          */
         productsForLoan() {
             return this.productsIn(this.selectedCategory);
@@ -1800,6 +1781,12 @@ export default {
         if (Number.isFinite(this.pendingDraftStep)) {
             this.setStep(Math.min(this.pendingDraftStep, this.path.length - 1));
         }
+        if (this.retiredLoanName) {
+            this.alert = {
+                text: `The loan you picked, ${this.retiredLoanName}, isn't offered any more. Please choose another.`,
+                type: "warning",
+            };
+        }
     },
 
     methods: {
@@ -2329,14 +2316,20 @@ export default {
             Object.assign(this.formData, patch);
         },
 
-        /** The products in one loan category (an entry of loans), or []. */
+        /** The loan types on offer in one loan category (an entry of loans), or []. */
         productsIn(category) {
-            if (!category) return [];
-            return this.products.filter((product) => {
-                const linked = this.toId(product.loan_category);
-                if (linked && category.recordId) return linked === category.recordId;
-                return categoryKind(product.category) === category.kind;
-            });
+            if (!category || !category.recordId) return [];
+            return this.products.filter(
+                (product) =>
+                    this.isOffered(product) &&
+                    this.toId(product.loan_category) === category.recordId,
+            );
+        },
+
+        /** A loan type is on offer when its status is Active or empty. */
+        isOffered(product) {
+            const status = String(product?.status || "").trim().toLowerCase();
+            return status === "" || status === "active";
         },
 
         /**
@@ -2365,6 +2358,10 @@ export default {
          */
         selectProduct(id) {
             this.formData.loan_type_id = id;
+            if (this.retiredLoanName) {
+                this.retiredLoanName = "";
+                this.alert = { text: "", type: "warning" };
+            }
             this.chooseProduct();
             if (this.formData.id) this.hydrateAllDocumentUploads();
         },
@@ -3799,8 +3796,7 @@ export default {
             ]);
 
             this.products = this.toList(products);
-            // Active categories in sort_order; the four original ones are
-            // used when none load (see the loans computed property).
+            // Active categories in sort_order.
             this.loanCategoryRecords = this.activeSortedTypes(categoryRows).filter(
                 (row) => String(row.code || "").trim() !== "",
             );
@@ -3911,6 +3907,7 @@ export default {
                 tuition_currency: this.options(applicationProps, "tuition_currency"),
                 disbursement_schedule: this.options(applicationProps, "disbursement_schedule"),
             });
+            this.optionsLoaded = true;
         },
 
         // ---- Validation and navigation ----
@@ -4063,10 +4060,11 @@ export default {
         /** What's wrong with an applicant's identifications, or "". */
         identificationsIssue(person) {
             const rows = person.identifications || [];
-            if (rows.length < MINIMUM_IDENTIFICATIONS) {
-                return MINIMUM_IDENTIFICATIONS === 1
+            const minimum = this.minimumIdentifications;
+            if (rows.length < minimum) {
+                return minimum === 1
                     ? "Add a form of identification."
-                    : `Add at least ${MINIMUM_IDENTIFICATIONS} forms of identification.`;
+                    : `Add at least ${minimum} forms of identification.`;
             }
             for (const row of rows) {
                 const issue = this.identificationRowIssue(row);
@@ -4935,9 +4933,7 @@ export default {
             // workflow assigns it, and sending it would overwrite it.
             const payload = {
                 status: form.status || "draft",
-                loan_category: form.loan_category,
                 loan_type_id: this.toId(form.loan_type_id),
-                loan_name: form.loan_name,
                 loan_purpose: form.loan_purpose,
                 documents: form.document_ids.map(this.toId).filter(Boolean),
             };
@@ -6059,9 +6055,29 @@ export default {
                 ["enrollment_start_date", "expected_graduation_date"].forEach((key) => {
                     form[key] = form[key] ? String(form[key]).slice(0, 10) : "";
                 });
-                // Older drafts may have an old category code (e.g. "auto");
-                // switch them to the matching LoanCategory's code.
-                if (this.selectedCategory) form.loan_category = this.selectedCategory.id;
+                // The loan category and name come from the linked loan type.
+                const product = this.selectedProduct;
+                const categoryRecord = product
+                    ? this.loanCategoryRecords.find(
+                          (row) => this.toId(row) === this.toId(product.loan_category),
+                      )
+                    : null;
+                form.loan_category = categoryRecord ? String(categoryRecord.code || "") : "";
+                form.loan_name = product ? product.name || "" : "";
+
+                // A loan type that isn't offered any more: the applicant picks
+                // another one on the first step. Everything else stays.
+                if (form.loan_type_id && (!product || !this.isOffered(product))) {
+                    this.retiredLoanName = form.loan_name || "your loan";
+                    Object.assign(form, {
+                        loan_type_id: "",
+                        loan_name: "",
+                        requested_loan_amount: null,
+                        requested_loan_term: null,
+                        requested_credit_limit: null,
+                    });
+                    if (!this.selectedCategory) form.loan_category = "";
+                }
                 form.document_ids = (record.documents || [])
                     .map(this.toId)
                     .filter(Boolean);
@@ -6547,6 +6563,7 @@ export default {
                 );
                 if (Number.isFinite(savedStep))
                     this.pendingDraftStep = savedStep;
+                if (this.retiredLoanName) this.pendingDraftStep = 0;
 
                 // Work out the Yes/No answers from what was saved: "yes" if
                 // there's anything in the section, "no" if the applicant
