@@ -746,6 +746,8 @@ const createEmptyApplication = () => ({
     business_type: "",
     business_incorporation_date: "",
     business_employee_count: null,
+    // Saved on the Business Borrower's ApplicationParty (annual_revenue).
+    business_annual_revenue: null,
     // Nested collections
     primary: createEmptyApplicant("Primary Applicant"),
     parties: [],
@@ -1122,6 +1124,7 @@ export default {
                 business_type: form.business_type,
                 business_incorporation_date: form.business_incorporation_date,
                 business_employee_count: form.business_employee_count,
+                business_annual_revenue: form.business_annual_revenue,
             };
         },
 
@@ -1315,6 +1318,8 @@ export default {
                             ["Business", form.business_name],
                             ["Registration number", form.business_registration_number],
                             ["Business type", form.business_type],
+                            ["Employees", form.business_employee_count],
+                            ["Yearly sales", form.business_annual_revenue ? money(form.business_annual_revenue) : ""],
                         ]),
                     },
                 ],
@@ -2733,6 +2738,7 @@ export default {
                         business_type: this.testOption("business_type", null),
                         business_incorporation_date: "2015-06-01",
                         business_employee_count: 5,
+                        business_annual_revenue: 250000,
                     });
                 }
             }
@@ -3836,7 +3842,13 @@ export default {
             }
 
             Object.assign(this.lookups, {
-                role: this.options(applicationPartyProps, "role"),
+                // "Business Borrower" is only for the business on a business
+                // loan, which the form links itself, so it's never offered.
+                role: this.options(applicationPartyProps, "role").filter(
+                    (option) =>
+                        String(option.value).trim().toLowerCase() !==
+                        BUSINESS_BORROWER_ROLE.toLowerCase(),
+                ),
                 employment_status: this.options(
                     applicationPartyProps,
                     "employment_status",
@@ -5027,17 +5039,33 @@ export default {
                 incorporation_date: form.business_incorporation_date || null,
                 number_of_employees: form.business_employee_count,
             });
+            const payload = {
+                party: this.toId(form.business_party_id),
+                role: BUSINESS_BORROWER_ROLE,
+                relationship_status: "Active",
+                is_primary_contact: false,
+                // The business's figures when it applied (the Party keeps
+                // the latest employee count too).
+                number_of_employees: form.business_employee_count,
+                annual_revenue: form.business_annual_revenue,
+            };
+            const isNew = !this.toId(form.business_application_party_id);
             form.business_application_party_id = await this.upsert(
                 "ApplicationParty",
                 form.business_application_party_id,
-                {
-                    party: this.toId(form.business_party_id),
-                    party_id: this.toId(form.business_party_id),
-                    role: BUSINESS_BORROWER_ROLE,
-                    relationship_status: "Active",
-                    is_primary_contact: false,
-                },
+                payload,
             );
+            // Saturn fills ApplicationParty.partysnapshot when a link is
+            // updated, not when it's created. People's links are always
+            // saved a second time (their income list); the business's link
+            // has nothing else to save, so it's saved again here.
+            if (isNew) {
+                await this.upsert(
+                    "ApplicationParty",
+                    form.business_application_party_id,
+                    payload,
+                );
+            }
             return form.business_application_party_id;
         },
 
@@ -5096,7 +5124,6 @@ export default {
         identificationPayload(row, partyId) {
             return {
                 party: this.toId(partyId),
-                party_id: this.toId(partyId),
                 identification_type: row.identification_type,
                 identification_number: row.identification_number,
                 issuing_country: row.issuing_country,
@@ -5139,7 +5166,6 @@ export default {
             if (!isPrimary && this.isThirdPartyOwner(person)) {
                 return {
                     party: this.toId(person.party_id),
-                    party_id: this.toId(person.party_id),
                     role: THIRD_PARTY_OWNER_ROLE,
                     relationship_status: "Active",
                     ownership_percentage: 0,
@@ -5174,7 +5200,6 @@ export default {
 
             return {
                 party: this.toId(person.party_id),
-                party_id: this.toId(person.party_id),
                 role: isPrimary ? "Primary Applicant" : person.role,
                 relationship_status: "Active",
                 // This person's share of the loan (see loanShareOf).
@@ -6305,6 +6330,18 @@ export default {
                             business_employee_count: business.number_of_employees ?? null,
                         });
                     }
+                }
+                // The figures given when applying are on the Business
+                // Borrower link; use them over the Party's latest count.
+                if (businessLink) {
+                    if (
+                        businessLink.number_of_employees !== null &&
+                        businessLink.number_of_employees !== undefined &&
+                        businessLink.number_of_employees !== ""
+                    ) {
+                        form.business_employee_count = businessLink.number_of_employees;
+                    }
+                    form.business_annual_revenue = businessLink.annual_revenue ?? null;
                 }
 
                 for (const asset of form.assets) {

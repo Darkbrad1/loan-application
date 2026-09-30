@@ -374,6 +374,15 @@
               @update:model-value="set('business_employee_count', $event)"
             />
           </el-form-item>
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Yearly sales (EC$)">
+            <FormField
+              :model-value="draft.business_annual_revenue"
+              :property="fields.business_annual_revenue"
+              :form="draft"
+              @update:model-value="set('business_annual_revenue', $event)"
+            />
+            <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The business's total sales or income for its last full year.</small>
+          </el-form-item>
         </div>
       </template>
 
@@ -696,7 +705,8 @@ const FIELDS = [
     ["business_registration_number", "Registration number", "input", "Party", "registration_number"],
     ["business_type", "Business type", "select", "Party", "business_type"],
     ["business_incorporation_date", "Incorporation date", "date", "Party", "incorporation_date"],
-    ["business_employee_count", "Number of employees", "number", "Party", "number_of_employees"],
+    ["business_employee_count", "Number of employees", "number", "ApplicationParty", "number_of_employees"],
+    ["business_annual_revenue", "Yearly sales (EC$)", "number", "ApplicationParty", "annual_revenue"],
     ["requested_credit_limit", "Limit (EC$)", "number", "Application", "requested_credit_limit"],
     ["is_secured_by_savings", "Secured by savings", "checkbox", "Application", "is_secured_by_savings"],
     ["secured_savings_amount", "Savings held against it (EC$)", "number", "Application", "secured_savings_amount"],
