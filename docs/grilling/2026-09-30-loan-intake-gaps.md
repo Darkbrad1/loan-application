@@ -545,7 +545,7 @@ ADR 0001 is rewritten and accepted: one install per lender, the same code for ev
 
 Facts found before this round:
 
-- Restoring a draft still reads two old things: `Application.business_party` (before the Business Borrower link) and `party_id` on ApplicationParty and PartyIdentification (before `party`).
+- Restoring a draft still reads two old things: `Application.business_party` (before the Business Borrower link) and `party_id` on ApplicationParty (before `party`), as a fallback in two lines of the restore code (`AdaptiveLoanApplcationFrom.vue` lines 6081 and 6313). PartyIdentification restore doesn't read it. The many other `party_id` names in the code are the form's own in-memory fields, which hold the Party ID, and aren't read from Saturn.
 - The form also understands old category codes such as `home`, `auto`, `vehicle`, `business`, and `card`. These are other names a lender might give a `LoanCategory` code, not old data.
 
 ❓ **Q1** - **Removing the old fields**: With only test applications so far, should `Application.business_party` and `LoanType.category` (the old text category) be deleted in Saturn, and the form stop reading them and `party_id` when restoring?
