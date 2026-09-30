@@ -657,7 +657,7 @@ People and shares
 
 Other questions and fields
 
-- Ask `Application.preferred_contact_method` on the contact details screen, as answer cards from its Saturn list.
+- Ask each person's preferred contact method on their contact details screen, as answer cards from its Saturn list, saved to `ApplicationParty.preferred_contact_method`. Everyone is asked, including Third Party Owners. `Application.preferred_contact_method` is removed (see Round 7).
 - Remove from Saturn and the form: `Party.business_name` (use `legal_name`, including for business Third Party Owners), `Party.years_at_address`, `LoanCategory.property`, `Application.business_party`, `LoanType.category`. The form stops reading `party_id` when restoring.
 - Keep on purpose: `Application.loan_category` and `loan_name`, the worked-out figures (`gross_monthly_income`, `years_employed`, `nis_deduction`, `income_tax_deduction`, every `monthly_equivalent`), and `number_of_employees` on both Party and ApplicationParty.
 - Documents staff ask for after sending (`DocumentRequest`) are not in the form for now (Phase 3).
@@ -689,6 +689,8 @@ The developer asked whether `preferred_contact_method` belongs on ApplicationPar
 
 ➡️ ApplicationParty. Each person answers for themselves, and it follows the project's rule that facts which can change later are kept on ApplicationParty, as they were when the person applied. `Application.preferred_contact_method` is then removed.
 
+**Answer:** `ApplicationParty.preferred_contact_method`.
+
 ---
 
 ❓ **Q2** - **Who is asked**: Which people get the question on their contact details screen?
@@ -697,3 +699,5 @@ The developer asked whether `preferred_contact_method` belongs on ApplicationPar
 - [ ] Everyone except Third Party Owners
 
 ➡️ Everyone, including Third Party Owners. Staff may need to reach an owner about the collateral, and it's one tap.
+
+**Answer:** Everyone, including Third Party Owners. (The reply was "q1a q1a"; read as Q1 a, Q2 a.)
