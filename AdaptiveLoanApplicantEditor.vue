@@ -90,6 +90,33 @@
           />
         </el-form-item>
       </div>
+      <el-form-item label="How should we contact them?" required :error="need(draft.preferred_contact_method)">
+        <template v-if="choices('preferred_contact_method')">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
+            <button
+              v-for="option in choices('preferred_contact_method')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.preferred_contact_method === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :aria-checked="draft.preferred_contact_method === option.value"
+              @click="set('preferred_contact_method', option.value)"
+            >
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.preferred_contact_method === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
+          <FormField
+            :model-value="draft.preferred_contact_method"
+            :property="field('ApplicationParty', 'preferred_contact_method', 'How should we contact them?', 'select')"
+            :form="draft"
+            @update:model-value="set('preferred_contact_method', $event)"
+          />
+        </template>
+      </el-form-item>
     </template>
 
     <!-- ===== About: name and contact ===== -->
@@ -128,6 +155,33 @@
           :form="draft"
           @update:model-value="set('email', $event)"
         />
+      </el-form-item>
+      <el-form-item label="How should we contact you?" required :error="need(draft.preferred_contact_method)">
+        <template v-if="choices('preferred_contact_method')">
+          <div class="choice-list inline flex flex-col gap-3 w-full" role="radiogroup">
+            <button
+              v-for="option in choices('preferred_contact_method')"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.preferred_contact_method === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :aria-checked="draft.preferred_contact_method === option.value"
+              @click="set('preferred_contact_method', option.value)"
+            >
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.preferred_contact_method === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+            </button>
+          </div>
+        </template>
+        <template v-else>
+          <FormField
+            :model-value="draft.preferred_contact_method"
+            :property="field('ApplicationParty', 'preferred_contact_method', 'How should we contact you?', 'select')"
+            :form="draft"
+            @update:model-value="set('preferred_contact_method', $event)"
+          />
+        </template>
       </el-form-item>
       <el-form-item label="Date of birth" required :error="need(draft.date_of_birth)">
         <FormField

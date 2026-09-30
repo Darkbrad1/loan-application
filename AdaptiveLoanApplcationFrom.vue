@@ -532,6 +532,8 @@ const createEmptyApplicant = (role = "") => ({
     business_name: "",
     // Business loans, Primary Applicant only: their position in the business.
     signing_authority: "",
+    // Everyone: how they'd like to be contacted (ApplicationParty).
+    preferred_contact_method: "",
     // Third Party Owners only: how they're related to the primary applicant.
     relationship_to_applicant: "",
     email: "",
@@ -752,6 +754,9 @@ export default {
         return {
             // Branding pulled from the system configuration
             companyName: "",
+            // Start of the localStorage keys that remember the draft, from
+            // the company name (see draftKey).
+            draftKeyPrefix: "loan_",
             companyLogo: "",
             primaryColor: "",
             secondaryColor: "",
@@ -830,6 +835,7 @@ export default {
             // Dropdown option lists keyed by field name
             lookups: {
                 role: [],
+                preferred_contact_method: [],
                 identification_type: [],
                 marital_status: [],
                 parish: [],
@@ -1344,6 +1350,7 @@ export default {
                                 ["Relationship", label("relationship_to_applicant", person.relationship_to_applicant)],
                                 ["Phone", person.phone],
                                 ["Email", person.email],
+                                ["Contact by", label("preferred_contact_method", person.preferred_contact_method)],
                             ]),
                         };
                     }
@@ -1354,6 +1361,7 @@ export default {
                             ["Member", person.is_member ? `Yes (${person.member_number})` : "Not yet a member"],
                             ["Email", person.email],
                             ["Phone", person.phone],
+                            ["Contact by", label("preferred_contact_method", person.preferred_contact_method)],
                             ["Date of birth", person.date_of_birth],
                             ["Address", [person.address, person.parish, person.country].filter(Boolean).join(", ")],
                             ["Housing", label("housing_status", person.housing_status)],
@@ -2535,14 +2543,33 @@ export default {
          */
         rememberDraftLocation() {
             if (this.testMode && !this.testKeepDraft) return;
-            localStorage.setItem("gccu_draft_app_id", this.formData.id);
-            localStorage.setItem("gccu_draft_step", String(this.step));
+            localStorage.setItem(this.draftKey("draft_app_id"), this.formData.id);
+            localStorage.setItem(this.draftKey("draft_step"), String(this.step));
         },
 
         /** Removes the saved draft location, so a reload starts fresh. */
         forgetDraftLocation() {
-            localStorage.removeItem("gccu_draft_app_id");
-            localStorage.removeItem("gccu_draft_step");
+            localStorage.removeItem(this.draftKey("draft_app_id"));
+            localStorage.removeItem(this.draftKey("draft_step"));
+        },
+
+        /**
+         * The key prefix for a company name: lower case, with anything that
+         * isn't a letter or a number turned into "_", then "_" (for example
+         * "grenada_credit_union_"). With no name, "loan_". Renaming the
+         * company makes browsers forget drafts saved under the old name.
+         */
+        draftKeyPrefixFor(name) {
+            const key = String(name || "")
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "_");
+            return key ? `${key}_` : "loan_";
+        },
+
+        /** A localStorage key for the draft, e.g. "grenada_credit_union_draft_step". */
+        draftKey(suffix) {
+            return `${this.draftKeyPrefix}${suffix}`;
         },
 
         /**
@@ -2609,6 +2636,7 @@ export default {
                     last_name: "Applicant",
                     email: "test.applicant@example.com",
                     phone: "473-555-0100",
+                    preferred_contact_method: this.testOption("preferred_contact_method", /phone/i),
                     date_of_birth: "1990-05-15",
                     marital_status: this.testOption("marital_status", /single/i),
                     address: "12 Test Street, Grand Anse",
@@ -3724,6 +3752,7 @@ export default {
             }
 
             this.companyName = config.name || "Loan Application";
+            this.draftKeyPrefix = this.draftKeyPrefixFor(config.name);
             this.primaryColor =
                 config.primary_color || config.primaryColor || "";
             this.secondaryColor =
@@ -3947,6 +3976,7 @@ export default {
                 income_type: this.options(incomeProps, "income_type"),
                 income_frequency: this.options(incomeProps, "frequency"),
                 reference_type: this.options(referenceProps, "reference_type"),
+                preferred_contact_method: this.options(applicationPartyProps, "preferred_contact_method"),
                 reference_relationship: this.options(referenceProps, "relationship"),
                 source_of_funds: this.options(applicationProps, "source_of_funds"),
                 seller_type: this.options(applicationProps, "seller_type"),
@@ -4153,6 +4183,9 @@ export default {
                 }
                 if (!person.phone) return "Please enter a phone number.";
                 if (!person.email) return "Please enter an email address.";
+                if (!person.preferred_contact_method) {
+                    return "Please choose how we should contact you.";
+                }
                 if (!person.date_of_birth) return "Please enter the date of birth.";
             }
 
@@ -4366,6 +4399,9 @@ export default {
                 return "Please choose how they're related to you.";
             }
             if (!person.phone) return "Please enter their phone number.";
+            if (!person.preferred_contact_method) {
+                return "Please choose how we should contact them.";
+            }
             return "";
         },
 
@@ -5231,6 +5267,7 @@ export default {
                     ownership_percentage: 0,
                     is_primary_contact: false,
                     relationship_to_applicant: person.relationship_to_applicant,
+                    preferred_contact_method: person.preferred_contact_method,
                     employment_status: "",
                     employer_name: "",
                     job_title: "",
@@ -5265,6 +5302,7 @@ export default {
                 // This person's share of the loan (see loanShareOf).
                 ownership_percentage: this.loanShareOf(person, isPrimary),
                 is_primary_contact: isPrimary,
+                preferred_contact_method: person.preferred_contact_method,
                 // Business loans: the Primary Applicant's position in the business.
                 signing_authority:
                     isPrimary && this.loanKind === "organization"
@@ -6081,7 +6119,7 @@ export default {
          * document requirements load in mounted().
          */
         async restoreDraft() {
-            const applicationId = localStorage.getItem("gccu_draft_app_id");
+            const applicationId = localStorage.getItem(this.draftKey("draft_app_id"));
             if (!applicationId) return;
 
             try {
@@ -6237,6 +6275,7 @@ export default {
                             last_name: party.last_name || "",
                             business_name: party.legal_name || "",
                             signing_authority: link.signing_authority || "",
+                            preferred_contact_method: link.preferred_contact_method || "",
                             relationship_to_applicant:
                                 link.relationship_to_applicant || "",
                             email: party.email || "",
@@ -6630,7 +6669,7 @@ export default {
 
                 // Defer the saved step until requirements load in mounted().
                 const savedStep = Number(
-                    localStorage.getItem("gccu_draft_step"),
+                    localStorage.getItem(this.draftKey("draft_step")),
                 );
                 if (Number.isFinite(savedStep))
                     this.pendingDraftStep = savedStep;
@@ -6748,8 +6787,8 @@ export default {
                 this.receipt = { number: saved.application_number || "" };
 
                 // A submitted application is no longer a draft.
-                localStorage.removeItem("gccu_draft_app_id");
-                localStorage.removeItem("gccu_draft_step");
+                localStorage.removeItem(this.draftKey("draft_app_id"));
+                localStorage.removeItem(this.draftKey("draft_step"));
             } catch (error) {
                 this.warn("Submission could not be verified.", "error");
             } finally {
@@ -6774,8 +6813,8 @@ export default {
 
         /** Clears the draft and returns the wizard to a blank first step. */
         reset() {
-            localStorage.removeItem("gccu_draft_app_id");
-            localStorage.removeItem("gccu_draft_step");
+            localStorage.removeItem(this.draftKey("draft_app_id"));
+            localStorage.removeItem(this.draftKey("draft_step"));
             this.formData = createEmptyApplication();
             this.activePartyTab = this.formData.primary.client_key;
             this.setStep(0);
