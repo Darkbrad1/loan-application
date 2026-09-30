@@ -1,6 +1,18 @@
 <template>
   <section>
     <template v-if="show('main')">
+      <template v-if="revolving">
+        <el-form-item label="What limit would you like? (EC$)" required :error="need(draft.requested_credit_limit)">
+          <FormField
+            :model-value="draft.requested_credit_limit"
+            :property="fields.requested_credit_limit"
+            :form="draft"
+            @update:model-value="set('requested_credit_limit', $event)"
+          />
+          <small v-if="selectedProduct" class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">You can ask for {{ money(amountMinimum) }} to {{ money(amountMaximum) }}.</small>
+        </el-form-item>
+      </template>
+      <template v-else>
       <el-form-item label="How much would you like to borrow? (EC$)" required :error="need(draft.requested_loan_amount)">
         <FormField
           :model-value="draft.requested_loan_amount"
@@ -46,19 +58,20 @@
           />
         </template>
       </el-form-item>
-      <el-form-item label="What is the loan for?" required :error="need(draft.loan_purpose)">
+      </template>
+      <el-form-item :label="revolving ? 'What will you use it for?' : 'What is the loan for?'" required :error="need(draft.loan_purpose)">
         <FormField
           :model-value="draft.loan_purpose"
           :property="fields.loan_purpose"
           :form="draft"
           @update:model-value="set('loan_purpose', $event)"
         />
-        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">A sentence is enough, for example &quot;To buy a used car for work&quot;.</small>
+        <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">{{ revolving ? 'A sentence is enough, for example "Everyday spending and emergencies".' : loanCategory === 'student' ? 'A sentence is enough, for example "Tuition and books for my nursing degree".' : 'A sentence is enough, for example "To buy a used car for work".' }}</small>
       </el-form-item>
     </template>
 
     <template v-if="show('details')">
-      <template v-if="loanCategory === 'auto'">
+      <template v-if="loanCategory === 'automotive'">
         <div class="field-grid flex flex-wrap" style="column-gap:16px">
           <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="Make">
             <FormField
@@ -132,7 +145,7 @@
         </div>
       </template>
 
-      <template v-if="loanCategory === 'home'">
+      <template v-if="loanCategory === 'property'">
         <el-form-item label="Address of the property">
           <FormField
             :model-value="draft.property_address"
@@ -300,7 +313,7 @@
       </template>
 
       <!-- The business is saved as its own Party record -->
-      <template v-if="loanCategory === 'business'">
+      <template v-if="loanCategory === 'organization'">
         <el-form-item label="Business name" required :error="need(draft.business_name)">
           <FormField
             :model-value="draft.business_name"
@@ -363,6 +376,288 @@
           </el-form-item>
         </div>
       </template>
+
+      <template v-if="loanCategory === 'credit_card'">
+        <el-form-item label="Name to print on the card" required :error="need(draft.name_on_card)">
+          <FormField
+            :model-value="draft.name_on_card"
+            :property="fields.name_on_card"
+            :form="draft"
+            @update:model-value="set('name_on_card', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">As it should appear on the card, for example &quot;JANE A SMITH&quot;.</small>
+        </el-form-item>
+        <el-form-item label="How would you like to get your card?">
+          <template v-if="choices('card_collection_method')">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+              <button
+                v-for="option in choices('card_collection_method')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.card_collection_method === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                :aria-checked="draft.card_collection_method === option.value"
+                @click="set('card_collection_method', option.value)"
+              >
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.card_collection_method === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.card_collection_method"
+              :property="fields.card_collection_method"
+              :form="draft"
+              @update:model-value="set('card_collection_method', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Would you like to secure it with your savings?">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+            <button
+              v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.is_secured_by_savings === true === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :aria-checked="draft.is_secured_by_savings === true === option.value"
+              @click="set('is_secured_by_savings', option.value)"
+            >
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.is_secured_by_savings === true === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+            </button>
+          </div>
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Your savings or shares with us are held against it, which can mean a better rate.</small>
+        </el-form-item>
+        <el-form-item label="How much of your savings? (EC$)" required :error="need(draft.secured_savings_amount)" v-if="draft.is_secured_by_savings">
+          <FormField
+            :model-value="draft.secured_savings_amount"
+            :property="fields.secured_savings_amount"
+            :form="draft"
+            @update:model-value="set('secured_savings_amount', $event)"
+          />
+        </el-form-item>
+      </template>
+
+      <template v-if="loanCategory === 'overdraft'">
+        <el-form-item label="Which account is the overdraft for?" required :error="need(draft.linked_account_number)">
+          <FormField
+            :model-value="draft.linked_account_number"
+            :property="fields.linked_account_number"
+            :form="draft"
+            @update:model-value="set('linked_account_number', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The account number, from your passbook or statement.</small>
+        </el-form-item>
+        <el-form-item label="Would you like to secure it with your savings?">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+            <button
+              v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.is_secured_by_savings === true === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :aria-checked="draft.is_secured_by_savings === true === option.value"
+              @click="set('is_secured_by_savings', option.value)"
+            >
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.is_secured_by_savings === true === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+            </button>
+          </div>
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Your savings or shares with us are held against it, which can mean a better rate.</small>
+        </el-form-item>
+        <el-form-item label="How much of your savings? (EC$)" required :error="need(draft.secured_savings_amount)" v-if="draft.is_secured_by_savings">
+          <FormField
+            :model-value="draft.secured_savings_amount"
+            :property="fields.secured_savings_amount"
+            :form="draft"
+            @update:model-value="set('secured_savings_amount', $event)"
+          />
+        </el-form-item>
+      </template>
+
+      <template v-if="loanCategory === 'student'">
+        <el-form-item label="Name of the school, college, or university" required :error="need(draft.institution_name)">
+          <FormField
+            :model-value="draft.institution_name"
+            :property="fields.institution_name"
+            :form="draft"
+            @update:model-value="set('institution_name', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="Which country is it in?">
+          <FormField
+            :model-value="draft.institution_country"
+            :property="fields.institution_country"
+            :form="draft"
+            @update:model-value="set('institution_country', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="What will you study?" required :error="need(draft.program_name)">
+          <FormField
+            :model-value="draft.program_name"
+            :property="fields.program_name"
+            :form="draft"
+            @update:model-value="set('program_name', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">For example &quot;Nursing&quot; or &quot;Business administration&quot;.</small>
+        </el-form-item>
+        <el-form-item label="What level is the course?">
+          <template v-if="choices('program_level')">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+              <button
+                v-for="option in choices('program_level')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.program_level === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                :aria-checked="draft.program_level === option.value"
+                @click="set('program_level', option.value)"
+              >
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.program_level === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.program_level"
+              :property="fields.program_level"
+              :form="draft"
+              @update:model-value="set('program_level', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Student ID number (if you have one)">
+          <FormField
+            :model-value="draft.student_id_number"
+            :property="fields.student_id_number"
+            :form="draft"
+            @update:model-value="set('student_id_number', $event)"
+          />
+        </el-form-item>
+        <div class="field-grid flex flex-wrap" style="column-gap:16px">
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="When does the course start?">
+            <FormField
+              :model-value="draft.enrollment_start_date"
+              :property="fields.enrollment_start_date"
+              :form="draft"
+              @update:model-value="set('enrollment_start_date', $event, 'date')"
+            />
+          </el-form-item>
+          <el-form-item class="grid-cell" style="flex:1 1 240px;min-width:0" label="When will you finish?" required :error="need(draft.expected_graduation_date)">
+            <FormField
+              :model-value="draft.expected_graduation_date"
+              :property="fields.expected_graduation_date"
+              :form="draft"
+              @update:model-value="set('expected_graduation_date', $event, 'date')"
+            />
+          </el-form-item>
+        </div>
+        <el-form-item label="Tuition fees" required :error="need(draft.tuition_amount)">
+          <FormField
+            :model-value="draft.tuition_amount"
+            :property="fields.tuition_amount"
+            :form="draft"
+            @update:model-value="set('tuition_amount', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">The total for the course, from the school's fee letter.</small>
+        </el-form-item>
+        <el-form-item label="Which currency are the fees in?">
+          <template v-if="choices('tuition_currency')">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+              <button
+                v-for="option in choices('tuition_currency')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.tuition_currency === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                :aria-checked="draft.tuition_currency === option.value"
+                @click="set('tuition_currency', option.value)"
+              >
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.tuition_currency === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.tuition_currency"
+              :property="fields.tuition_currency"
+              :form="draft"
+              @update:model-value="set('tuition_currency', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Other costs, like books and living costs">
+          <FormField
+            :model-value="draft.other_study_costs"
+            :property="fields.other_study_costs"
+            :form="draft"
+            @update:model-value="set('other_study_costs', $event)"
+          />
+        </el-form-item>
+        <el-form-item label="How should the money be paid out?">
+          <template v-if="choices('disbursement_schedule')">
+            <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+              <button
+                v-for="option in choices('disbursement_schedule')"
+                :key="String(option.value)"
+                type="button"
+                role="radio"
+                class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+                :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.disbursement_schedule === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+                :aria-checked="draft.disbursement_schedule === option.value"
+                @click="set('disbursement_schedule', option.value)"
+              >
+                <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.disbursement_schedule === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+                <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <FormField
+              :model-value="draft.disbursement_schedule"
+              :property="fields.disbursement_schedule"
+              :form="draft"
+              @update:model-value="set('disbursement_schedule', $event)"
+            />
+          </template>
+        </el-form-item>
+        <el-form-item label="Should we pay the school directly?">
+          <div class="choice-list flex flex-col gap-3 w-full" role="radiogroup">
+            <button
+              v-for="option in [{ value: true, label: 'Yes' }, { value: false, label: 'No' }]"
+              :key="String(option.value)"
+              type="button"
+              role="radio"
+              class="choice flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base text-left"
+              :style="['min-height:56px;border-width:2px;border-style:solid;cursor:pointer;justify-content:flex-start;color:#111827;line-height:1.35', (draft.pay_to_institution === true === option.value) ? 'border-color:var(--brand);background:var(--brand-tint);box-shadow:inset 0 0 0 1px var(--brand)' : 'border-color:#d1d5db;background:#ffffff']"
+              :aria-checked="draft.pay_to_institution === true === option.value"
+              @click="set('pay_to_institution', option.value)"
+            >
+              <span class="choice-mark flex items-center justify-center rounded-full" :style="['width:26px;min-width:26px;max-width:26px;height:26px;min-height:26px;flex:0 0 26px;flex-grow:0;flex-shrink:0;align-self:center;padding:0;margin:0;box-sizing:border-box;border-width:2px;border-style:solid', (draft.pay_to_institution === true === option.value) ? 'background:var(--brand);border-color:var(--brand);color:var(--brand-ink)' : 'background:#ffffff;border-color:#d1d5db;color:transparent']"><v-icon size="16">mdi-check</v-icon></span>
+              <span class="choice-text" style="flex:1 1 auto;min-width:0;text-align:left;display:block">{{ option.label }}</span>
+            </button>
+          </div>
+        </el-form-item>
+        <el-form-item label="Months after you finish before payments start">
+          <FormField
+            :model-value="draft.grace_period_months"
+            :property="fields.grace_period_months"
+            :form="draft"
+            @update:model-value="set('grace_period_months', $event)"
+          />
+          <small class="helper block w-full mt-1 text-sm text-gray-600" style="flex:1 1 100%;line-height:1.45">Leave empty if you're not sure.</small>
+        </el-form-item>
+      </template>
+
     </template>
   </section>
 </template>
@@ -402,11 +697,32 @@ const FIELDS = [
     ["business_type", "Business type", "select", "Party", "business_type"],
     ["business_incorporation_date", "Incorporation date", "date", "Party", "incorporation_date"],
     ["business_employee_count", "Number of employees", "number", "Party", "number_of_employees"],
+    ["requested_credit_limit", "Limit (EC$)", "number", "Application", "requested_credit_limit"],
+    ["is_secured_by_savings", "Secured by savings", "checkbox", "Application", "is_secured_by_savings"],
+    ["secured_savings_amount", "Savings held against it (EC$)", "number", "Application", "secured_savings_amount"],
+    ["linked_account_number", "Account number", "input", "Application", "linked_account_number"],
+    ["name_on_card", "Name on the card", "input", "Application", "name_on_card"],
+    ["card_collection_method", "How to get the card", "select", "Application", "card_collection_method"],
+    ["institution_name", "School", "input", "Application", "institution_name"],
+    ["institution_country", "Country of the school", "select", "Application", "institution_country"],
+    ["program_name", "Course", "input", "Application", "program_name"],
+    ["program_level", "Level", "select", "Application", "program_level"],
+    ["student_id_number", "Student ID", "input", "Application", "student_id_number"],
+    ["enrollment_start_date", "Course start", "date", "Application", "enrollment_start_date"],
+    ["expected_graduation_date", "Expected finish", "date", "Application", "expected_graduation_date"],
+    ["tuition_amount", "Tuition fees", "number", "Application", "tuition_amount"],
+    ["tuition_currency", "Currency", "select", "Application", "tuition_currency"],
+    ["other_study_costs", "Other study costs", "number", "Application", "other_study_costs"],
+    ["disbursement_schedule", "Payout schedule", "select", "Application", "disbursement_schedule"],
+    ["pay_to_institution", "Pay the school directly", "checkbox", "Application", "pay_to_institution"],
+    ["grace_period_months", "Grace period (months)", "number", "Application", "grace_period_months"],
 ];
 
 /**
- * "Your request" step: amount, term, purpose, and the auto, home, or
- * business details, plus the purchase details for auto and home loans.
+ * "Your request" step: amount, term, and purpose (or, for credit cards and
+ * overdrafts, the limit), then the details for the kind of loan: vehicle,
+ * property, business, card, overdraft, or studies, plus the purchase
+ * details for auto and property loans.
  * Every input is Saturn's built-in FormField, using Saturn's own definition
  * of each property when it exists (see FIELDS for which resource).
  *
@@ -416,7 +732,14 @@ const FIELDS = [
 export default {
     props: {
         modelValue: { type: Object, default: () => ({}) },
+        /**
+         * The kind of loan: property, automotive, personal, organization,
+         * credit_card, overdraft, or student (the main form maps the
+         * LoanCategory code to this).
+         */
         loanCategory: { type: String, default: "" },
+        /** Credit cards and overdrafts: ask for a limit, not an amount and term. */
+        revolving: { type: Boolean, default: false },
         selectedProduct: { type: Object, default: null },
         lookups: { type: Object, default: () => ({}) },
         /** Saturn's property definitions for the Application resource. */
@@ -451,7 +774,7 @@ export default {
         },
 
         isPurchaseCategory() {
-            return this.loanCategory === "auto" || this.loanCategory === "home";
+            return this.loanCategory === "automotive" || this.loanCategory === "property";
         },
 
         /** The requested amount as a % of the purchase price (loan-to-value). */
