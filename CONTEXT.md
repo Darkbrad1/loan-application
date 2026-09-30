@@ -4,6 +4,10 @@ The online form people use to apply for a loan from a lender, from their own dev
 
 ## Language
 
+**Lender**:
+The organisation that offers the loans and receives the applications, such as a credit union. Each lender has its own install of the form.
+_Avoid_: Credit union, lending institution
+
 **Loan category**:
 A group of loan types that share the same screens, such as Automotive, Property, Credit card, or Student.
 _Avoid_: Loan kind

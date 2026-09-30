@@ -225,6 +225,8 @@ Facts found before this round:
 
 ➡️ Lender. It covers credit unions and anything else that lends, and it's short enough for everyday use.
 
+**Answer:** Lender.
+
 ---
 
 ❓ **Q2** - **One Saturn install per lender, or one shared**: Does each lender get its own Saturn install (its own records, logo, and settings), or do several lenders share one install?
@@ -233,6 +235,8 @@ Facts found before this round:
 - [ ] Several lenders share one install
 
 ➡️ One install per lender. Logo and colours already come from SystemConfiguration, which is one per install, and sharing would mean every record needs a lender link so applicants never see another lender's loan types.
+
+**Answer:** One install per lender.
 
 ---
 
@@ -243,6 +247,8 @@ Facts found before this round:
 
 ➡️ Grenada only for now. Other countries would need their own tax and social security rules, which is a separate piece of work.
 
+**Answer:** Grenada only for now.
+
 ---
 
 ❓ **Q4** - **Turning credit cards on or off**: Is switching the Credit card loan category to inactive enough for a lender without cards? And for a lender with cards, do the questions stay the same (name on the card, how to get it) whether it issues them itself or through a partner?
@@ -251,6 +257,8 @@ Facts found before this round:
 - [ ] A lender that issues its own cards needs extra questions
 
 ➡️ Yes to both. It needs no new setting, and the two card questions cover what either kind of issuer needs from the application.
+
+**Answer:** Yes to both.
 
 ---
 
@@ -262,6 +270,8 @@ Facts found before this round:
 
 ➡️ A field on `LoanType`. The developer controls LoanType, it needs no new resource, and a lender sets the same number on all its loan types. It also lets one loan type ask for more if a lender ever wants that.
 
+**Answer:** Keep the constant, and change it in the code for each lender.
+
 ---
 
 ❓ **Q6** - **Trading name when it's the same as the legal name**: You made trading name required. Many small businesses trade under their legal name.
@@ -272,6 +282,8 @@ Facts found before this round:
 
 ➡️ Required, with a "Same as the legal name" tick box. Staff always see a trading name, and the applicant doesn't type it twice.
 
+**Answer:** Optional; empty means the same as the legal name.
+
 ---
 
 ❓ **Q7** - **Industry answers**: `Party.industry` is text. Should the answers come from a Saturn list (for example Retail, Construction, Agriculture, Tourism, Other), or be typed?
@@ -280,6 +292,8 @@ Facts found before this round:
 - [ ] Typed
 
 ➡️ A Saturn list. Staff can then group and report by industry, which typed answers won't allow.
+
+**Answer:** Typed.
 
 ---
 
@@ -290,6 +304,8 @@ Facts found before this round:
 
 ➡️ A Saturn list, as answer cards. It's a short list, and cards are easier than typing for the people this form is for.
 
+**Answer:** Typed.
+
 ---
 
 ❓ **Q9** - **NIS card for students**: Every applicant must give an NIS number and upload the NIS card (the `applicant-all` document). A full-time student who has never worked may not have one.
@@ -299,6 +315,8 @@ Facts found before this round:
 
 ➡️ Optional when the work situation is Student. A student who has never worked can't get past the form otherwise, and the guarantor, who does give an NIS number, carries the repayment.
 
+**Answer:** Optional when the work situation is Student.
+
 ---
 
 ❓ **Q10** - **Trying again after a failed send**: With the workflow setting status, date, and number together, what happens when it fails?
@@ -307,3 +325,105 @@ Facts found before this round:
 - [ ] Something else
 
 ➡️ The first option. The applicant can fix it by pressing Send again, and the "only when it has none" rule stops double numbers.
+
+**Answer:** The first option: stays a draft, Send again reruns the workflow, a number only when there's none.
+
+
+## Round 3
+
+Facts found before this round:
+
+- The "Business name" box saves the same text into both `Party.business_name` and `Party.legal_name`.
+- The browser remembers a draft under keys starting `gccu_`, which is one lender's initials.
+- `STATUTORY_DEDUCTIONS`, `DEFAULT_COUNTRY`, and the tax bands are Grenadian, so they stay the same for every lender while all lenders are in Grenada.
+- ADR 0001 (one install per lender, lender differences in the code) is written as "proposed". Q2 below confirms its reason.
+
+❓ **Q1** - **Which settings differ per lender**: Which constants at the top of the main form does each lender set for itself?
+
+- [ ] `MINIMUM_IDENTIFICATIONS` (1 or 2)
+- [ ] `DEFAULT_REVOLVING_RATE` (the 3% used for credit cards and overdrafts when the liability type has no rate)
+- [ ] `TEST_MODE_AVAILABLE` (on while testing, off when real applicants use it)
+
+➡️ All three, grouped together at the top of the main form under a "Lender settings" heading, so setting up a new lender means changing only that block.
+
+---
+
+❓ **Q2** - **Why a code constant and not a `LoanType` field**: ADR 0001 says it keeps the lender's setup with the developer and adds no Saturn fields. Is that the reason?
+
+- [ ] Yes
+- [ ] Another reason (say which)
+
+➡️ Only you know this one, so there's no recommendation. The ADR stays "proposed" until you answer.
+
+---
+
+❓ **Q3** - **Keeping track of each lender's settings**: With one copy of the code per lender, how do we keep track of which lender has which settings?
+
+- [ ] One copy of the code in this repo, plus a table in `claude.md` listing each lender's values
+- [ ] A branch per lender
+
+➡️ One copy plus a table. A branch per lender means copying every fix into every branch.
+
+---
+
+❓ **Q4** - **The `gccu_` draft keys**: Each lender has its own web address, so the keys never clash, but they carry one lender's name. Renaming them makes browsers forget drafts saved before the change.
+
+- [ ] Rename to `loan_` now, while only test drafts exist
+- [ ] Keep `gccu_`
+
+➡️ Rename to `loan_` now. Later, real applicants would lose their place.
+
+---
+
+❓ **Q5** - **The "Business name" box**: Since trading name is optional and empty means "same as the legal name", the main box has to be the legal name.
+
+- [ ] Label it "Registered business name", saved to `legal_name` and `business_name` as now
+- [ ] Keep "Business name"
+
+➡️ "Registered business name". It tells the applicant which name to type, and makes the empty trading name mean something.
+
+---
+
+❓ **Q6** - **Industry and licence number**: You ticked both. Are they required?
+
+- [ ] Industry required, licence number required
+- [ ] Industry required, licence number optional
+- [ ] Both optional
+
+➡️ Industry required, licence number optional. Some sole traders and new businesses don't have a licence number yet, and blocking them loses real applicants.
+
+---
+
+❓ **Q7** - **The business's share of the loan**: On a business loan, the Business Borrower has no `ownership_percentage` set. The Primary Applicant gets the whole 100%, as if they were borrowing personally.
+
+- [ ] Business Borrower 100%; the people on the application 0% (a director who backs the loan personally is added as a Guarantor)
+- [ ] Business Borrower and the Primary Applicant split it
+
+➡️ Business Borrower 100%, people 0%. The business owes the money, and personal backing already has its own role.
+
+---
+
+❓ **Q8** - **Exactly what "optional NIS for students" covers**: Restated precisely. When a person's work situation is Student, the NIS number and the NIS card upload are both optional, and their NIS deduction is 0. If they do give a number, the form checks it the same way as for anyone else.
+
+- [ ] That's right
+- [ ] Not quite (say what's different)
+
+➡️ That's right.
+
+---
+
+❓ **Q9** - **A loan type retired while someone's draft uses it**: An applicant saves a draft for "Auto loan, 5 years", staff then set its status to something other than Active, and the applicant comes back.
+
+- [ ] They keep it and can send the application; staff decide
+- [ ] They're told it's no longer offered and must pick another loan type
+
+➡️ They keep it and can send. They chose it while it was offered, and staff can still turn it down.
+
+---
+
+❓ **Q10** - **A loan category with no active loan types**: Today it still shows as a box on the first step, and picking it leads nowhere.
+
+- [ ] Hide it
+- [ ] Show it, greyed out, with "Not available right now"
+
+➡️ Hide it. An applicant can't do anything with it.
