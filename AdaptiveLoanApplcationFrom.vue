@@ -303,7 +303,7 @@
                         :disabled="saving || documentsLoading"
                         @click="next"
                     >
-                        <v-icon v-if="saving" size="22" class="spin">mdi-loading</v-icon>
+                        <v-progress-circular v-if="saving" indeterminate size="20" width="3" />
                         {{ saving ? 'Saving' : 'Continue' }}
                         <v-icon v-if="!saving" size="22">mdi-arrow-right</v-icon>
                     </button>
@@ -314,7 +314,7 @@
                         :disabled="saving"
                         @click="submit"
                     >
-                        <v-icon v-if="saving" size="22" class="spin">mdi-loading</v-icon>
+                        <v-progress-circular v-if="saving" indeterminate size="20" width="3" />
                         {{ saving ? 'Sending' : 'Send my application' }}
                         <v-icon v-if="!saving" size="22">mdi-send</v-icon>
                     </button>
@@ -825,6 +825,9 @@ export default {
             // save or restore. Anything in here that's no longer in the form
             // was removed by the applicant and is deleted on the next save.
             persistedIds: {},
+            // What was last written to each record, keyed by resource, ID,
+            // and the fields sent, so an unchanged record isn't sent again.
+            savedPayloads: {},
 
             // Saturn's own field definitions, so the steps can render them
             // with Saturn's FormField. applicationProps is the Application
@@ -5119,7 +5122,7 @@ export default {
             if (this.loanKind !== "organization" || !form.business_name) {
                 return null;
             }
-            form.business_party_id = await this.upsert("Party", form.business_party_id, {
+            const businessSave = await this.saveRecord("Party", form.business_party_id, {
                 kind: "ORGANIZATION",
                 legal_name: form.business_name,
                 trading_name: form.business_trading_name,
@@ -5131,6 +5134,7 @@ export default {
                 incorporation_date: form.business_incorporation_date || null,
                 number_of_employees: form.business_employee_count,
             });
+            form.business_party_id = businessSave.id;
             const payload = {
                 party: this.toId(form.business_party_id),
                 role: BUSINESS_BORROWER_ROLE,
@@ -5143,11 +5147,13 @@ export default {
                 number_of_employees: form.business_employee_count,
                 annual_revenue: form.business_annual_revenue,
             };
+            const businessChanged = businessSave.wrote;
             const isNew = !this.toId(form.business_application_party_id);
             form.business_application_party_id = await this.upsert(
                 "ApplicationParty",
                 form.business_application_party_id,
                 payload,
+                { force: businessChanged && !isNew },
             );
             // Saturn fills ApplicationParty.partysnapshot when a link is
             // updated, not when it's created. People's links are always
@@ -5158,6 +5164,7 @@ export default {
                     "ApplicationParty",
                     form.business_application_party_id,
                     payload,
+                    { force: true },
                 );
             }
             return form.business_application_party_id;
@@ -5366,15 +5373,33 @@ export default {
          * the server's reply, and rethrown with the resource's name, so a
          * failed save says which record it was.
          */
-        async upsert(resourceName, id, fullPayload) {
+        async upsert(resourceName, id, fullPayload, options = {}) {
+            const result = await this.saveRecord(resourceName, id, fullPayload, options);
+            return result.id;
+        },
+
+        /**
+         * Does the work for upsert() and returns { id, wrote }, where wrote
+         * is false when the record was unchanged and nothing was sent.
+         */
+        async saveRecord(resourceName, id, fullPayload, options = {}) {
             const resource = new Resource(this, resourceName);
             const action = id ? "updating" : "creating";
             const payload = this.withoutEmptyValues(fullPayload);
+            const snapshot = JSON.stringify(payload);
 
             try {
                 if (id) {
+                    // Nothing changed since this form last wrote these fields:
+                    // skip the request. (force: always send, e.g. to make a
+                    // Saturn workflow that runs on update run again.)
+                    const cacheKey = this.payloadCacheKey(resourceName, id, payload);
+                    if (!options.force && this.savedPayloads[cacheKey] === snapshot) {
+                        return { id: this.toId(id), wrote: false };
+                    }
                     await resource.update(this.toId(id), payload);
-                    return this.toId(id);
+                    this.savedPayloads[cacheKey] = snapshot;
+                    return { id: this.toId(id), wrote: true };
                 }
 
                 const result = await resource.create(payload);
@@ -5405,7 +5430,9 @@ export default {
                         `the server didn't return a record ID (reply: ${JSON.stringify(result).slice(0, 300)})`,
                     );
                 }
-                return createdId;
+                this.savedPayloads[this.payloadCacheKey(resourceName, createdId, payload)] =
+                    snapshot;
+                return { id: createdId, wrote: true };
             } catch (error) {
                 console.error(
                     `[Loan form] Failed ${action} ${resourceName}`,
@@ -5417,6 +5444,15 @@ export default {
                 failure.cause = error;
                 throw failure;
             }
+        },
+
+        /**
+         * Key for savedPayloads: the resource, the record ID, and the names
+         * of the fields sent (a record can be saved with different sets of
+         * fields, e.g. an ApplicationParty and then just its income_ids).
+         */
+        payloadCacheKey(resourceName, id, payload) {
+            return `${resourceName}:${this.toId(id)}:${Object.keys(payload).sort().join(",")}`;
         },
 
         /**
@@ -5487,32 +5523,43 @@ export default {
             // The Party is saved first: PartyIdentification requires the
             // party it belongs to, so it can't be created before the Party
             // exists. Party.ids is then filled in once the IDs are saved.
-            person.party_id = await this.upsert(
+            const partySave = await this.saveRecord(
                 "Party",
                 person.party_id,
                 this.partyPayload(person),
             );
+            person.party_id = partySave.id;
+            // When the person's details changed, the link is saved again even
+            // if it hasn't changed, so Saturn refreshes its partysnapshot.
+            let partyChanged = partySave.wrote;
 
             // Third Party Owners give no identification, so their IDs are
             // skipped (any saved earlier under another role are left alone).
             if (!isPrimary && this.isThirdPartyOwner(person)) {
-                return this.saveApplicationParty(person, isPrimary);
+                return this.saveApplicationParty(person, isPrimary, partyChanged);
             }
 
-            for (const row of person.identifications || []) {
-                row.id = await this.upsert(
-                    "PartyIdentification",
-                    row.id,
-                    this.identificationPayload(row, person.party_id),
-                );
-            }
+            const identificationSaves = await Promise.all(
+                (person.identifications || []).map((row) =>
+                    this.saveRecord(
+                        "PartyIdentification",
+                        row.id,
+                        this.identificationPayload(row, person.party_id),
+                    ),
+                ),
+            );
+            identificationSaves.forEach((saved, index) => {
+                person.identifications[index].id = saved.id;
+                partyChanged = partyChanged || saved.wrote;
+            });
 
             // Link the identifications back onto the Party.
-            await this.upsert("Party", person.party_id, {
+            const idsSave = await this.saveRecord("Party", person.party_id, {
                 ids: (person.identifications || [])
                     .map((row) => this.toId(row.id))
                     .filter(Boolean),
             });
+            partyChanged = partyChanged || idsSave.wrote;
 
             // Delete identifications removed since the last save. Party
             // records are shared across applications, so only IDs the
@@ -5532,11 +5579,14 @@ export default {
             }
             person.saved_identification_ids = currentIds.concat(failedIds);
 
-            return this.saveApplicationParty(person, isPrimary);
+            return this.saveApplicationParty(person, isPrimary, partyChanged);
         },
 
-        /** Saves the ApplicationParty link for one applicant and returns its ID. */
-        async saveApplicationParty(person, isPrimary) {
+        /**
+         * Saves the ApplicationParty link for one applicant and returns its
+         * ID. force: send it even if unchanged (the person's Party changed).
+         */
+        async saveApplicationParty(person, isPrimary, force = false) {
             const applicationPartyPayload = this.applicationPartyPayload(
                 person,
                 isPrimary,
@@ -5545,6 +5595,7 @@ export default {
                 "ApplicationParty",
                 person.application_party_id,
                 applicationPartyPayload,
+                { force: force && Boolean(person.application_party_id) },
             );
 
             // Keep the local consent metadata in sync with what was saved.
@@ -5567,17 +5618,19 @@ export default {
         async saveIncomes(person, isPrimary) {
             const incomes =
                 !isPrimary && this.isThirdPartyOwner(person) ? [] : person.incomes || [];
-            for (const income of incomes) {
-                income.id = await this.upsert("IncomeSource", income.id, {
-                    application_party: this.toId(person.application_party_id),
-                    income_type: income.income_type,
-                    description: income.description,
-                    amount: income.amount,
-                    frequency: income.frequency,
-                    monthly_equivalent: monthlyAmount(income.amount, income.frequency),
-                    documents: this.documentIdsOf(income),
-                });
-            }
+            await Promise.all(
+                incomes.map(async (income) => {
+                    income.id = await this.upsert("IncomeSource", income.id, {
+                        application_party: this.toId(person.application_party_id),
+                        income_type: income.income_type,
+                        description: income.description,
+                        amount: income.amount,
+                        frequency: income.frequency,
+                        monthly_equivalent: monthlyAmount(income.amount, income.frequency),
+                        documents: this.documentIdsOf(income),
+                    });
+                }),
+            );
             await this.upsert(
                 "ApplicationParty",
                 person.application_party_id,
@@ -5624,11 +5677,14 @@ export default {
                 status: "Active",
             };
 
-            row.id = await this.upsert(
+            const responsibilitySave = await this.saveRecord(
                 "LiabilityResponsibility",
                 row.id,
                 payload,
             );
+            row.id = responsibilitySave.id;
+            // Unchanged since it was last saved and checked.
+            if (!responsibilitySave.wrote) return;
 
             const saved = this.recordOf(
                 await new Resource(this, "LiabilityResponsibility").get(row.id),
@@ -5832,22 +5888,30 @@ export default {
             // requires it. If the applicant switched to an unsecured loan,
             // deleteStaleRecords() removes any collateral saved earlier.
             // Projected insurance expenses are saved after their collateral.
-            for (const asset of this.formData.assets) {
-                assetIds.push(await this.saveAsset(asset));
+            // Each asset, liability, and expense is independent, so they're
+            // saved side by side (each asset's own records stay in order).
+            const saveAssetChain = async (asset) => {
+                const assetId = await this.saveAsset(asset);
+                let projectedId = null;
                 if (this.isCollateral(asset)) {
                     await this.saveCollateral(asset);
-                    const projectedId = await this.saveProjectedInsurance(asset);
-                    if (projectedId) expenseIds.push(projectedId);
+                    projectedId = await this.saveProjectedInsurance(asset);
                 } else {
                     asset.collateral.projected_expense_id = null;
                 }
-            }
-            for (const liability of this.formData.liabilities) {
-                liabilityIds.push(await this.saveLiability(liability));
-            }
-            for (const expense of this.formData.expenses) {
-                expenseIds.push(await this.saveExpense(expense));
-            }
+                return { assetId, projectedId };
+            };
+            const results = await Promise.all([
+                Promise.all(this.formData.assets.map(saveAssetChain)),
+                Promise.all(this.formData.liabilities.map((liability) => this.saveLiability(liability))),
+                Promise.all(this.formData.expenses.map((expense) => this.saveExpense(expense))),
+            ]);
+            results[0].forEach((result) => {
+                assetIds.push(result.assetId);
+                if (result.projectedId) expenseIds.push(result.projectedId);
+            });
+            results[1].forEach((id) => liabilityIds.push(id));
+            results[2].forEach((id) => expenseIds.push(id));
 
             return { assetIds, liabilityIds, expenseIds };
         },
@@ -6016,13 +6080,14 @@ export default {
 
             try {
                 // 1. Persist parties and application-parties FIRST
-                const partyLinks = [];
-                partyLinks.push(
-                    await this.saveApplicant(this.formData.primary, true),
+                // Each person is saved side by side.
+                const partyLinks = await Promise.all(
+                    [this.saveApplicant(this.formData.primary, true)].concat(
+                        this.formData.parties.map((person) =>
+                            this.saveApplicant(person, false),
+                        ),
+                    ),
                 );
-                for (const person of this.formData.parties) {
-                    partyLinks.push(await this.saveApplicant(person, false));
-                }
 
                 // The business on a business loan is its own Party, joined
                 // through a "Business Borrower" ApplicationParty.
@@ -6043,8 +6108,12 @@ export default {
                 );
 
                 // 4. Save financials and references (these need this.formData.id)
-                const financials = await this.saveFinancials();
-                const referenceIds = await this.saveReferences();
+                const saved = await Promise.all([
+                    this.saveFinancials(),
+                    this.saveReferences(),
+                ]);
+                const financials = saved[0];
+                const referenceIds = saved[1];
 
                 // Link them back to the application
                 await this.upsert("Application", this.formData.id, {
@@ -6836,6 +6905,7 @@ export default {
             this.answers = { others: null, assets: null, debts: null, bills: null };
             this.pendingDraftStep = null;
             this.persistedIds = {};
+            this.savedPayloads = {};
             this.receipt = null;
             this.alert = { text: "", type: "warning" };
             this.documentState = {};
