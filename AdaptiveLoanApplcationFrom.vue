@@ -6763,14 +6763,14 @@ export default {
                 const resource = new Resource(this, "Application");
 
                 // Submit workflow: sets the status, date, and number.
-                await new Resource(this).request(
+                const workflowReply = await new Resource(this).request(
                     "post",
                     `/workflows/execute/MXHGYH/${this.formData.id}`,
                 );
 
                 // Confirm the server persisted the submitted status, waiting
                 // briefly for the workflow to assign the reference number.
-                const saved = await this.waitForApplicationNumber(
+                const saved = await this.waitForSubmission(
                     resource,
                     this.formData.id,
                 );
@@ -6778,6 +6778,11 @@ export default {
                     !saved ||
                     String(saved.status || "").toLowerCase() !== "submitted"
                 ) {
+                    console.error("[Loan form] Submission not verified", {
+                        workflowReply,
+                        status: saved?.status,
+                        application_number: saved?.application_number,
+                    });
                     throw Error("Submission not verified");
                 }
 
@@ -6800,15 +6805,22 @@ export default {
         },
 
         /**
-         * Re-reads the application until the submit workflow has assigned
-         * application_number, in case the workflow finishes after its request
-         * returns. Returns the latest record either way.
+         * Re-reads the application until the submit workflow has finished:
+         * the status is "submitted" and application_number is set. The
+         * workflow writes the number before the status (and on a retry the
+         * number is already there), so waiting for the number alone can
+         * stop too early. Returns the latest record either way.
          */
-        async waitForApplicationNumber(resource, id, attempts = 5, delayMs = 1000) {
+        async waitForSubmission(resource, id, attempts = 10, delayMs = 1000) {
             let saved = null;
             for (let attempt = 0; attempt < attempts; attempt++) {
                 saved = this.recordOf(await resource.get(id));
-                if (saved?.application_number) return saved;
+                if (
+                    saved?.application_number &&
+                    String(saved.status || "").toLowerCase() === "submitted"
+                ) {
+                    return saved;
+                }
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
             return saved;
