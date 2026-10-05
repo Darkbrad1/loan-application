@@ -310,10 +310,25 @@ A Party can be a person or a business, so Party keeps its business fields.
 
 - **September 2026 design session** (full list in `docs/grilling/2026-09-30-loan-intake-gaps.md`): one install per lender; credit cards are switched on or off per lender by the Credit card category, with the same card questions for all; the student loan always needs a guarantor; guarantors get 0% of the loan; on business loans the person applying stays Primary Applicant; the number of IDs is set per loan type; input boxes stay `FormField`; uploads keep our own card; the submit workflow sets status, date, and number together; the top tax rate stays 30% until IRD confirms.
 
+- **Public applicant form, October 2026 (planned, not built yet; don't start until the developer says go).** Applicants fill in the form themselves on a public "apply" page:
+  - **No Saturn logins for applicants** (Saturn supports it, but it isn't allowed). The page is public and uses `pageHttp` with saved Requests and Secrets; the browser never sees the bearer token.
+  - **Applicants start their own application.** No staff invite and no one-time code (too cumbersome). Spam guards that add no steps: a hidden honeypot field, nothing created until the Applicants step is left (as today), limits in the start step, and cleanup of expired drafts.
+  - **Option A, one gateway Path** (`loan_intake`, a Saturn HTTP WorkflowTrigger → workflow action → Code operators). The form keeps its save, restore, and delete logic; `Resource` is swapped for a helper with the same methods that sends `{ application, token, op, resource, id, data }`. Uploads (`loan_upload`) and submit (`loan_submit`) get their own Paths; the submit logic becomes a reusable command.
+  - **Every Path checks everything itself,** because `/api/_paths/...` answers without a login: token, expiry, status Draft, allowed resource, the ID is in the application's own list (`intake_record_ids`), and staff-only fields (`status`, `application_number`, `submitted_at`, `interest_rate`, `interest_rate_type`, token fields) are stripped. The start step never looks up existing Parties. Errors come back as `{"status":"FAILURE"}`, often with HTTP 200.
+  - **Link token:** `randomBytes(32)`, stored only as a SHA-256 hash (`access_token_hash`), compared with `timingSafeEqual`, **valid 30 days** (`access_token_expires_at`), cleared on submit. Kept in `localStorage` for resuming; a "Finish later" button and submitting remove it from the browser.
+  - **Resume link by email,** sent by a Saturn workflow from the server-side start step (never from the browser). The address is shown back to the applicant before sending. The workflow ID goes in a marked placeholder (`WORKFLOW_ACTIONS.resumeLinkEmail`, next to `submit: "MXHGYH"`).
+  - **Public only:** staff won't keep a separate logged-in version of the form.
+  - **The API key** belongs to a limited User Group, not an admin.
+  - Background and concepts: `docs/learn.md`.
+
 ### Decisions still waiting on the developer
 
 1. **Income tax rates:** the form uses 10% for the middle band and 30% for the top band. A 2022 World Bank paper says the top rate was cut to 28% in 2019. Keep 30% until the Inland Revenue Division confirms.
 2. **AML and declaration questions:** confirm the set with the compliance officer.
+3. **Public form, largest upload a Path accepts:** unknown. Base64 adds about 33%; test a real 5–10 MB scan through a test-only Path.
+4. **Public form, what a failing Path returns to the page** (a `throw` in a Code operator): unknown. Check the Network tab on the MediPal page with a made-up link. Until then, handle both an HTTP error and `{"status":"FAILURE"}`.
+5. **Public form, does saving restart the 30-day clock?** Suggested yes.
+6. **Public form, data-protection sign-off** before going live: who approves it.
 
 ### Next up
 
@@ -333,4 +348,4 @@ Valuations and appraisals (including the minimum required value, and vehicle app
 
 - **Students and the NIS number:** the NIS number is asked on the ID screen, before the work situation, so a student who hasn't chosen "Student" yet is still asked for it. It becomes optional once "Student" is chosen.
 - **Changing an item's type** after uploading leaves the old document linked.
-- **Drafts only resume in the same browser.** Cross-device resume would need an emailed link or a login.
+- **Drafts only resume in the same browser.** Cross-device resume would need an emailed link or a login. (The planned public form fixes this with the emailed resume link.)
