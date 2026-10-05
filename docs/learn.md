@@ -93,7 +93,7 @@ Give every key, user and process **only the permissions it needs**. Then a mista
 
 Anything public will eventually be scripted: spam, guessing, oversized uploads.
 - **Rate limiting**: cap requests per IP or per token.
-- **CAPTCHA or a one-time code**: proves a human (and a real email address or phone) is behind a new application. Needed because applicants start applications on the public "apply" page, so anyone can call the start Path.
+- **Bot checks that don't slow people down**: anyone can start an application on the public "apply" page, so bots can too. A *honeypot* is a hidden field people never see but bots fill in; the server drops anything that fills it. A CAPTCHA or one-time code would block more, but was turned down to keep the form easy for anyone.
 - **Cleanup**: abandoned drafts pile up; expire them and remove or archive them on a schedule.
 - **Upload limits**: check file type and size on the server.
 - **Kill switch**: a WorkflowTrigger's `status` can be set to inactive to switch a Path off at once.
@@ -187,6 +187,12 @@ Read: [Vue, props](https://vuejs.org/guide/components/props.html) · [Vue, lifec
 ### 19. localStorage is not security
 
 `localStorage` stays in one browser on one device, and the user can read and change it. It's fine for convenience (remembering a draft or a step) but never for deciding access. MediPal's "link already used" flag only hides the buttons in that one browser. The server's record is what counts.
+
+Keeping a **secret** there (like the applicant's link token) is a different question. The main risks:
+- **Shared devices.** The next person on a family phone or a cyber-café computer opens the page and lands in the draft.
+- **Any script on the same site can read it**, including code from another custom page on the same Saturn address, a bad library, or a cross-site scripting (XSS) bug.
+
+What keeps the risk acceptable: the token only opens one draft, it expires, it stops working on submit, and a "Finish later" button lets the applicant remove it from the browser.
 
 Read: [MDN, localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
 
