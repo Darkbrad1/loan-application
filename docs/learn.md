@@ -93,7 +93,8 @@ Give every key, user and process **only the permissions it needs**. Then a mista
 
 Anything public will eventually be scripted: spam, guessing, oversized uploads.
 - **Rate limiting**: cap requests per IP or per token.
-- **CAPTCHA**: proves a human is there. Not needed while staff start every application.
+- **CAPTCHA or a one-time code**: proves a human (and a real email address or phone) is behind a new application. Needed because applicants start applications on the public "apply" page, so anyone can call the start Path.
+- **Cleanup**: abandoned drafts pile up; expire them and remove or archive them on a schedule.
 - **Upload limits**: check file type and size on the server.
 - **Kill switch**: a WorkflowTrigger's `status` can be set to inactive to switch a Path off at once.
 
