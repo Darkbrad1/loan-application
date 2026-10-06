@@ -152,7 +152,9 @@ A **Path** is configuration, not backend code:
 - **Built-in operators**: `property_updater` (update a record), `send_email`, `upload_to_cloud`/`save_to_cloud`.
 - **Errors**: `throw new Error("…")` stops the action. Check how the page receives it.
 
-**Check yourself:** if every action is reachable without a login, where must the token check live?
+**Check yourself:** Saturn needs the bearer token to run a Path, but the public page lets any visitor use it. So where must the applicant's token check live?
+
+**Reading Saturn's replies:** without a bearer token, Saturn answers `Route not found` for every route, even real ones like `/api/applications`. So "Route not found" without a token doesn't prove the route is missing.
 
 ### 16. Document databases (Couchbase)
 
