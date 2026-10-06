@@ -325,8 +325,8 @@ A Party can be a person or a business, so Party keeps its business fields.
 
 1. **Income tax rates:** the form uses 10% for the middle band and 30% for the top band. A 2022 World Bank paper says the top rate was cut to 28% in 2019. Keep 30% until the Inland Revenue Division confirms.
 2. **AML and declaration questions:** confirm the set with the compliance officer.
-3. **Public form, largest upload a Path accepts:** unknown. Base64 adds about 33%; test a real 5–10 MB scan through a test-only Path.
-4. **Public form, what a failing Path returns to the page** (a `throw` in a Code operator): unknown. Check the Network tab on the MediPal page with a made-up link. Until then, handle both an HTTP error and `{"status":"FAILURE"}`.
+3. **Public form, request size (tested 6 Oct 2026 on `apply-intake-test`):** `pageHttp` requests up to **32 KB** worked; **64 KB and up** failed fast with HTTP 400 `{"status":"FAILURE","message":"Page HTTP request failed"}`. So documents can't go through `pageHttp` as base64; uploads need another route (to be decided). Paths themselves accept multipart files (`_flow._file`), but calling `/api/_paths/...` needs the bearer token, which a browser can't be given.
+4. **Public form, do Paths return results? Probably not.** The echo test only ever returned `{"status":"SUCCESS","type":"single"}`, never the Code step's return value, which matches Saturn's own note that an HTTP trigger "responds as soon as the event is dispatched; it does not wait for the workflow to finish". If confirmed, Paths can write but can't send data back to the page (restoring drafts, new record IDs, "invalid link"), and Option A needs a different way to read. Still to check: the Test failure output, and the workflow's System Logs to confirm it ran and received the payload.
 5. **Public form, does saving restart the 30-day clock?** Suggested yes.
 6. **Public form, data-protection sign-off** before going live: who approves it.
 
