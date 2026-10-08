@@ -145,7 +145,9 @@ Choose loan → Applicants → Your request → Assets → Liabilities → Expen
 
 ## Document uploads
 
-Requirements come from Saturn **AttachmentGroups** named `<kind>-<name>`. A group named `<kind>-all` applies to every item of that kind.
+Requirements come from Saturn **AttachmentGroups** named `<kind>-<name>`. A group named `<kind>-all` applies to every item of that kind. Matching ignores case and spaces around the dash ("Asset - all" = `asset-all`), but the name must match the type or loan name exactly.
+
+Groups that don't follow this pattern are ignored by the form. **"All loan types" is used elsewhere in Saturn, not by the form, so leave it alone.**
 
 |Group label|Applies to|
 |---|---|
